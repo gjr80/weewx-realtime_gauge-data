@@ -5,7 +5,7 @@ Gauges.
 
 Pre-Requisites
 
-The Realtime gauge-data extension requires weewx v3.x.y or greater.
+The Realtime gauge-data extension requires weewx v3.4.0 or greater.
 
 Installation Instructions
 
@@ -37,7 +37,7 @@ gauge-data releases page (https://github.com/gjr80/weewx-realtime_gauge-data
 a directory accessible from the weewx machine.
 
     wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
-/releases/download/v0.1.0/rtgd-0.1.0.tar.gz
+/releases/download/v0.2.0/rtgd-0.2.0.tar.gz
 
 	where $DOWNLOAD_ROOT is the path to the directory where the Realtime 
     gauge-data extension is to be downloaded.  
@@ -53,15 +53,15 @@ a directory accessible from the weewx machine.
 3.  Install the Realtime gauge-data extension downloaded at step 1 using the 
 *wee_extension* utility:
 
-    wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.1.0.tar.gz
+    wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.2.0.tar.gz
 
     This will result in output similar to the following:
 
-        Request to install '/var/tmp/rtgd-0.1.0.tar.gz'
-        Extracting from tar archive /var/tmp/rtgd-0.1.0.tar.gz
+        Request to install '/var/tmp/rtgd-0.2.0.tar.gz'
+        Extracting from tar archive /var/tmp/rtgd-0.2.0.tar.gz
         Saving installer file to /home/weewx/bin/user/installer/Rtgd
         Saved configuration dictionary. Backup copy at /home/weewx/weewx.conf.20161123124410
-        Finished installing extension '/var/tmp/rtgd-0.1.0.tar.gz'
+        Finished installing extension '/var/tmp/rtgd-0.2.0.tar.gz'
 
 4. Start weewx:
 
@@ -85,14 +85,14 @@ gauge-data releases page (https://github.com/gjr80/weewx-realtime_gauge-data
 a directory accessible from the weewx machine.
 
     wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
-/releases/download/v0.1.0/rtgd-0.1.0.tar.gz
+/releases/download/v0.2.0/rtgd-0.2.0.tar.gz
 
 	where $DOWNLOAD_ROOT is the path to the directory where the Realtime 
     gauge-data extension is to be downloaded.  
 
 2.  Unpack the extension as follows:
 
-    tar xvfz rtgd-0.1.0.tar.gz
+    tar xvfz rtgd-0.2.0.tar.gz
 
 3.  Copy files from within the resulting folder as follows:
 

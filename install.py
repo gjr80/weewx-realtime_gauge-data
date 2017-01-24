@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.1.0                                        Date: 10 January 2017
+# Version: 0.2.0                                        Date: 24 January 2017
 #
 # Revision History
+#  24 January 2017      v0.2.0
+#       - updated weewx.conf options
 #  10 January 2017      v0.1.0
 #       - initial implementation
 #
@@ -24,7 +26,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.1.0"
+RTGD_VERSION = "0.2.0"
 
 def loader():
     return RtgdInstaller()
@@ -46,9 +48,10 @@ class RtgdInstaller(ExtensionInstaller):
             config={
                 'RealtimeGaugeData': {
                     'date_format': '%Y.%m.%d %H:%M',
-                    'period': '10',
-                    'nth_loop': '4',
-                    'rtgd_path_file': '/home/weewx/public_html/gauge-data.txt',
+                    'min_interval': '9',
+                    'rtgd_path': '/home/weewx/public_html',
+                    'windrose_points': '16',
+                    'windrose_period': '86400',
                     'Calculate': {
                         'atc': '0.8',
                         'nfac': '2',

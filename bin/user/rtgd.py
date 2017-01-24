@@ -1,6 +1,6 @@
 # rtgd.py
 #
-# A weewx service to generate a loop based realtime gauge-data.txt.
+# A weewx service to generate a loop based gauge-data.txt.
 #
 # Copyright (C) 2017 Gary Roderick                  gjroderick<at>gmail.com
 #
@@ -17,16 +17,27 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.1.2                                      Date: 19 January 2017
+# Version: 0.2.0                                      Date: 24 January 2017
 #
 # Revision History
-#  19 January 2017    v0.1.2  - fix error that occurred when stations do not 
-#                               emit radiation
-#  18 January 2017    v0.1.1  - better handles loop observations that are None
-#  3 January 2017     v0.1    - initial release
+#  24 January 2017      v0.2.0  - now runs in a thread to eliminate blocking
+#                                 impact on weewx
+#                               - now calculates WindRoseData
+#                               - now calculates pressL and pressH
+#                               - frequency of generation is now specified by
+#                                 a single config option min_interval
+#                               - gauge-data.txt output path is now specified
+#                                 by rtgd_path config option
+#                               - added config options for windrose period and
+#                                 number of compass points to be generated
+#  19 January 2017      v0.1.2  - fix error that occurred when stations do not
+#                                 emit radiation
+#  18 January 2017      v0.1.1  - better handles loop observations that are None
+#  3 January 2017       v0.1.0  - initial release
 #
-"""A weewx service to generate a loop based gauge-data.txt to allow the
-SteelSeries Weather Gauges to be updated in near real time.
+"""A weewx service to generate a loop based gauge-data.txt.
+
+Used to update the SteelSeries Weather Gauges in near real time.
 
 Inspired by crt.py v0.5 by Matthew Wall, a weewx service to emit loop data to
 file in Cumulus realtime format. Refer http://wiki.sandaysoft.com/a/Realtime.txt
@@ -45,95 +56,77 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Date format to be used in gauge-data.txt. Default is %Y.%m.%d %H:%M
     date_format = %Y.%m.%d %H:%M
 
-    # To ease processor load, gauge-data.txt can be generated less often than
-    # on every loop packet. Generation can occur on:
-    # - the next loop packet x seconds after the last generation
-    # - on every nth loop packet.
-    #
-    # For example, to generate every 15 seconds use period = 15. Note that
-    # generation will not occur every 15 seconds, but rather it will occur on
-    # the next loop packet once 15 seconds has past since the last generation.
-    #
-    # To generate on every 3rd loop packet use nth_loop = 3. This will cause
-    # gauge-data.txt to be generated on every 3rd loop packet.
-    #
-    # If both period and nth_loop are non-zero then generation will occur on
-    # whichever condition occurs first, eg if loop packets are 2.5 sec apart
-    # setting period = 15 and nth_loop = 3 will result in generation on every
-    # 3rd loop packet (ie every 7.5 seconds), the period setting will have no
-    # effect. Under the same settings, if loop packets occurred every 10 sec,
-    # generation would occur every 20 sec (ie the first loop packet 15 seconds
-    # after the last generation). In this case nth_loop would have no effect.
-    #
-    # Default settings are period = 0 and nth_loop = 0 which results in
-    # generation on every loop packet.
-    #
-    period = 10
-    nth_loop = 4
+    # Ideally gauge-data.txt would be generated on receipt of every loop packet
+    # (there is no point in generating more frequently than this); however, in
+    # some cases the user may wish to generate gauge-data.txt less frequently.
+    # The min_interval option sets the minimum time between successive
+    # gauge-data.txt generations. Generation will always happen upon receipt of
+    # a loop packet; however, generation will be skipped unless min_interval
+    # seconds have elapsed since the last generation. If min_interval is 0 or
+    # omitted generation will occur on every loop packet (as will be the case
+    # if min_interval < station loop period)
 
-    # Path to gauge-data.txt
-    rtgd_path_file = /home/weewx/public_html/gauge-data.txt
+    min_interval = 9.5
 
-    # Parameters to be used for calculated fields. At present only maxSolarRad
-    # is supported. If omitted then any equivalent settings under
-    # [StdWxCalculate] will be used or failing this maxSolarRad will be
-    # calculated using the Ryan-Stolzenbach algorithm with atc=0.8.
-    # Unfortunately the maxSolarRad calculations settings are not documented
-    # other than in wxformaulas.py under def solar_rad_RS() and
-    # def solar_rad_Bras().
-    #
-    # Note the pyephem module must be installed in order to calculate
-    # maxSolarRad.
-    #
-    # Default settings are to use the Ryan-Stolzenbach algorithm with atc=0.8.
-    # This should suit most users.
+    # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
+    # empty default is HTML_ROOT. If setting omitted altogether default is
+    # /var/tmp
+    rtgd_path = ss
+
+    # Number of compass points to include in WindRoseData, normally 8 or 16.
+    # Defaults to 16
+    windrose_points = 16
+
+    # Period over which to calculate WindRoseData in seconds. Defaults
+    # to 86400 (24 hours)
+    windrose_period = 86400
+
+    # Parameters used in/required by rtgd calculations
     [[Calculate]]
+        # atmospheric transmission coefficient [0.7-0.91]
         atc = 0.8
+        # atmospheric turbidity (2=clear, 4-5=smoggy)
         nfac = 2
         [[[Algorithm]]]
+            # theoretical max solar radiation algorithm to use. Must be RS
+            # or Bras
             maxSolarRad = RS
 
 
-    # Format codes for numeric values included in gauge-data.txt.
-    # Structure/codes are identical to those used in skin.conf/weewx.conf.
     [[StringFormats]]
         # String formats
-        degree_C           = %.1f
-        degree_F           = %.1f
-        degree_compass     = %.0f
-        hPa                = %.1f
-        inHg               = %.3f
-        inch               = %.2f
-        inch_per_hour      = %.2f
-        km_per_hour        = %.0f
-        km                 = %.1f
-        knot               = %.0f
-        mbar               = %.1f
-        meter              = %.0f
-        meter_per_second   = %.1f
-        mile_per_hour      = %.0f
-        mile               = %.1f
-        mm                 = %.1f
-        mm_per_hour        = %.1f
-        percent            = %.0f
-        uv_index           = %.1f
+        degree_C = %.1f
+        degree_F = %.1f
+        degree_compass = %.0f
+        hPa = %.1f
+        inHg = %.3f
+        inch = %.2f
+        inch_per_hour = %.2f
+        km_per_hour = %.0f
+        km = %.1f
+        knot = %.0f
+        mbar = %.1f
+        meter = %.0f
+        meter_per_second = %.1f
+        mile_per_hour = %.0f
+        mile = %.1f
+        mm = %.1f
+        mm_per_hour = %.1f
+        percent = %.0f
+        uv_index = %.1f
         watt_per_meter_squared = %.0f
 
-    # Units to be used in gauge-data.txt. Structure/codes are identical to
-    # those used in skin.conf/weewx.conf. Note that not all weewx units are
-    # supported by the SteelSeries Weather Gauges. Supported/unsupported units
-    # are included in the comments below.
     [[Groups]]
         # Groups
-        group_pressure     = hPa            # Options are 'inHg', 'mbar', or 'hPa'
-        group_rain         = mm             # Options are 'inch' or 'mm'
-        group_rainrate     = mm_per_hour    # Options are 'inch_per_hour' or 'mm_per_hour'. Note cm_per_hour not supported
-        group_speed        = km_per_hour    # Options are 'mile_per_hour', 'km_per_hour', 'knot', or 'meter_per_second'
-        group_distance     = km             # Options are 'mile', 'km'
-        group_temperature  = degree_C       # Options are 'degree_F' or 'degree_C'
-        group_percent      = percent
-        group_uv           = uv_index
-        group_direction    = degree_compass
+        group_pressure = hPa            # Options are 'inHg', 'mbar', or 'hPa'
+        group_rain = mm                 # Options are 'inch' or 'mm'
+        group_rainrate = mm_per_hour    # Options are 'inch_per_hour' or 'mm_per_hour'. Note cm_per_hour not supported
+        group_speed = km_per_hour       # Options are 'mile_per_hour', 'km_per_hour', 'knot', or 'meter_per_second'
+        group_distance = km             # Options are 'mile', 'km'
+        group_temperature = degree_C    # Options are 'degree_F' or 'degree_C'
+        group_percent = percent
+        group_uv = uv_index
+        group_direction = degree_compass
 
 4.  Add the RealtimeGaugeData service to the list of report services under
 [Engines] [[WxEngine]] in weewx.conf:
@@ -174,13 +167,8 @@ and nth_loop settings under [RealtimeGaugeData] in weewx.conf.
 gauge-data.txt is generated.
 
 To do:
-    - PressL and PressH, the all time low and high barometer values need to be
-      populated. These values determine the scaling on the pressure gauge. At
-      the moment they have been hard coded to reasonale values.
     - hourlyrainTH, ThourlyrainTH and LastRainTipISO. Need to populate these
       fields, presently set to 0.0, 00:00 and 00:00 respectively.
-    - WindRoseData. Need to calculate, presently set to a series of 0 values
-      thus displaying no wind rose.
     - Lost contact with station sensors is implemented for Vantage and Simulator
       stations only. Need to extend current code to cater for the weewx
       supported stations. Current code assume that contact is there unless told
@@ -205,12 +193,14 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
       and gauges.js
 """
 
+import Queue
 import datetime
 import json
 import math
 import os.path
-import sys
+# import sys
 import syslog
+import threading
 import time
 
 import weedb
@@ -223,11 +213,11 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool
 
 # version number of this script
-RTGD_VERSION = 0.1
+RTGD_VERSION = '0.2.0'
 # version number (format) of the generated gauge-data.txt
-GAUGE_DATA_VERSION = 13
+GAUGE_DATA_VERSION = '13'
 
-# ordinal compas points supported
+# ordinal compass points supported
 COMPASS_POINTS = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
                   'S','SSW','SW','WSW','W','WNW','NW','NNW','N']
 
@@ -264,21 +254,26 @@ ARCHIVE_STATIONS = ['Vantage']
 # stations supporting lost contact reporting through their loop packet
 LOOP_STATIONS = ['FineOffsetUSB']
 
+
 def logmsg(level, msg):
-    syslog.syslog(level, 'rtgd: %s' % msg)
+    syslog.syslog(level, msg)
 
-def logdbg(msg):
-    logmsg(syslog.LOG_DEBUG, msg)
 
-def logdbg2(msg):
+def logdbg(id, msg):
+    logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+
+
+def logdbg2(id, msg):
     if weewx.debug >= 2:
-        logmsg(syslog.LOG_DEBUG, msg)
+        logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
 
-def loginf(msg):
-    logmsg(syslog.LOG_INFO, msg)
 
-def logerr(msg):
-    logmsg(syslog.LOG_ERR, msg)
+def loginf(id, msg):
+    logmsg(syslog.LOG_INFO, '%s: %s' % (id, msg))
+
+
+def logerr(id, msg):
+    logmsg(syslog.LOG_ERR, '%s: %s' % (id, msg))
 
 
 # ============================================================================
@@ -309,7 +304,7 @@ class ZambrettiForecast(object):
         self.db_retry_wait = 3
         # Get a db manager for the forecast database and import the Zambretti
         # label lookup dict. If an exception is raised then we can assume the
-        # forecst extension is not installed.
+        # forecast extension is not installed.
         try:
             # create a db manager config dict
             dbm_dict = weewx.manager.get_manager_dict(config_dict['DataBindings'],
@@ -318,7 +313,7 @@ class ZambrettiForecast(object):
                                                       default_binding_dict=ZambrettiForecast.DEFAULT_BINDING_DICT)
             # get a db manager for the forecast database
             self.dbm = weewx.manager.open_manager(dbm_dict)
-            # import the Zambretti forecst text
+            # import the Zambretti forecast text
             from user.forecast import zambretti_label_dict
             self.zambretti_label_dict = zambretti_label_dict
             # if we made it this far the forecast extension is installed and we
@@ -326,7 +321,7 @@ class ZambrettiForecast(object):
             self.forecasting_installed = True
         except (weewx.UnknownBinding, weedb.DatabaseError,
                 weewx.UnsupportedFeature, KeyError, ImportError):
-            # something went wrong, our forecasting_installed flag wiull not
+            # something went wrong, our forecasting_installed flag will not
             # have been set so we can just continue on
             pass
 
@@ -336,14 +331,14 @@ class ZambrettiForecast(object):
         return self.forecasting_installed
 
     def get_zambretti_text(self):
-        """Return the currenbt Zambretti forecast text."""
+        """Return the current Zambretti forecast text."""
 
         # if the forecast extension is not installed then return an appropriate
         # message
         if not self.forecasting_installed:
             return 'Forecast not available'
 
-        # SQL query to get the latest Zambretti forecst code
+        # SQL query to get the latest Zambretti forecast code
         sql = "select dateTime,zcode from %s where method = 'Zambretti' order by dateTime desc limit 1" % self.dbm.table_name
         # try to execute the query
         for count in range(self.db_max_tries):
@@ -354,9 +349,9 @@ class ZambrettiForecast(object):
                 if record is not None:
                     return self.zambretti_label_dict[record[1]]
             except Exception, e:
-                logerr('get zambretti failed (attempt %d of %d): %s' %
+                logerr('rtgdthread: zambretti:', 'get zambretti failed (attempt %d of %d): %s' %
                        ((count + 1), self.db_max_tries, e))
-                logdbg('waiting %d seconds before retry' %
+                logdbg('rtgdthread: zambretti', 'waiting %d seconds before retry' %
                        self.db_retry_wait)
                 time.sleep(self.db_retry_wait)
         # if we made it here we have been unable to get a response from the
@@ -376,36 +371,133 @@ class RealtimeGaugeData(StdService):
         # initialize my superclass
         super(RealtimeGaugeData, self).__init__(engine, config_dict)
 
-        # Get our station type. Needed for determining lostContact
-        self.station_type = config_dict['Station']['station_type']
+        self.queue = Queue.Queue()
+        manager_dict = weewx.manager.get_manager_dict_from_config(config_dict,
+                                                                  'wx_binding')
+        self.db_manager = weewx.manager.open_manager(manager_dict)
+        self.loop_thread = RealtimeGaugeDataThread(self.queue,
+                                                   config_dict,
+                                                   manager_dict,
+                                                   latitude=engine.stn_info.latitude_f,
+                                                   longitude=engine.stn_info.longitude_f,
+                                                   altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
+        self.loop_thread.start()
+        self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
+        self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
+        self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
 
-        # Extract the weewx binding from the StdArchive section of the config
-        # file. If it's missing, fill with a default
-        if 'StdArchive' in config_dict:
-            self.db_binding_wx = config_dict['StdArchive'].get('data_binding',
-                                                               'wx_binding')
+    def new_loop_packet(self, event):
+        """Puts new loop packets in the queue."""
+
+        # self.cached_values.update(event.packet, event.packet['dateTime'])
+        # logdbg("rtgd", "cached packet: %s" % self.cached_values.get_packet(event.packet['dateTime']))
+        # self.queue.put(self.cached_values.get_packet(event.packet['dateTime']))
+        _package = {'type': 'loop',
+                    'payload': event.packet}
+        self.queue.put(_package)
+        logdbg2("rtgd", "queued loop packet: %s" %  _package['payload'])
+
+    def new_archive_record(self, event):
+        """Puts archive records in the queue."""
+
+        _package = {'type': 'archive',
+                    'payload': event.record}
+        self.queue.put(_package)
+        logdbg2("rtgd", "queued archive record: %s" %  _package['payload'])
+        # get alltime min max baro and put in the queue
+        # get the min and max values (incl usUnits)
+        _minmax_baro = self.get_minmax_obs('barometer')
+        # if we have some data then package it and put it in the queue
+        if _minmax_baro:
+            _package = {'type': 'stats',
+                        'payload': _minmax_baro}
+            self.queue.put(_package)
+            logdbg2("rtgd", "queued min/max barometer values: %s" %  _package['payload'])
+
+    def end_archive_period(self, event):
+        """Puts END_ARCHIVE_PERIOD event in the queue."""
+
+        _package = {'type': 'event',
+                    'payload': weewx.END_ARCHIVE_PERIOD}
+        self.queue.put(_package)
+        logdbg2("rtgd", "queued weewx.END_ARCHIVE_PERIOD event")
+
+    def shutDown(self):
+        """Shut down any threads."""
+
+        if hasattr(self, 'loop_queue') and hasattr(self, 'loop_thread'):
+            if self.queue and self.loop_thread.isAlive():
+                # Put a None in the queue to signal the thread to shutdown
+                self.queue.put(None)
+                # Wait up to 20 seconds for the thread to exit:
+                self.loop_thread.join(20.0)
+                if self.loop_thread.isAlive():
+                    logerr("rtgd", "Unable to shut down %s thread" % self.loop_thread.name)
+                else:
+                    logdbg("rtgd", "Shut down %s thread." % self.loop_thread.name)
+
+    def get_minmax_obs(self, obs_type):
+        """Obtain the alltime max/min values for and observation."""
+
+        # create an interpolation dict
+        inter_dict = {'table_name': self.db_manager.table_name,
+                      'obs_type': obs_type}
+        # the query to be used
+        minmax_sql = "SELECT MAX(min), MIN(max) FROM %(table_name)s_day_%(obs_type)s"
+        # execute the query
+        _row = self.db_manager.getSql(minmax_sql % inter_dict)
+        if not _row or None in _row:
+            return {'min_%s' % obs_type: None,
+                    'max_%s' % obs_type: None}
         else:
-            self.db_binding_wx = 'wx_binding'
-        # get and save a db manager for later access to the database
-        self.db_manager = weewx.manager.open_manager_with_config(self.config_dict,
-                                                                 self.db_binding_wx)
+            return {'min_%s' % obs_type: _row[0],
+                    'max_%s' % obs_type: _row[1]}
+
+
+# ============================================================================
+#                       class RealtimeGaugeDataThread
+# ============================================================================
+
+
+class RealtimeGaugeDataThread(threading.Thread):
+    """Thread that generates gauge-data.txt in near realtime."""
+
+    def __init__(self, queue, config_dict, manager_dict,
+                 latitude, longitude, altitude):
+        # Initialize my superclass:
+        threading.Thread.__init__(self)
+
+        self.setDaemon(True)
+        self.queue = queue
+        self.config_dict = config_dict
+        self.manager_dict = manager_dict
 
         # get our RealtimeGaugeData config dictionary
         self.rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
 
         # setup every nth record or every n seconds file generation
-        self.period = int(self.rtgd_config_dict.get('period', '0'))
-        self.nth_loop = int(self.rtgd_config_dict.get('nth_loop', '0'))
-        self.loop_count = 1 # how many loop packets since last generation
+        self.min_interval = self.rtgd_config_dict.get('min_interval', None)
         self.last_write = 0 # ts (actual) of last generation
 
         # get our file paths and names
-        self.rtgd_path_file = self.rtgd_config_dict.get('rtgd_path_file',
-                                                        '/var/tmp/gauge-data.txt')
+        _path = self.rtgd_config_dict.get('rtgd_path', '/var/tmp')
+        _html_root = os.path.join(config_dict['WEEWX_ROOT'],
+                                  config_dict['StdReport'].get('HTML_ROOT', ''))
 
-        # Zambretti forecast
-        self.forecast = ZambrettiForecast(config_dict)
-        loginf("zambretti is installed: %s" % self.forecast.is_installed())
+        rtgd_path = os.path.join(_html_root, _path)
+        self.rtgd_path_file = os.path.join(rtgd_path,
+                                           self.rtgd_config_dict.get('rtgd_file_name',
+                                                                     'gauge-data.txt'))
+
+        # get windrose settings
+        try:
+            self.wr_period = int(self.rtgd_config_dict.get('windrose_period', 86400))
+        except ValueError:
+            self.wr_period = 86400
+        try:
+            self.wr_points = int(self.rtgd_config_dict.get('windrose_points', 16))
+        except ValueError:
+            self.wr_points = 16
 
         # setup max solar rad calcs
         # do we have any?
@@ -415,7 +507,7 @@ class RealtimeGaugeData(StdService):
         if 'maxSolarRad' in algo_dict:
             self.solar_algorithm = algo_dict['maxSolarRad', 'RS']
         else:
-            # do we have an algorithm in [StdWxCalculate], if so use tha
+            # do we have an algorithm in [StdWxCalculate], if so use that
             svc_dict = config_dict.get('StdWXCalculate', {})
             algo_dict = calc_dict.get('Algorithm', {})
             self.solar_algorithm = algo_dict.get('maxSolarRad', 'RS')
@@ -508,7 +600,8 @@ class RealtimeGaugeData(StdService):
         # what units are incoming packets using
         self.packet_units = None
 
-        # Are we updating windrun using archive data only or archive and loop data?
+        # Are we updating windrun using archive data only or archive and loop
+        # data?
         self.windrun_loop = to_bool(self.rtgd_config_dict.get('windrun_loop',
                                                               'False'))
 
@@ -521,89 +614,136 @@ class RealtimeGaugeData(StdService):
         # initialise some properties used to hold archive period wind data
         self.windSpeedAvg = None
         self.windDirAvg = None
+        self.min_barometer = None
+        self.max_barometer = None
+
+        # get some station info
+        self.latitude = latitude
+        self.longitude = longitude
+        self.altitude_m = altitude
+        self.station_type = config_dict['Station']['station_type']
 
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
 
-        # get some station info
-        self.latitude = engine.stn_info.latitude_f
-        self.longitude = engine.stn_info.longitude_f
-        self.altitude_m = convert(engine.stn_info.altitude_vt, 'meter').value
+    def run(self):
+        """Collect packets from the queue and manage their processing.
 
+        Now that we are in a thread get a manager for our db so we can
+        initialise our forecast and day stats. Once this is done we wait for
+        something in the queue.
+        """
+
+        # get a db manager
+        self.db_manager = weewx.manager.open_manager(self.manager_dict)
+        # get a Zambretti forecast objects
+        self.forecast = ZambrettiForecast(self.config_dict)
+        logdbg("rtgdthread", "Zambretti is installed: %s" % self.forecast.is_installed())
         # initialise our day stats
         self.day_stats = self.db_manager._get_day_summary(time.time())
+        # get a windrose to start with since it is only on receipt of an
+        # archive record
+        logdbg2("rtgdthread", "calculating windrose data ...")
+        self.rose = calc_windrose(self.db_manager,
+                                  self.wr_period,
+                                  self.wr_points)
+        logdbg2("rtgdthread", "windrose data calculated")
 
-        # Bind to the NEW_LOOP_PACKET event
-        self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
+        # now run a continuous loop, waiting for records to appear in the queue
+        # then processing them.
+        while True:
+            while True:
+                _package = self.queue.get()
+                # a None record is our signal to exit
+                if _package is None:
+                    return
+                elif _package['type'] == 'archive':
+                    self.new_archive_record(_package['payload'])
+                    logdbg2("rtgdthread", "received archive record")
+                    logdbg2("rtgdthread", "calculating windrose data ...")
+                    self.rose = calc_windrose(self.db_manager,
+                                              self.wr_period,
+                                              self.wr_points)
+                    logdbg2("rtgdthread", "windrose data calculated")
+                    continue
+                elif _package['type'] == 'event':
+                    if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
+                        logdbg2("rtgdthread",
+                                "received event - END_ARCHIVE_PERIOD")
+                        self.end_archive_period()
+                    continue
+                elif _package['type'] == 'stats':
+                    logdbg2("rtgdthread",
+                            "received stats package payload=%s" % (_package['payload'], ))
+                    self.process_stats(_package['payload'])
+                    logdbg2("rtgdthread", "processed stats package")
+                    continue
+                # if packets have backed up in the queue, trim it until it's no
+                # bigger than the max allowed backlog
+                if self.queue.qsize() <= 5:
+                    break
 
-        # Bind to the END_ARCHIVE_PERIOD event
-        self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
+            # we now have a packet to process, wrap in a try..except so we can
+            # catch any errors
+            try:
+                logdbg2("rtgdthread",
+                        "received packet: %s" % _package['payload'])
+                self.process_packet(_package['payload'])
+            except Exception, e:
+                # Some unknown exception occurred. This is probably a serious
+                # problem. Exit.
+                syslog.syslog(syslog.LOG_CRIT,
+                              "rtgdthread: Unexpected exception of type %s" % (type(e), ))
+                weeutil.weeutil.log_traceback('*** ', syslog.LOG_DEBUG)
+                syslog.syslog(syslog.LOG_CRIT,
+                              "rtgdthread: Thread exiting. Reason: %s" % (e, ))
+                return
 
-        # Bind to the NEW_ARCHIVE_RECORD event
-        self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
-
-    def new_archive_record(self, event):
-        """Control processing when new a archive record is presented."""
-
-        # set our lost contact flag if applicable
-        if self.station_type in ARCHIVE_STATIONS:
-            self.lost_contact_flag = event.record[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
-        # save the windSpeed value to use as our archive period average
-        if 'windSpeed' in event.record and event.record['windSpeed'] is not None:
-            self.windSpeedAvg = event.record['windSpeed']
-        else:
-            self.windSpeedAvg = None
-        # save the windDir value to use as our archive period average
-        if 'windDir' in event.record and event.record['windDir'] is not None:
-            self.windDirAvg = event.record['windDir']
-        else:
-            self.windDirAvg = None
-        # refresh our day (archive record based) stats to date in case we have
-        # jumped to the next day
-        self.day_stats = self.db_manager._get_day_summary(event.record['dateTime'])
-
-    def end_archive_period(self, event):
-        """Control processing at the end of each archive period."""
-
-        # Reset our loop stats.
-        self.buffer.reset_loop_stats()
-
-    def new_loop_packet(self, event):
-        """Control processing of each loop packet received."""
+    def process_packet(self, packet):
+        """Process incoming loop packets and generate gauge-data.txt."""
 
         # get time for debug timing
         t1 = time.time()
         # do those things that must be done with every loop packet
-        # ie setup/update our lows and highs and our 5 and 10 min wind lists
-        self.buffer.setLowsAndHighs(event.packet)
-        # work out whether we need to generate a file or not
-        _bool1 = ((self.period==0) and (self.loop_count >= self.nth_loop)) or ((self.last_write + self.period > int(time.time())) and (self.nth_loop>0) and (self.loop_count >= self.nth_loop))
-        _bool2 = ((self.period==0) and (self.nth_loop==0)) or ((self.period>0) and (self.last_write + self.period <= int(time.time())))
-        if (_bool1 or _bool2):
+        # ie update our lows and highs and our 5 and 10 min wind lists
+        self.buffer.setLowsAndHighs(packet)
+        # generate if we have no minimum interval setting or if minimum interval
+        # seconds have elapsed since our last generation
+        if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
             try:
                 # set our lost contact flag if applicable
                 if self.station_type in LOOP_STATIONS:
-                    self.lost_contact_flag = event.record[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
+                    self.lost_contact_flag = packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
                 data = {}
-                # get the data elements to construct our file
-                data = self.calculate(event.packet)
+                # get a data dict from which to construct our file
+                data = self.calculate(packet)
                 # write our file
                 self.write_data(data)
-                # reset our counter if generating on every nth loop packet
-                self.loop_count = 0
-                # reset our write time if generating every n seconds
-                self.last_write = int(time.time())
+                # set our write time
+                self.last_write = time.time()
+                # log the generation
+                logdbg("rtgdthread",
+                       "packet (%s) gauge-data.txt generated in %.5f seconds" % (packet['dateTime'],
+                                                                                 (self.last_write-t1)))
             except Exception, e:
-                weeutil.weeutil.log_traceback('rtgd: **** ')
-        # increase our loop counter used if generating on every nth loop packet
-        self.loop_count += 1
-        # get time for debug timing
-        t2 = time.time()
-        # print a message if debug is on
-        syslog.syslog(syslog.LOG_DEBUG, "rtgd: loop data processed in %.5f seconds" % (t2-t1))
+                weeutil.weeutil.log_traceback('rtgdthread: **** ')
+        else:
+            # we skipped this packet so log it
+            logdbg("rtgdthread", "packet (%s) skipped" % packet['dateTime'])
+
+    def process_stats(self, package):
+        """Process a stats package.
+
+            Inputs:
+                package: dict containing the stats data
+        """
+
+        if package is not None:
+            for key, value in package.iteritems():
+                setattr(self, key, value)
 
     def write_data(self, data):
-        """ Write gauge-data.txt file.
+        """Write the gauge-data.txt file.
 
             Takes dictionary of data elements, converts them to JSON format
             and writes them to file. Order of data elements may vary from time
@@ -619,7 +759,7 @@ class RealtimeGaugeData(StdService):
             f.close()
 
     def calculate(self, packet):
-        """ Construct gauge-data.txt data elements.
+        """Construct a data dict for gauge-data.txt.
 
             Input:
                 packet: loop data packet
@@ -658,7 +798,7 @@ class RealtimeGaugeData(StdService):
         data['tempunit'] = UNITS_TEMP.get(self.temp_group, 'C')
         # windunit -wind units - m/s, mph, km/h, kts
         data['windunit'] = UNITS_WIND.get(self.wind_group, 'km/h')
-        #pressunit - pressure units - mb, hPa, in
+        # pressunit - pressure units - mb, hPa, in
         data['pressunit'] = UNITS_PRES.get(self.pres_group, 'hPa')
         # rainunit - rain units - mm, in
         data['rainunit'] = UNITS_RAIN.get(self.rain_group, 'mm')
@@ -917,11 +1057,27 @@ class RealtimeGaugeData(StdService):
             data['TpressTL'] = None
             data['TpressTH'] = None
         # pressL - all time low barometer
-        ###FIX ME - need to determine alltime low baro
-        data['pressL'] = "850.0"
+        if self.max_barometer is not None:
+            pressL_vt = ValueTuple(self.min_barometer,
+                                   self.p_baro_type,
+                                   self.p_baro_group)
+        else:
+            pressL_vt = ValueTuple(850,
+                                   'hPa',
+                                   self.p_baro_group)
+        pressL = convert(pressL_vt, self.pres_group).value
+        data['pressL'] = self.pres_format % pressL
         # pressH - all time high barometer
-        ###FIX ME - need to determine alltime high baro
-        data['pressH'] = "1100.0"
+        if self.max_barometer is not None:
+            pressH_vt = ValueTuple(self.max_barometer,
+                                   self.p_baro_type,
+                                   self.p_baro_group)
+        else:
+            pressH_vt = ValueTuple(1100,
+                                   'hPa',
+                                   self.p_baro_group)
+        pressH = convert(pressH_vt, self.pres_group).value
+        data['pressH'] = self.pres_format % pressH
         # presstrendval -  pressure trend value
         presstrendval = calc_trend('barometer', press_vt, self.pres_group,
                                    self.db_manager, ts - 3600, 300)
@@ -967,12 +1123,12 @@ class RealtimeGaugeData(StdService):
         # LastRainTipISO -
         ###FIX ME - need to determine LastRainTipISO
         data['LastRainTipISO'] = "00:00"
-        # wlatest - latest wind speed reading - confirmed OK
+        # wlatest - latest wind speed reading
         wlatest_vt = ValueTuple(packet_d['windSpeed'],
                                 self.p_wind_type,
                                 self.p_wind_group)
         data['wlatest'] = self.wind_format % convert(wlatest_vt, self.wind_group).value if wlatest_vt.value is not None else "0.0"
-        # wspeed - wind speed (average) - confirmed OK
+        # wspeed - wind speed (average)
         wspeed_vt = ValueTuple(self.windSpeedAvg,
                                self.p_wind_type,
                                self.p_wind_group)
@@ -989,12 +1145,12 @@ class RealtimeGaugeData(StdService):
         windM_loop = convert(windTM_loop_vt, self.wind_group).value
         windTM = max(windM_loop, windTM)
         data['windTM'] = self.wind_format % windTM
-        # wgust - 10 minute high gust - goes back 10 min in archive - confirmed OK
+        # wgust - 10 minute high gust
         wgust = self.buffer.tenMinuteWindGust()
         wgust_vt = ValueTuple(wgust, self.p_wind_type, self.p_wind_group)
         wgust = convert(wgust_vt, self.wind_group).value
         data['wgust'] = self.wind_format % wgust if wgust is not None else "0.0"
-        # wgustTM - today's high wind gust - confirmed OK
+        # wgustTM - today's high wind gust
         wgustTM_vt = ValueTuple(self.day_stats['wind'].max,
                                 self.p_wind_type,
                                 self.p_wind_group)
@@ -1008,7 +1164,7 @@ class RealtimeGaugeData(StdService):
         # TwgustTM - time of today's high wind gust (hh:mm)
         TwgustTM = time.localtime(self.day_stats['wind'].maxtime) if wgustM_loop <= wgustTM else time.localtime(self.buffer.wgustM_loop[2])
         data['TwgustTM'] = time.strftime(self.time_format, TwgustTM)
-        # bearing - wind bearing (degrees) - confirmed OK
+        # bearing - wind bearing (degrees)
         windDir = packet_d['windDir'] if packet_d['windDir'] is not None else 0
         data['bearing'] = self.dir_format % windDir
         # avgbearing - 10-minute average wind bearing (degrees)
@@ -1020,7 +1176,9 @@ class RealtimeGaugeData(StdService):
         bearingTM = self.day_stats['wind'].max_dir if self.day_stats['wind'].max_dir is not None else 0
         bearingTM = self.buffer.wgustM_loop[1] if wgustTM == wgustM_loop else bearingTM
         data['bearingTM'] = self.dir_format % bearingTM
-        # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes (or as configured using AvgBearingMinutes in cumulus.ini), rounded down to nearest 10 degrees
+        # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
+        # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
+        # down to nearest 10 degrees
         if self.windDirAvg is not None:
             fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
             BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
@@ -1031,7 +1189,9 @@ class RealtimeGaugeData(StdService):
         else:
             BearingRangeFrom10 = 0.0
         data['BearingRangeFrom10'] = self.dir_format % BearingRangeFrom10
-        # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes (or as configured using AvgBearingMinutes in cumulus.ini), rounded up to the nearest 10 degrees
+        # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
+        # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
+        # up to the nearest 10 degrees
         if self.windDirAvg is not None:
             toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
             BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
@@ -1042,33 +1202,36 @@ class RealtimeGaugeData(StdService):
         else:
             BearingRangeTo10 = 0.0
         data['BearingRangeTo10'] = self.dir_format % BearingRangeTo10
-        # domwinddir - Today's dominant wind direction as compass point - confirmed OK
+        # domwinddir - Today's dominant wind direction as compass point
         deg = 90.0 - math.degrees(math.atan2(self.day_stats['wind'].ysum,
                                   self.day_stats['wind'].xsum))
         dom_dir = deg if deg >= 0 else deg + 360.0
         data['domwinddir'] = degreeToCompass(dom_dir)
         # WindRoseData -
-        ###FIX ME - need to calculate windrose
-        data['WindRoseData'] = '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]'
+        data['WindRoseData'] = self.rose
         # windrun - wind run (today)
         last_ts = self.db_manager.lastGoodStamp()
         try:
             wind_sum_vt = ValueTuple(self.day_stats['wind'].sum,
                                      self.p_wind_type,
                                      self.p_wind_group)
-            windrun_day_average = (last_ts - weeutil.weeutil.startOfDay(ts))/3600.0 * convert(wind_sum_vt, self.wind_group).value/self.day_stats['wind'].count
+            windrun_day_average = (last_ts - weeutil.weeutil.startOfDay(ts))/3600.0 * convert(wind_sum_vt,
+                                                                                              self.wind_group).value/self.day_stats['wind'].count
         except:
             windrun_day_average = 0.0
         if self.windrun_loop:   # is loop/realtime estimate
             loop_hours = (ts - last_ts)/3600.0
             try:
-                windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum, self.p_wind_type, self.p_wind_group), self.wind_group).value/self.windcount
+                windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum,
+                                                                      self.p_wind_type,
+                                                                      self.p_wind_group),
+                                                                     self.wind_group).value/self.buffer.windcount
             except:
                 windrun = windrun_day_average
         else:
             windrun = windrun_day_average
         data['windrun'] = self.dist_format % windrun
-        # Tbeaufort - wind speed (beaufort) - confirmed OK
+        # Tbeaufort - wind speed (beaufort)
         if packet_d['windSpeed'] is not None:
             data['Tbeaufort'] = str(weewx.wxformulas.beaufort(convert(wlatest_vt,
                                                                       'knot').value))
@@ -1092,7 +1255,7 @@ class RealtimeGaugeData(StdService):
             SolarRad = 0.0
         else:
             SolarRad = packet_d['radiation']
-        data['SolarRad'] = self.rad_format % SolarRad
+        data['SolarRad'] = self.rad_format % SolarRad if SolarRad is not None else 0.0
         # SolarTM - today's maximum solar radiation W/m2
         if 'radiation' not in self.day_stats:
             SolarTM = 0.0
@@ -1135,6 +1298,32 @@ class RealtimeGaugeData(StdService):
         data['ver'] = self.version
         return data
 
+    def new_archive_record(self, record):
+        """Control processing when new a archive record is presented."""
+
+        # set our lost contact flag if applicable
+        if self.station_type in ARCHIVE_STATIONS:
+            self.lost_contact_flag = record[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
+        # save the windSpeed value to use as our archive period average
+        if 'windSpeed' in record and record['windSpeed'] is not None:
+            self.windSpeedAvg = record['windSpeed']
+        else:
+            self.windSpeedAvg = None
+        # save the windDir value to use as our archive period average
+        if 'windDir' in record and record['windDir'] is not None:
+            self.windDirAvg = record['windDir']
+        else:
+            self.windDirAvg = None
+        # refresh our day (archive record based) stats to date in case we have
+        # jumped to the next day
+        self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
+
+    def end_archive_period(self):
+        """Control processing at the end of each archive period."""
+
+        # Reset our loop stats.
+        self.buffer.reset_loop_stats()
+
 
 # ============================================================================
 #                             class RtgdBuffer
@@ -1145,10 +1334,10 @@ class RtgdBuffer(object):
     """Class to buffer various loop packet obs.
 
         If archive based stats are an efficient means of getting stats for
-        today. However, their use woudl mean that any daily stat (eg todays max
+        today. However, their use would mean that any daily stat (eg todays max
         outTemp) that 'occurs' after the most recent archive record but before
         the next archive record is written to archive will not be captured. For
-        this reason selected loop data is bufferred to ensure that such stats
+        this reason selected loop data is buffered to ensure that such stats
         are correctly reflected.
     """
 
@@ -1169,35 +1358,35 @@ class RtgdBuffer(object):
         self.wind_period = 600
 
     def reset_loop_stats(self):
-       """Reset loop windrun sum/count and loop low/high/max stats.
+        """Reset loop windrun sum/count and loop low/high/max stats.
 
            Normally performed when the class is initialised and at the end of
            each archive period.
-       """
+        """
 
-       # reset sum/counter for windrun calculator and sum for rain
-       self.windsum = 0
-       self.windcount = 0
-       self.rainsum = 0
+        # reset sum/counter for windrun calculator and sum for rain
+        self.windsum = 0
+        self.windcount = 0
+        self.rainsum = 0
 
-       # reset loop period low/high/max stats
-       self.tempL_loop = [None,None]
-       self.tempH_loop = [None,None]
-       self.dewpointL_loop = [None,None]
-       self.dewpointH_loop = [None,None]
-       self.apptempL_loop = [None,None]
-       self.apptempH_loop = [None,None]
-       self.wchillL_loop = [None,None]
-       self.heatindexH_loop = [None,None]
-       self.wgustM_loop = [None,None,None]
-       self.pressL_loop = [None,None]
-       self.pressH_loop = [None,None]
-       self.rrateH_loop = [None,None]
-       self.humL_loop = [None,None]
-       self.humH_loop = [None,None]
-       self.windM_loop = [None, None]
-       self.UVH_loop = [None,None]
-       self.SolarH_loop = [None,None]
+        # reset loop period low/high/max stats
+        self.tempL_loop = [None,None]
+        self.tempH_loop = [None,None]
+        self.dewpointL_loop = [None,None]
+        self.dewpointH_loop = [None,None]
+        self.apptempL_loop = [None,None]
+        self.apptempH_loop = [None,None]
+        self.wchillL_loop = [None,None]
+        self.heatindexH_loop = [None,None]
+        self.wgustM_loop = [None,None,None]
+        self.pressL_loop = [None,None]
+        self.pressH_loop = [None,None]
+        self.rrateH_loop = [None,None]
+        self.humL_loop = [None,None]
+        self.humH_loop = [None,None]
+        self.windM_loop = [None, None]
+        self.UVH_loop = [None,None]
+        self.SolarH_loop = [None,None]
 
     def averageWind(self):
         """ Calculate average wind speed over an archive interval period.
@@ -1216,7 +1405,8 @@ class RtgdBuffer(object):
 
             Inputs: Nothing
 
-            Returns: average wind speed over the last 'archive interval' seconds
+            Returns: average wind speed over the last 'archive interval'
+                     seconds
         """
 
         if self.averageWind_valid:
@@ -1279,8 +1469,7 @@ class RtgdBuffer(object):
         return gust
 
     def setLowsAndHighs(self, packet):
-        """ Do any processing of loop packet data that needs to occur every loop
-            packet irrespective of how often gauge-data.txt is written.
+        """ Update loop highs an dlows with new loop data.
 
             Almost operates as a mini Weewx accumulator but wind data is
             stored in lists to allow samples to be added at one end and old
@@ -1383,7 +1572,8 @@ class RtgdBuffer(object):
             self.wind_list = [s for s in self.wind_list if s[1] > old_ts]
         # get our latest (archive_interval) average wind
         windM_loop = self.averageWind() if self.averageWind_valid else 0.0
-        # have we seen a new high (archive_interval) avg wind? if so update self.windM_loop
+        # have we seen a new high (archive_interval) avg wind? if so update
+        # self.windM_loop
         self.windM_loop = [windM_loop, ts] if windM_loop > self.windM_loop[0] else self.windM_loop
         # 10 minute average wind direction
         self.wind_dir_list.append([windSpeed * math.cos(math.radians(90.0 - windDir)),
@@ -1451,3 +1641,52 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
             now = convert(now_vt, group).value
             then = convert(then_vt, group).value
             return now - then
+
+def calc_windrose(db_manager, period, points):
+    """Calculate a SteelSeries Weather Gauges windrose array.
+
+    Calculate an array representing the 'amount of wind' from each of the 8 or
+    16 compass points. The value for each compass point is determined by
+    summing the archive windSpeed values for wind from that compass point over
+    the period concerned. Resulting values are rounded to one decimal point.
+
+        Inputs:
+            db_manager: A manager object for the database to be used.
+            period:     Calculate the windrose using the last period (in
+                        seconds) of data in the archive.
+            points:     The number of compass points to use, normally 8 or 16.
+
+        Return:
+            List containing windrose data with 'points' elements.
+    """
+
+
+    # initialise our result
+    rose = [0.0 for x in range(points)]
+    # get the earliest ts we will use
+    ts = db_manager.lastGoodStamp() - period
+    # determine the factor to be used to divide numerical windDir into
+    # cardinal/ordinal compass points
+    angle = 360.0/points
+    # create an interpolation dict for our query
+    inter_dict = {'table_name': db_manager.table_name,
+                  'ts': ts,
+                  'angle': angle}
+    # the query to be used
+    windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) FROM %(table_name)s WHERE dateTime>=%(ts)s GROUP BY ROUND(windDir/%(angle)s)"
+
+    # we expect at least 'points' rows in our result so use genSql
+    for _row in db_manager.genSql(windrose_sql % inter_dict):
+        # for windDir==None we expect some results with None, we can ignore those
+        if _row is None or None in _row:
+            pass
+        else:
+            # Because of the structure of the compass and the limitations in
+            # SQL maths our 'North' result will be returned in 2 parts. It will
+            # be the sum of the '0' group and the 'points' group.
+            if int(_row[0]) != points:
+                rose[int(_row[0])] = _row[0]
+            else:
+                rose[1] += _row[1]
+    # now  round our results and return
+    return [round(x,1) for x in rose]

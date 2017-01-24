@@ -1,2 +1,18 @@
+v0.2.0
+*   now runs in a thread to eliminate blocking impact on weewx
+*   now calculates WindRoseData
+*   now calculates pressL and pressH
+*   frequency of generation is now specified by a single config option 
+    min_interval
+*   gauge-data.txt output path is now specified by rtgd_path config option
+*   added config options for windrose period and number of compass points to 
+    be generated
+    
+v0.1.2
+*   fix error that occurred when stations do not emit radiation
+
+v0.1.1
+*   better handle loop observations that are None
+  
 v0.1.0
 *   initial release
