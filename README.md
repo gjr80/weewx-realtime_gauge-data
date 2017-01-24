@@ -20,7 +20,7 @@ The *Realtime gauge-data* extension can be installed manually or automatically u
     
 -   *$SKIN_ROOT*. The path to the directory where weewx skin folders are located This directory is normally set in the *[StdReport]* section of *weewx.conf*. Refer to [where to find things](http://weewx.com/docs/usersguide.htm#Where_to_find_things "where to find things") in the weewx [User's Guide](http://weewx.com/docs/usersguide.htm "User's Guide to the weewx Weather System") for further information.
 
-### Installation using the wee_extension utility ### 
+### Installation using the wee_extension utility ###
 
 1.  Download the latest *Realtime gauge-data* extension from the Realtime gauge-data [releases page](https://github.com/gjr80/weewx-realtime_gauge-data/releases) into a directory accessible from the weewx machine.
 
