@@ -6,7 +6,7 @@ The *Realtime gauge-data* extension generates a loop data based *gauge-data.txt*
 
 ## Pre-Requisites ##
 
-The *Realtime gauge-data* extension requires weewx v3.4.0 or greater.
+The *Realtime gauge-data* extension requires weewx v3.4.0 or greater. Use of the *Realtime gauge-data* extension with the SteelSeries Weather Gauges requires the installation and configuration for use with *weewx* of the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub").
 
 ## Installation ##
 
