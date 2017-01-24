@@ -17,9 +17,12 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.1                                      Date: 3 January 2017
+# Version: 0.1.2                                      Date: 19 January 2017
 #
 # Revision History
+#  19 January 2017    v0.1.2  - fix error that occurred when stations do not 
+#                               emit radiation
+#  18 January 2017    v0.1.1  - better handles loop observations that are None
 #  3 January 2017     v0.1    - initial release
 #
 """A weewx service to generate a loop based gauge-data.txt to allow the
@@ -665,7 +668,8 @@ class RealtimeGaugeData(StdService):
         temp_vt = ValueTuple(packet_d['outTemp'],
                              self.p_temp_type,
                              self.p_temp_group)
-        data['temp'] = self.temp_format % convert(temp_vt, self.temp_group).value
+        temp = convert(temp_vt, self.temp_group).value
+        data['temp'] = self.temp_format % temp if temp is not None else 0.0
         # tempTL - today's low temperature
         tempTL_vt = ValueTuple(self.day_stats['outTemp'].min,
                                self.p_temp_type,
@@ -702,8 +706,8 @@ class RealtimeGaugeData(StdService):
         intemp_vt = ValueTuple(packet_d['inTemp'],
                                self.p_temp_type,
                                self.p_temp_group)
-        data['intemp'] = self.temp_format % convert(intemp_vt,
-                                                    self.temp_group).value
+        intemp = convert(intemp_vt, self.temp_group).value
+        data['intemp'] = self.temp_format % intemp if intemp is not None else 0.0
         # hum - relative humidity
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
@@ -729,7 +733,8 @@ class RealtimeGaugeData(StdService):
         dew_vt = ValueTuple(packet_d['dewpoint'],
                                      self.p_temp_type,
                                      self.p_temp_group)
-        data['dew'] = self.temp_format % convert(dew_vt, self.temp_group).value
+        dew = convert(dew_vt, self.temp_group).value
+        data['dew'] = self.temp_format % dew if dew is not None else 0.0
         # dewpointTL - today's low dew point
         dewpointTL_vt = ValueTuple(self.day_stats['dewpoint'].min,
                                    self.p_temp_type,
@@ -762,8 +767,8 @@ class RealtimeGaugeData(StdService):
         wchill_vt = ValueTuple(packet_d['windchill'],
                                self.p_temp_type,
                                self.p_temp_group)
-        data['wchill'] = self.temp_format % convert(wchill_vt,
-                                                    self.temp_group).value
+        wchill = convert(wchill_vt, self.temp_group).value
+        data['wchill'] = self.temp_format % wchill if wchill is not None else 0.0
         # wchillTL - today's low wind chill
         wchillTL_vt = ValueTuple(self.day_stats['windchill'].min,
                                  self.p_temp_type,
@@ -782,8 +787,8 @@ class RealtimeGaugeData(StdService):
         heatindex_vt = ValueTuple(packet_d['heatindex'],
                                   self.p_temp_type,
                                   self.p_temp_group)
-        data['heatindex'] = self.temp_format % convert(heatindex_vt,
-                                                       self.temp_group).value
+        heatindex = convert(heatindex_vt, self.temp_group).value
+        data['heatindex'] = self.temp_format % heatindex if heatindex is not None else 0.0
         # heatindexTH - today's high heat index
         heatindexTH_vt = ValueTuple(self.day_stats['heatindex'].max,
                                     self.p_temp_type,
@@ -818,7 +823,7 @@ class RealtimeGaugeData(StdService):
                                                  windspeed_ms)
             apptemp_vt = ValueTuple(apptemp_C, 'degree_C', 'group_temperature')
         apptemp = convert(apptemp_vt, self.temp_group).value
-        data['apptemp'] = self.temp_format % apptemp if apptemp is not None else self.temp_format % convert((0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        data['apptemp'] = self.temp_format % apptemp if apptemp is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
         # apptempTL - today's low apparent temperature
         # apptempTH - today's high apparent temperature
         # TapptempTL - time of today's low apparent temperature (hh:mm)
@@ -870,13 +875,13 @@ class RealtimeGaugeData(StdService):
                                                   packet_d['outHumidity'])
             humidex_vt = ValueTuple(humidex_C, 'degree_C', 'group_temperature')
             humidex = convert(humidex_vt, self.temp_group).value
-        data['humidex'] = self.temp_format % humidex if humidex is not None else self.temp_format % convert((0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        data['humidex'] = self.temp_format % humidex if humidex is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
         # press - barometer
         press_vt = ValueTuple(packet_d['barometer'],
                               self.p_baro_type,
                               self.p_baro_group)
-        data['press'] = self.pres_format % convert(press_vt,
-                                                   self.pres_group).value
+        press = convert(press_vt, self.pres_group).value
+        data['press'] = self.pres_format % press if press is not None else 0.0
         # pressTL - today's low barometer
         # pressTH - today's high barometer
         # TpressTL - time of today's low barometer (hh:mm)
@@ -1016,20 +1021,26 @@ class RealtimeGaugeData(StdService):
         bearingTM = self.buffer.wgustM_loop[1] if wgustTM == wgustM_loop else bearingTM
         data['bearingTM'] = self.dir_format % bearingTM
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes (or as configured using AvgBearingMinutes in cumulus.ini), rounded down to nearest 10 degrees
-        fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
-        BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
-        if BearingRangeFrom10 < 0:
-            BearingRangeFrom10 += 360
-        elif BearingRangeFrom10 > 360:
-            BearingRangeFrom10 -= 360
+        if self.windDirAvg is not None:
+            fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
+            BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
+            if BearingRangeFrom10 < 0:
+                BearingRangeFrom10 += 360
+            elif BearingRangeFrom10 > 360:
+                BearingRangeFrom10 -= 360
+        else:
+            BearingRangeFrom10 = 0.0
         data['BearingRangeFrom10'] = self.dir_format % BearingRangeFrom10
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes (or as configured using AvgBearingMinutes in cumulus.ini), rounded up to the nearest 10 degrees
-        toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
-        BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
-        if BearingRangeTo10 < 0:
-            BearingRangeTo10 += 360
-        elif BearingRangeTo10 > 360:
-            BearingRangeTo10 -= 360
+        if self.windDirAvg is not None:
+            toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
+            BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
+            if BearingRangeTo10 < 0:
+                BearingRangeTo10 += 360
+            elif BearingRangeTo10 > 360:
+                BearingRangeTo10 -= 360
+        else:
+            BearingRangeTo10 = 0.0
         data['BearingRangeTo10'] = self.dir_format % BearingRangeTo10
         # domwinddir - Today's dominant wind direction as compass point - confirmed OK
         deg = 90.0 - math.degrees(math.atan2(self.day_stats['wind'].ysum,
@@ -1113,7 +1124,7 @@ class RealtimeGaugeData(StdService):
                                                    self.altitude_m)
             cb_vt = ValueTuple(cb, 'meter', self.p_alt_group)
         cloudbase = convert(cb_vt, self.alt_group).value
-        data['cloudbasevalue'] = self.alt_format % cloudbase
+        data['cloudbasevalue'] = self.alt_format % cloudbase if cloudbase is not None else 0.0
         # forecast - forecast text
         data['forecast'] = self.forecast.get_zambretti_text()
         # version - weather software version
