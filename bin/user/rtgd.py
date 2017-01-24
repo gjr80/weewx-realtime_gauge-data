@@ -626,6 +626,15 @@ class RealtimeGaugeDataThread(threading.Thread):
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
 
+        if self.min_interval is None:
+            _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is None"
+        elif self.min_interval == 1:
+            _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is 1 second"
+        else:
+            _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is %s seconds" % self.min_interval
+        loginf("engine", _msg)
+
+
     def run(self):
         """Collect packets from the queue and manage their processing.
 
