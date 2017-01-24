@@ -6,13 +6,101 @@ The *Realtime gauge-data* extension generates a loop data based *gauge-data.txt*
 
 ## Pre-Requisites ##
 
-To be advised.
+The *Realtime gauge-data* extension requires weewx v3.4.0 or greater.
 
 ## Installation ##
 
-To be advised.
+The *Realtime gauge-data* extension can be installed manually or automatically using the *wee_extension* utility. the preferred method of installation is through the use of *wee_extension*.
 
-## Support ###
+**Note:**   Symbolic names are used below to refer to some file location on the weewx system. These symbolic names allow a common name to be used to refer to a directory that may be different from system to system. The following symbolic names are used below:
+
+-   *$DOWNLOAD_ROOT*. The path to the directory containing the downloaded *Realtime gauge-data* extension.
+    
+-   *$HTML_ROOT*. The path to the directory where weewx generated reports are saved. This directory is normally set in the *[StdReport]* section of *weewx.conf*. Refer to [where to find things](http://weewx.com/docs/usersguide.htm#Where_to_find_things "where to find things") in the weewx [User's Guide](http://weewx.com/docs/usersguide.htm "User's Guide to the weewx Weather System") for further information.
+    
+-   *$SKIN_ROOT*. The path to the directory where weewx skin folders are located This directory is normally set in the *[StdReport]* section of *weewx.conf*. Refer to [where to find things](http://weewx.com/docs/usersguide.htm#Where_to_find_things "where to find things") in the weewx [User's Guide](http://weewx.com/docs/usersguide.htm "User's Guide to the weewx Weather System") for further information.
+
+### Installation using the wee_extension utility ### 
+
+1.  Download the latest *Realtime gauge-data* extension from the Realtime gauge-data [releases page](https://github.com/gjr80/weewx-realtime_gauge-data/releases) into a directory accessible from the weewx machine.
+
+     
+        wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.2.0/rtgd-0.2.0.tar.gz
+
+    where $DOWNLOAD_ROOT is the path to the directory where the *Realtime gauge-data* extension is to be downloaded.  
+
+2.  Stop *weewx*:
+
+        sudo /etc/init.d/weewx stop
+
+    or
+
+        sudo service weewx stop
+
+3.  Install the *Realtime gauge-data* extension downloaded at step 1 using the *wee_extension* utility:
+
+        wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.2.0.tar.gz
+
+    This will result in output similar to the following:
+
+        Request to install '/var/tmp/rtgd-0.2.0.tar.gz'
+        Extracting from tar archive /var/tmp/rtgd-0.2.0.tar.gz
+        Saving installer file to /home/weewx/bin/user/installer/Rtgd
+        Saved configuration dictionary. Backup copy at /home/weewx/weewx.conf.20161123124410
+        Finished installing extension '/var/tmp/rtgd-0.2.0.tar.gz'
+
+4.  Start *weewx*:
+
+        sudo /etc/init.d/weewx start
+
+    or
+
+        sudo service weewx start
+
+This will result in the *gauge-data.txt* file being generated based on loop data. A default installation will result in the *gauge-data.txt* file being saved in the *$HTML_ROOT* directory. The *Realtime gauge-data* extension installation can be further customized (eg file locations, frequency of generation etc) by referring to the *Realtime gauge-data* extension wiki.
+
+### Manual installation ###
+
+1.  Download the latest *Realtime gauge-data* extension from the Realtime gauge-data [releases page](https://github.com/gjr80/weewx-realtime_gauge-data/releases) into a directory accessible from the weewx machine.
+
+        wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.2.0/rtgd-0.2.0.tar.gz
+
+    where $DOWNLOAD_ROOT is the path to the directory where the *Realtime gauge-data* extension is to be downloaded.  
+
+2.  Unpack the extension as follows:
+
+        tar xvfz rtgd-0.2.0.tar.gz
+
+3.  Copy files from within the resulting directory as follows:
+
+        cp rtgd/bin/user/rtgd.py $BIN_ROOT/user
+    
+    replacing the symbolic name *$BIN_ROOT* with the nominal locations for your installation.
+
+4.  Edit *weewx.conf*:
+
+        vi weewx.conf
+
+5.  In *weewx.conf*, modify the *[Engine] [[Services]]* section by adding the *RealtimeGaugeData* service to the list of process services to be run:
+
+        [Engine]
+            [[Services]]
+        
+                report_services = weewx.engine.StdPrint, weewx.engine.StdReport, user.rtgd.RealtimeGaugeData
+
+6.  Stop then start weewx:
+
+        sudo /etc/init.d/weewx stop
+        sudo /etc/init.d/weewx start
+
+    or
+
+        sudo service weewx stop
+        sudo service weewx start
+
+This will result in the *gauge-data.txt* file being generated based on loop data. A default installation will result in the *gauge-data.txt* file being saved in the *$HTML_ROOT* directory. The *Realtime gauge-data* extension installation can be further customized (eg file locations, frequency of generation etc) by referring to the *Realtime gauge-data* extension wiki.
+
+## Support ##
 
 General support issues may be raised in the Google Groups [weewx-user forum](https://groups.google.com/group/weewx-user "Google Groups weewx-user forum"). Specific bugs in the *Realtime gauge-data* extension code should be the subject of a new issue raised via the [Issues Page](https://github.com/gjr80/weewx-realtime_gdrt/issues "Realtime gauge-data extension Issues").
  
