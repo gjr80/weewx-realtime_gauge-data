@@ -215,7 +215,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool
 
 # version number of this script
-RTGD_VERSION = '0.2.0'
+RTGD_VERSION = '0.2.1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
