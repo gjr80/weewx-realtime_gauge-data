@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.0                                      Date: 24 January 2017
 #
 # Revision History
+#  15 February 2017     v0.2.1  - fixed error that resulted in incorrect pressL
+#                                 and pressH values
 #  24 January 2017      v0.2.0  - now runs in a thread to eliminate blocking
 #                                 impact on weewx
 #                               - now calculates WindRoseData
@@ -443,7 +444,7 @@ class RealtimeGaugeData(StdService):
         inter_dict = {'table_name': self.db_manager.table_name,
                       'obs_type': obs_type}
         # the query to be used
-        minmax_sql = "SELECT MAX(min), MIN(max) FROM %(table_name)s_day_%(obs_type)s"
+        minmax_sql = "SELECT MIN(min), MAX(max) FROM %(table_name)s_day_%(obs_type)s"
         # execute the query
         _row = self.db_manager.getSql(minmax_sql % inter_dict)
         if not _row or None in _row:
@@ -1066,7 +1067,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             data['TpressTL'] = None
             data['TpressTH'] = None
         # pressL - all time low barometer
-        if self.max_barometer is not None:
+        if self.min_barometer is not None:
             pressL_vt = ValueTuple(self.min_barometer,
                                    self.p_baro_type,
                                    self.p_baro_group)
