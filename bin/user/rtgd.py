@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
+# Version: 0.2.1                                      Date: 15 February 2017
 #
 # Revision History
 #  15 February 2017     v0.2.1  - fixed error that resulted in incorrect pressL
