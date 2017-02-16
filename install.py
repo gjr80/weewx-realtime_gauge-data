@@ -11,12 +11,14 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.0                                        Date: 24 January 2017
+# Version: 0.2.1                                        Date: 15 February 2017
 #
 # Revision History
-#  24 January 2017      v0.2.0
+#  15 February 2017    v0.2.1
+#       - minor formatting changes
+#  24 January 2017      v0.2
 #       - updated weewx.conf options
-#  10 January 2017      v0.1.0
+#  10 January 2017      v0.1
 #       - initial implementation
 #
 
@@ -26,7 +28,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.0"
+RTGD_VERSION = "0.2.1"
 
 def loader():
     return RtgdInstaller()
@@ -34,14 +36,14 @@ def loader():
 class RtgdInstaller(ExtensionInstaller):
     def __init__(self):
         if StrictVersion(weewx.__version__) < StrictVersion(REQUIRED_VERSION):
-            msg = "%s requires weewx %s or greater, found %s" % ('Rtgd ' + RTGD_VERSION, 
+            msg = "%s requires weeWX %s or greater, found %s" % ('Rtgd ' + RTGD_VERSION, 
                                                                  REQUIRED_VERSION, 
                                                                  weewx.__version__)
             raise weewx.UnsupportedFeature(msg)
         super(RtgdInstaller, self).__init__(
             version=RTGD_VERSION,
             name='Rtgd',
-            description='weewx support for near realtime updating of the SteelSeries Weather Gauges.',
+            description='weeWX support for near realtime updating of the SteelSeries Weather Gauges.',
             author="Gary Roderick",
             author_email="gjroderick@gmail.com",
             report_services=['user.rtgd.RealtimeGaugeData'],
