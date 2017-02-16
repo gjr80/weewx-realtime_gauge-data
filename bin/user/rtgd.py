@@ -1,6 +1,6 @@
 # rtgd.py
 #
-# A weewx service to generate a loop based gauge-data.txt.
+# A weeWX service to generate a loop based gauge-data.txt.
 #
 # Copyright (C) 2017 Gary Roderick                  gjroderick<at>gmail.com
 #
@@ -23,7 +23,7 @@
 #  15 February 2017     v0.2.1  - fixed error that resulted in incorrect pressL
 #                                 and pressH values
 #  24 January 2017      v0.2.0  - now runs in a thread to eliminate blocking
-#                                 impact on weewx
+#                                 impact on weeWX
 #                               - now calculates WindRoseData
 #                               - now calculates pressL and pressH
 #                               - frequency of generation is now specified by
@@ -37,17 +37,17 @@
 #  18 January 2017      v0.1.1  - better handles loop observations that are None
 #  3 January 2017       v0.1.0  - initial release
 #
-"""A weewx service to generate a loop based gauge-data.txt.
+"""A weeWX service to generate a loop based gauge-data.txt.
 
 Used to update the SteelSeries Weather Gauges in near real time.
 
-Inspired by crt.py v0.5 by Matthew Wall, a weewx service to emit loop data to
+Inspired by crt.py v0.5 by Matthew Wall, a weeWX service to emit loop data to
 file in Cumulus realtime format. Refer http://wiki.sandaysoft.com/a/Realtime.txt
 
 Abbreviated instructions for use:
 
-1.  Install the SteelSeries Weather Gauges for weewx and confirm correct
-operation of the gauges with weewx. Refer to
+1.  Install the SteelSeries Weather Gauges for weeWX and confirm correct
+operation of the gauges with weeWX. Refer to
 https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_server/WeeWX
 
 2.  Put this file in $BIN_ROOT/user.
@@ -160,7 +160,7 @@ Gauges.
 
 7.  Delete the file $HTML_ROOT/ss/scripts/gauges.js.
 
-8.  Stop/start weewx
+8.  Stop/start weeWX
 
 9.  Confirm that gauge-data.txt is being generated regularly as per the period
 and nth_loop settings under [RealtimeGaugeData] in weewx.conf.
@@ -172,7 +172,7 @@ To do:
     - hourlyrainTH, ThourlyrainTH and LastRainTipISO. Need to populate these
       fields, presently set to 0.0, 00:00 and 00:00 respectively.
     - Lost contact with station sensors is implemented for Vantage and Simulator
-      stations only. Need to extend current code to cater for the weewx
+      stations only. Need to extend current code to cater for the weeWX
       supported stations. Current code assume that contact is there unless told
       otherwise.
     - consolidate wind lists into a single list.
@@ -184,7 +184,7 @@ To do:
       this may not be reflected in the stats database as the average wind max
       recorded in stats db is based on archive records only. This is because
       windAv is in an archive record but not in a loop packet. This can be
-      remedied by adding the calculated average to the loop packet. weewx
+      remedied by adding the calculated average to the loop packet. weeWX
       normal archive processing will then take care of updating stats db.
 
 Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
@@ -195,16 +195,17 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
       and gauges.js
 """
 
+# python imports
 import Queue
 import datetime
 import json
 import math
 import os.path
-# import sys
 import syslog
 import threading
 import time
 
+# weeWX imports
 import weedb
 import weewx
 import weeutil.weeutil
@@ -223,7 +224,7 @@ GAUGE_DATA_VERSION = '13'
 COMPASS_POINTS = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
                   'S','SSW','SW','WSW','W','WNW','NW','NNW','N']
 
-# map weewx unit names to unit names supported by the SteelSeries Weather Gauges
+# map weeWX unit names to unit names supported by the SteelSeries Weather Gauges
 UNITS_WIND = {'mile_per_hour':      'mph',
               'meter_per_second':   'm/s',
               'km_per_hour':        'km/h',
@@ -261,6 +262,10 @@ def logmsg(level, msg):
     syslog.syslog(level, msg)
 
 
+def logcrit(id, msg):
+    logmsg(syslog.LOG_CRIT, '%s: %s' % (id, msg))
+
+
 def logdbg(id, msg):
     logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
 
@@ -286,7 +291,7 @@ def logerr(id, msg):
 class ZambrettiForecast(object):
     """Class to extract Zambretti forecast text.
 
-    Requires the weewx forecast extension to be installed and configured to
+    Requires the weeWX forecast extension to be installed and configured to
     provide the Zambretti forecast otherwise 'Forecast not available' will be
     returned."""
 
@@ -299,7 +304,7 @@ class ZambrettiForecast(object):
     def __init__(self, config_dict):
         """Initialise the ZambrettiForecast object."""
 
-        # flag as to whether the weewx forecasting extension is installed
+        # flag as to whether the weeWX forecasting extension is installed
         self.forecasting_installed = False
         # set some forecast db access parameters
         self.db_max_tries = 3
@@ -703,11 +708,10 @@ class RealtimeGaugeDataThread(threading.Thread):
             except Exception, e:
                 # Some unknown exception occurred. This is probably a serious
                 # problem. Exit.
-                syslog.syslog(syslog.LOG_CRIT,
-                              "rtgdthread: Unexpected exception of type %s" % (type(e), ))
+                logcrit("rtgdthread",
+                        "Unexpected exception of type %s" % (type(e), ))
                 weeutil.weeutil.log_traceback('*** ', syslog.LOG_DEBUG)
-                syslog.syslog(syslog.LOG_CRIT,
-                              "rtgdthread: Thread exiting. Reason: %s" % (e, ))
+                logcrit("rtgdthread", "Thread exiting. Reason: %s" % (e, ))
                 return
 
     def process_packet(self, packet):
@@ -745,8 +749,8 @@ class RealtimeGaugeDataThread(threading.Thread):
     def process_stats(self, package):
         """Process a stats package.
 
-            Inputs:
-                package: dict containing the stats data
+        Inputs:
+            package: dict containing the stats data
         """
 
         if package is not None:
@@ -756,13 +760,12 @@ class RealtimeGaugeDataThread(threading.Thread):
     def write_data(self, data):
         """Write the gauge-data.txt file.
 
-            Takes dictionary of data elements, converts them to JSON format
-            and writes them to file. Order of data elements may vary from time
-            to time but not an issue as gauge-data.txt is just a JSON format
-            data file.
+        Takes dictionary of data elements, converts them to JSON format and
+        writes them to file. Order of data elements may vary from time to time
+        but not an issue as gauge-data.txt is just a JSON format data file.
 
-            Inputs:
-                data:   dictionary of gauge-data.txt data elements
+        Inputs:
+            data:   dictionary of gauge-data.txt data elements
         """
 
         with open(self.rtgd_path_file, 'w') as f:
@@ -772,11 +775,11 @@ class RealtimeGaugeDataThread(threading.Thread):
     def calculate(self, packet):
         """Construct a data dict for gauge-data.txt.
 
-            Input:
-                packet: loop data packet
+        Input:
+            packet: loop data packet
 
-            Returns:
-                Dictionary of gauge-data.txt data elements.
+        Returns:
+            Dictionary of gauge-data.txt data elements.
         """
 
         packet_d = dict(packet)
@@ -1181,7 +1184,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # avgbearing - 10-minute average wind bearing (degrees)
         data['avgbearing'] = self.dir_format % self.windDirAvg if self.windDirAvg is not None else "0.0"
         # bearingTM - The wind bearing at the time of today's high gust
-        # As our self.day_stats is really a Weewx accumulator filled with the
+        # As our self.day_stats is really a weeWX accumulator filled with the
         # relevant days stats we need to use .max_dir rather than .gustdir
         # to get the gust direction for the day.
         bearingTM = self.day_stats['wind'].max_dir if self.day_stats['wind'].max_dir is not None else 0
@@ -1344,12 +1347,12 @@ class RealtimeGaugeDataThread(threading.Thread):
 class RtgdBuffer(object):
     """Class to buffer various loop packet obs.
 
-        If archive based stats are an efficient means of getting stats for
-        today. However, their use would mean that any daily stat (eg todays max
-        outTemp) that 'occurs' after the most recent archive record but before
-        the next archive record is written to archive will not be captured. For
-        this reason selected loop data is buffered to ensure that such stats
-        are correctly reflected.
+    If archive based stats are an efficient means of getting stats for today.
+    However, their use would mean that any daily stat (eg todays max outTemp)
+    that 'occurs' after the most recent archive record but before the next
+    archive record is written to archive will not be captured. For this reason
+    selected loop data is buffered to ensure that such stats are correctly
+    reflected.
     """
 
     def __init__(self, config_dict):
@@ -1371,8 +1374,8 @@ class RtgdBuffer(object):
     def reset_loop_stats(self):
         """Reset loop windrun sum/count and loop low/high/max stats.
 
-           Normally performed when the class is initialised and at the end of
-           each archive period.
+        Normally performed when the class is initialised and at the end of each
+        archive period.
         """
 
         # reset sum/counter for windrun calculator and sum for rain
@@ -1402,22 +1405,23 @@ class RtgdBuffer(object):
     def averageWind(self):
         """ Calculate average wind speed over an archive interval period.
 
-            Archive stats are defined on fixed 'archive interval' boundaries.
-            gauge-data.txt requires the average wind speed over the last
-            'archive interval' seconds. This means calculating over the last
-            'archive interval' seconds ending on the current loop period. This
-            is achieved by keeping a list of last 'archive interval' of loop
-            wind speed data and calculating a simple average.
-            Units used are loop data units so unit conversion of the result may
-            be required.
-            Result is only considered valid if a full 'archive interval' of
-            loop wind data is held. self.averageWind_valid is used to check
-            whether the result is valid or not.
+        Archive stats are defined on fixed 'archive interval' boundaries.
+        gauge-data.txt requires the average wind speed over the last
+        'archive interval' seconds. This means calculating over the last
+        'archive interval' seconds ending on the current loop period. This is
+        achieved by keeping a list of last 'archive interval' of loop wind
+        speed data and calculating a simple average.
+        Units used are loop data units so unit conversion of the result may be
+        required.
+        Result is only considered valid if a full 'archive interval' of loop
+        wind data is held. self.averageWind_valid is used to check whether the
+        result is valid or not.
 
-            Inputs: Nothing
+        Inputs:
+            Nothing
 
-            Returns: average wind speed over the last 'archive interval'
-                     seconds
+        Returns:
+            Average wind speed over the last 'archive interval' seconds
         """
 
         if self.averageWind_valid:
@@ -1432,15 +1436,17 @@ class RtgdBuffer(object):
     def tenMinuteAverageWindDir(self):
         """ Calculate average wind direction over the last 10 minutes.
 
-            Takes list of last 10 minutes of loop wind speed and direction data
-            and calculates a vector average direction.
-            Result is only considered valid if a full 10 minutes of loop
-            wind data is held. self.tenMinuteWind_valid is used to check
-            whether the result is valid or not.
+        Takes list of last 10 minutes of loop wind speed and direction data and
+        calculates a vector average direction.
+        Result is only considered valid if a full 10 minutes of loop wind data
+        is held. self.tenMinuteWind_valid is used to check whether the result
+        is valid or not.
 
-            Inputs: Nothing
+        Inputs:
+            Nothing
 
-            Returns: 10 minute vector average wind direction
+        Returns:
+            10 minute vector average wind direction
         """
 
         if self.tenMinuteWind_valid:
@@ -1455,19 +1461,20 @@ class RtgdBuffer(object):
         return avg_dir
 
     def tenMinuteWindGust(self):
-        """ Calculate 10 minute wind gust (ie max wind speed over last
-            10 minutes).
+        """ Calculate 10 minute wind gust.
 
-            Takes list of last 10 minutes of loop wind speed data and finds the
-            max value.  Units used are loop data units so unit conversion of
-            the result may be required.
-            Result is only considered valid if a full 10 minutes of loop
-            wind data is held. self.tenMinuteWind_valid is used to check
-            whether the result is valid or not.
+        Takes list of last 10 minutes of loop wind speed data and finds the max
+        value.  Units used are loop data units so unit conversion of the result
+        may be required.
+        Result is only considered valid if a full 10 minutes of loop wind data
+        is held. self.tenMinuteWind_valid is used to check whether the result
+        is valid or not.
 
-            Inputs: Nothing
+        Inputs:
+            Nothing
 
-            Returns: 10 minute wind gust
+        Returns:
+            10 minute wind gust
         """
 
         if self.tenMinuteWind_valid:
@@ -1482,20 +1489,20 @@ class RtgdBuffer(object):
     def setLowsAndHighs(self, packet):
         """ Update loop highs an dlows with new loop data.
 
-            Almost operates as a mini Weewx accumulator but wind data is
-            stored in lists to allow samples to be added at one end and old
-            samples dropped at the other end.
+        Almost operates as a mini weeWX accumulator but wind data is stored in
+        lists to allow samples to be added at one end and old samples dropped
+        at the other end.
 
-            - Look at each loop packet and update lows and highs as required.
-            - Add wind speed/direction data to archive_interval and 10 minute
-              lists used for average and 10 minute wind stats
+        -   Look at each loop packet and update lows and highs as required.
+        -   Add wind speed/direction data to archive_interval and 10 minute
+            lists used for average and 10 minute wind stats
 
-            Inputs:
-                packet: loop data packet
+        Inputs:
+            packet: loop data packet
 
-            Returns:
-                Nothing but updates various low/high stats and 'archive
-                interval' and 10 minute wind data lists
+        Returns:
+            Nothing but updates various low/high stats and 'archive interval'
+            and 10 minute wind data lists
         """
 
         packet_d = dict(packet)
@@ -1609,12 +1616,12 @@ class RtgdBuffer(object):
 def degreeToCompass(x):
     """Convert degrees to ordinal compass point.
 
-        Input:
-            x:      degrees
+    Input:
+        x:      degrees
 
-        Returns:
-            Corresponding ordinal compass point from COMPASS_POINTS. Can return
-            None.
+    Returns:
+        Corresponding ordinal compass point from COMPASS_POINTS. Can return
+        None.
     """
 
     if x is None:
@@ -1625,18 +1632,18 @@ def degreeToCompass(x):
 def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
     """ Calculate change in an observation over a specified period.
 
-        Inputs:
-            obs_type:   database field name of observation concerned
-            now_vt:     value of observation now (ie the finishing value)
-            group:      group our returned value must be in
-            db_manager: manager to be used
-            then_ts:    timestamp of start of trend period
-            grace:      the largest difference in time when finding the then_ts
-                        record that is acceptable
+    Inputs:
+        obs_type:   database field name of observation concerned
+        now_vt:     value of observation now (ie the finishing value)
+        group:      group our returned value must be in
+        db_manager: manager to be used
+        then_ts:    timestamp of start of trend period
+        grace:      the largest difference in time when finding the then_ts
+                    record that is acceptable
 
-        Returns:
-            Change in value over trend period. Can be positive, 0, negative or
-            None. Result will be in 'group' units.
+    Returns:
+        Change in value over trend period. Can be positive, 0, negative or
+        None. Result will be in 'group' units.
     """
 
     if now_vt.value is None:
@@ -1661,14 +1668,14 @@ def calc_windrose(db_manager, period, points):
     summing the archive windSpeed values for wind from that compass point over
     the period concerned. Resulting values are rounded to one decimal point.
 
-        Inputs:
-            db_manager: A manager object for the database to be used.
-            period:     Calculate the windrose using the last period (in
-                        seconds) of data in the archive.
-            points:     The number of compass points to use, normally 8 or 16.
+    Inputs:
+        db_manager: A manager object for the database to be used.
+        period:     Calculate the windrose using the last period (in
+                    seconds) of data in the archive.
+        points:     The number of compass points to use, normally 8 or 16.
 
-        Return:
-            List containing windrose data with 'points' elements.
+    Return:
+        List containing windrose data with 'points' elements.
     """
 
 
