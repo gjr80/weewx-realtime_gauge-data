@@ -1356,7 +1356,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # refresh our day (archive record based) stats to date in case we have
         # jumped to the next day
         self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
-        self.apptemp_day_stats = self.db_manager._get_day_summary(record['dateTime'])
+        self.apptemp_day_stats = self.apptemp_manager._get_day_summary(record['dateTime'])
 
     def end_archive_period(self):
         """Control processing at the end of each archive period."""
