@@ -1,3 +1,8 @@
+v0.2.2
+*   Added config option apptemp_binding specifying a binding containing appTemp
+    data. apptempTL and apptempTH default to apptemp if binding not specified
+    or it does not contain appTemp data.
+*   added missing mile string format to installer
 v0.2.1
 *   fixed error that resulted in incorrect pressL and pressH values
 v0.2

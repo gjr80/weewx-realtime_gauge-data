@@ -4,16 +4,18 @@
 # Foundation; either version 2 of the License, or (at your option) any later
 # version.
 #
-# This program is distributed in the hope that it will be useful, but WITHOUT 
+# This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 # FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 # details.
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.1                                        Date: 15 February 2017
+# Version: 0.2.2                                        Date: 19 February 2017
 #
 # Revision History
+#  19 February 2017    v0.2.2
+#       - added mile to string formats
 #  15 February 2017    v0.2.1
 #       - minor formatting changes
 #  24 January 2017      v0.2
@@ -28,7 +30,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.1"
+RTGD_VERSION = "0.2.2"
 
 def loader():
     return RtgdInstaller()
@@ -36,8 +38,8 @@ def loader():
 class RtgdInstaller(ExtensionInstaller):
     def __init__(self):
         if StrictVersion(weewx.__version__) < StrictVersion(REQUIRED_VERSION):
-            msg = "%s requires weeWX %s or greater, found %s" % ('Rtgd ' + RTGD_VERSION, 
-                                                                 REQUIRED_VERSION, 
+            msg = "%s requires weeWX %s or greater, found %s" % ('Rtgd ' + RTGD_VERSION,
+                                                                 REQUIRED_VERSION,
                                                                  weewx.__version__)
             raise weewx.UnsupportedFeature(msg)
         super(RtgdInstaller, self).__init__(
@@ -75,6 +77,7 @@ class RtgdInstaller(ExtensionInstaller):
                         'mbar': '%.1f',
                         'meter': '%.0f',
                         'meter_per_second': '%.1f',
+                        'mile': '%.1f',
                         'mile_per_hour': '%.0f',
                         'mm': '%.1f',
                         'mm_per_hour': '%.1f',
