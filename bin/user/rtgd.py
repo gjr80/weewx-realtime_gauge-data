@@ -1015,7 +1015,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                            self.p_temp_type,
                                            self.p_temp_group)
             apptempL_loop = convert(apptempTL_loop_vt, self.temp_group).value
-            apptempTL = self.temp_format % min(i for i in [apptempL_loop, apptempTL] if i is not None)
+            apptempTL = min(i for i in [apptempL_loop, apptempTL] if i is not None)
             apptempTH_vt = ValueTuple(self.apptemp_day_stats['appTemp'].max,
                                       self.p_temp_type,
                                       self.p_temp_group)
@@ -1024,7 +1024,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                            self.p_temp_type,
                                            self.p_temp_group)
             apptempH_loop = convert(apptempTH_loop_vt, self.temp_group).value
-            apptempTH = self.temp_format % max(apptempH_loop, apptempTH)
+            apptempTH = max(apptempH_loop, apptempTH)
             TapptempTL = time.localtime(self.apptemp_day_stats['appTemp'].mintime) if apptempL_loop >= apptempTL else time.localtime(self.buffer.apptempL_loop[1])
             TapptempTH = time.localtime(self.apptemp_day_stats['appTemp'].maxtime) if apptempH_loop <= apptempTH else time.localtime(self.buffer.apptempH_loop[1])
         else:
