@@ -17,9 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.1                                      Date: 15 February 2017
+# Version: 0.2.2                                      Date: 19 February 2017
 #
 # Revision History
+#  19 February 2017     v0.2.2  - Added config option apptemp_binding
+#                                 specifying a binding containing appTemp data.
+#                                 apptempTL and apptempTH default to apptemp if
+#                                 binding not specified or it does not contain
+#                                 appTemp data.
 #  15 February 2017     v0.2.1  - fixed error that resulted in incorrect pressL
 #                                 and pressH values
 #  24 January 2017      v0.2.0  - now runs in a thread to eliminate blocking
@@ -82,6 +87,9 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Period over which to calculate WindRoseData in seconds. Defaults
     # to 86400 (24 hours)
     windrose_period = 86400
+
+    # Binding to use for appTemp data. Defaults 'wx_binding'.
+    apptemp_binding = wx_binding
 
     # Parameters used in/required by rtgd calculations
     [[Calculate]]
@@ -216,7 +224,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool
 
 # version number of this script
-RTGD_VERSION = '0.2.1'
+RTGD_VERSION = '0.2.2'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -480,29 +488,29 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.manager_dict = manager_dict
 
         # get our RealtimeGaugeData config dictionary
-        self.rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
+        rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
 
         # setup every nth record or every n seconds file generation
-        self.min_interval = self.rtgd_config_dict.get('min_interval', None)
+        self.min_interval = rtgd_config_dict.get('min_interval', None)
         self.last_write = 0 # ts (actual) of last generation
 
         # get our file paths and names
-        _path = self.rtgd_config_dict.get('rtgd_path', '/var/tmp')
+        _path = rtgd_config_dict.get('rtgd_path', '/var/tmp')
         _html_root = os.path.join(config_dict['WEEWX_ROOT'],
                                   config_dict['StdReport'].get('HTML_ROOT', ''))
 
         rtgd_path = os.path.join(_html_root, _path)
         self.rtgd_path_file = os.path.join(rtgd_path,
-                                           self.rtgd_config_dict.get('rtgd_file_name',
-                                                                     'gauge-data.txt'))
+                                           rtgd_config_dict.get('rtgd_file_name',
+                                                                'gauge-data.txt'))
 
         # get windrose settings
         try:
-            self.wr_period = int(self.rtgd_config_dict.get('windrose_period', 86400))
+            self.wr_period = int(rtgd_config_dict.get('windrose_period', 86400))
         except ValueError:
             self.wr_period = 86400
         try:
-            self.wr_points = int(self.rtgd_config_dict.get('windrose_points', 16))
+            self.wr_points = int(rtgd_config_dict.get('windrose_points', 16))
         except ValueError:
             self.wr_points = 16
 
@@ -561,47 +569,47 @@ class RealtimeGaugeDataThread(threading.Thread):
                 self.nfac = 2.0
 
         # Get our groups and format strings
-        self.date_format = self.rtgd_config_dict.get('date_format',
-                                                     '%Y.%m.%d %H:%M')
+        self.date_format = rtgd_config_dict.get('date_format',
+                                                '%Y.%m.%d %H:%M')
         self.time_format = '%H:%M'
-        self.temp_group = self.rtgd_config_dict['Groups'].get('group_temperature',
-                                                              'degree_C')
-        self.temp_format = self.rtgd_config_dict.get(self.temp_group, '%.1f')
+        self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
+                                                         'degree_C')
+        self.temp_format = rtgd_config_dict.get(self.temp_group, '%.1f')
         self.temp_trend_format = '%+.1f'
-        self.hum_group = self.rtgd_config_dict['Groups'].get('group_percent',
-                                                             'percent')
-        self.hum_format = self.rtgd_config_dict.get(self.hum_group, '%.0f')
-        self.pres_group = self.rtgd_config_dict['Groups'].get('group_pressure',
-                                                              'hPa')
-        self.pres_format = self.rtgd_config_dict.get(self.pres_group, '%.1f')
+        self.hum_group = rtgd_config_dict['Groups'].get('group_percent',
+                                                        'percent')
+        self.hum_format = rtgd_config_dict.get(self.hum_group, '%.0f')
+        self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
+                                                         'hPa')
+        self.pres_format = rtgd_config_dict.get(self.pres_group, '%.1f')
         self.pres_trend_format = '%+.2f'
-        self.wind_group = self.rtgd_config_dict['Groups'].get('group_speed',
-                                                              'km_per_hour')
-        self.wind_format = self.rtgd_config_dict.get(self.wind_group, '%.1f')
-        self.rain_group = self.rtgd_config_dict['Groups'].get('group_rain',
-                                                              'mm')
-        self.rain_format = self.rtgd_config_dict.get(self.rain_group, '%.1f')
-        self.rainrate_group = self.rtgd_config_dict['Groups'].get('group_rainrate',
-                                                                  'mm_per_hour')
+        self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
+                                                         'km_per_hour')
+        self.wind_format = rtgd_config_dict.get(self.wind_group, '%.1f')
+        self.rain_group = rtgd_config_dict['Groups'].get('group_rain',
+                                                         'mm')
+        self.rain_format = rtgd_config_dict.get(self.rain_group, '%.1f')
+        self.rainrate_group = rtgd_config_dict['Groups'].get('group_rainrate',
+                                                             'mm_per_hour')
         if self.rainrate_group == 'cm_per_hour':
             self.rainrate_group = 'mm_per_hour'
-        self.rainrate_format = self.rtgd_config_dict.get(self.rainrate_group,
-                                                         '%.1f')
-        self.dir_group = self.rtgd_config_dict['Groups'].get('group_direction',
-                                                             'degree_compass')
-        self.dir_format = self.rtgd_config_dict.get(self.dir_group, '%.1f')
-        self.rad_group = self.rtgd_config_dict['Groups'].get('group_radiation',
-                                                             'watt_per_meter_squared')
-        self.rad_format = self.rtgd_config_dict.get(self.rad_group, '%.0f')
-        self.uv_group = self.rtgd_config_dict['Groups'].get('group_uv',
-                                                            'uv_index')
-        self.uv_format = self.rtgd_config_dict.get(self.uv_group, '%.1f')
-        self.dist_group = self.rtgd_config_dict['Groups'].get('group_distance',
-                                                              'km')
-        self.dist_format = self.rtgd_config_dict.get(self.dist_group, '%.1f')
-        self.alt_group = self.rtgd_config_dict['Groups'].get('group_altitude',
-                                                             'meter')
-        self.alt_format = self.rtgd_config_dict.get(self.alt_group, '%.1f')
+        self.rainrate_format = rtgd_config_dict.get(self.rainrate_group,
+                                                    '%.1f')
+        self.dir_group = rtgd_config_dict['Groups'].get('group_direction',
+                                                        'degree_compass')
+        self.dir_format = rtgd_config_dict.get(self.dir_group, '%.1f')
+        self.rad_group = rtgd_config_dict['Groups'].get('group_radiation',
+                                                        'watt_per_meter_squared')
+        self.rad_format = rtgd_config_dict.get(self.rad_group, '%.0f')
+        self.uv_group = rtgd_config_dict['Groups'].get('group_uv',
+                                                       'uv_index')
+        self.uv_format = rtgd_config_dict.get(self.uv_group, '%.1f')
+        self.dist_group = rtgd_config_dict['Groups'].get('group_distance',
+                                                         'km')
+        self.dist_format = rtgd_config_dict.get(self.dist_group, '%.1f')
+        self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
+                                                        'meter')
+        self.alt_format = rtgd_config_dict.get(self.alt_group, '%.1f')
         self.flag_format = '%.0f'
 
         # what units are incoming packets using
@@ -609,8 +617,16 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # Are we updating windrun using archive data only or archive and loop
         # data?
-        self.windrun_loop = to_bool(self.rtgd_config_dict.get('windrun_loop',
-                                                              'False'))
+        self.windrun_loop = to_bool(rtgd_config_dict.get('windrun_loop',
+                                                         'False'))
+
+        # weeWX does not normally archive appTemp so day stats are not usually
+        # available; however, if the user does have appTemp in a database then
+        # if we have a binding we can use it. Check if an appTemp binding was
+        # specified, if so use it, otherwise default to 'wx_binding'. We will
+        # check for data existence before using it.
+        self.apptemp_binding = rtgd_config_dict.get('apptemp_binding',
+                                                    'wx_binding')
 
         # create a RtgdBuffer object to hold our loop 'stats'
         self.buffer = RtgdBuffer(config_dict)
@@ -652,11 +668,18 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get a db manager
         self.db_manager = weewx.manager.open_manager(self.manager_dict)
+        # get a db manager for appTemp
+        loginf("run", "getting an apptemp manager for binding=%s" % self.apptemp_binding)
+        self.apptemp_manager = weewx.manager.open_manager_with_config(self.config_dict,
+                                                                      self.apptemp_binding)
+        loginf("run", "got an apptemp manager")
         # get a Zambretti forecast objects
         self.forecast = ZambrettiForecast(self.config_dict)
         logdbg("rtgdthread", "Zambretti is installed: %s" % self.forecast.is_installed())
         # initialise our day stats
         self.day_stats = self.db_manager._get_day_summary(time.time())
+        # initialise our day stats from our appTemp source
+        self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
         # get a windrose to start with since it is only on receipt of an
         # archive record
         logdbg2("rtgdthread", "calculating windrose data ...")
@@ -982,9 +1005,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         # apptempTH - today's high apparent temperature
         # TapptempTL - time of today's low apparent temperature (hh:mm)
         # TapptempTH - time of today's high apparent temperature (hh:mm)
-        if 'appTemp' in self.day_stats:
+        if 'appTemp' in self.apptemp_day_stats:
             # we have day stats for appTemp
-            apptempTL_vt = ValueTuple(self.day_stats['appTemp'].min,
+            apptempTL_vt = ValueTuple(self.apptemp_day_stats['appTemp'].min,
                                       self.p_temp_type,
                                       self.p_temp_group)
             apptempTL = convert(apptempTL_vt, self.temp_group).value
@@ -993,7 +1016,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                            self.p_temp_group)
             apptempL_loop = convert(apptempTL_loop_vt, self.temp_group).value
             apptempTL = self.temp_format % min(i for i in [apptempL_loop, apptempTL] if i is not None)
-            apptempTH_vt = ValueTuple(self.day_stats['appTemp'].max,
+            apptempTH_vt = ValueTuple(self.apptemp_day_stats['appTemp'].max,
                                       self.p_temp_type,
                                       self.p_temp_group)
             apptempTH = convert(apptempTH_vt, self.temp_group).value
@@ -1002,16 +1025,20 @@ class RealtimeGaugeDataThread(threading.Thread):
                                            self.p_temp_group)
             apptempH_loop = convert(apptempTH_loop_vt, self.temp_group).value
             apptempTH = self.temp_format % max(apptempH_loop, apptempTH)
-            TapptempTL = time.localtime(self.day_stats['appTemp'].mintime) if apptempL_loop >= apptempTL else time.localtime(self.buffer.apptempL_loop[1])
-            TapptempTH = time.localtime(self.day_stats['appTemp'].maxtime) if apptempH_loop <= apptempTH else time.localtime(self.buffer.apptempH_loop[1])
+            TapptempTL = time.localtime(self.apptemp_day_stats['appTemp'].mintime) if apptempL_loop >= apptempTL else time.localtime(self.buffer.apptempL_loop[1])
+            TapptempTH = time.localtime(self.apptemp_day_stats['appTemp'].maxtime) if apptempH_loop <= apptempTH else time.localtime(self.buffer.apptempH_loop[1])
         else:
-            # there are no appTemp day stats so all we can do is return None
-            apptempTL = None
-            apptempTH = None
+            # There are no appTemp day stats. Normally we would return None but
+            # the SteelSeries Gauges do not like None/null. Return the current
+            # appTemp value so as to not upset the gauge autoscaling. The day
+            # apptemp range wedge will not show, and the mouseover low/highs
+            # will be wrong but it is the best we can do.
+            apptempTL = apptemp
+            apptempTH = apptemp
             TapptempTL = datetime.date.today().timetuple()
             TapptempTH = datetime.date.today().timetuple()
-        data['apptempTL'] = apptempTL
-        data['apptempTH'] = apptempTH
+        data['apptempTL'] = self.temp_format % apptempTL if apptempTL is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        data['apptempTH'] = self.temp_format % apptempTH if apptempTH is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
         data['TapptempTL'] = time.strftime(self.time_format, TapptempTL)
         data['TapptempTH'] = time.strftime(self.time_format, TapptempTH)
         # humidex - humidex
@@ -1331,6 +1358,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # refresh our day (archive record based) stats to date in case we have
         # jumped to the next day
         self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
+        self.apptemp_day_stats = self.db_manager._get_day_summary(record['dateTime'])
 
     def end_archive_period(self):
         """Control processing at the end of each archive period."""
