@@ -669,10 +669,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get a db manager
         self.db_manager = weewx.manager.open_manager(self.manager_dict)
         # get a db manager for appTemp
-        loginf("run", "getting an apptemp manager for binding=%s" % self.apptemp_binding)
         self.apptemp_manager = weewx.manager.open_manager_with_config(self.config_dict,
                                                                       self.apptemp_binding)
-        loginf("run", "got an apptemp manager")
         # get a Zambretti forecast objects
         self.forecast = ZambrettiForecast(self.config_dict)
         logdbg("rtgdthread", "Zambretti is installed: %s" % self.forecast.is_installed())
