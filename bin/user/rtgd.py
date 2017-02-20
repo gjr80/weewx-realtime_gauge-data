@@ -681,7 +681,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get a windrose to start with since it is only on receipt of an
         # archive record
         logdbg2("rtgdthread", "calculating windrose data ...")
-        self.rose = calc_windrose(self.db_manager,
+        self.rose = calc_windrose(int(time.time()),
+                                  self.db_manager,
                                   self.wr_period,
                                   self.wr_points)
         logdbg2("rtgdthread", "windrose data calculated")
@@ -698,7 +699,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                     self.new_archive_record(_package['payload'])
                     logdbg2("rtgdthread", "received archive record")
                     logdbg2("rtgdthread", "calculating windrose data ...")
-                    self.rose = calc_windrose(self.db_manager,
+                    self.rose = calc_windrose(_package['payload']['dateTime'],
+                                              self.db_manager,
                                               self.wr_period,
                                               self.wr_points)
                     logdbg2("rtgdthread", "windrose data calculated")
@@ -1686,7 +1688,7 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
             then = convert(then_vt, group).value
             return now - then
 
-def calc_windrose(db_manager, period, points):
+def calc_windrose(now, db_manager, period, points):
     """Calculate a SteelSeries Weather Gauges windrose array.
 
     Calculate an array representing the 'amount of wind' from each of the 8 or
@@ -1708,7 +1710,7 @@ def calc_windrose(db_manager, period, points):
     # initialise our result
     rose = [0.0 for x in range(points)]
     # get the earliest ts we will use
-    ts = db_manager.lastGoodStamp() - period
+    ts = now - period
     # determine the factor to be used to divide numerical windDir into
     # cardinal/ordinal compass points
     angle = 360.0/points
@@ -1717,7 +1719,7 @@ def calc_windrose(db_manager, period, points):
                   'ts': ts,
                   'angle': angle}
     # the query to be used
-    windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) FROM %(table_name)s WHERE dateTime>=%(ts)s GROUP BY ROUND(windDir/%(angle)s)"
+    windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) FROM %(table_name)s WHERE dateTime>%(ts)s GROUP BY ROUND(windDir/%(angle)s)"
 
     # we expect at least 'points' rows in our result so use genSql
     for _row in db_manager.genSql(windrose_sql % inter_dict):
@@ -1728,9 +1730,9 @@ def calc_windrose(db_manager, period, points):
             # Because of the structure of the compass and the limitations in
             # SQL maths our 'North' result will be returned in 2 parts. It will
             # be the sum of the '0' group and the 'points' group.
-            if int(_row[0]) != points:
-                rose[int(_row[0])] = _row[0]
+            if int(_row[0]) != int(points):
+                rose[int(_row[0])] += _row[1]
             else:
-                rose[1] += _row[1]
+                rose[0] += _row[1]
     # now  round our results and return
     return [round(x,1) for x in rose]
