@@ -77,11 +77,11 @@ a directory accessible from the weeWX machine.
 
     sudo service weewx start
 
-This will result in the gauge-data.txt file being generated upon receipt of
-every nth loop packet. A default installation will result in the generated
-gauge-data.txt file being placed in the $HTML_ROOT directory. The Realtime
-gauge-data extension installation can be further customized (eg file locations
-etc) by referring to the Realtime gauge-data extension wiki.
+This will result in the gauge-data.txt file being generated on receipt of each 
+loop packet. A default installation will result in the generated gauge-data.txt 
+file being placed in the $HTML_ROOT directory. The Realtime gauge-data 
+extension installation can be further customized (eg file locations, frequency 
+of generation etc) by referring to the Realtime gauge-data extension wiki.
 
 Manual installation
 
@@ -127,8 +127,8 @@ RealtimeGaugeData service to the list of process services to be run:
 
     sudo service weewx start
 
-This will result in the gauge-data.txt file being generated upon receipt of
-every nth loop packet. A default installation will result in the generated
-gauge-data.txt file being placed in the $HTML_ROOT directory. The Realtime
-gauge-data extension installation can be further customized (eg file locations
-etc) by referring to the Realtime gauge-data extension wiki.
+This will result in the gauge-data.txt file being generated on receipt of each 
+loop packet. A default installation will result in the generated gauge-data.txt 
+file being placed in the $HTML_ROOT directory. The Realtime gauge-data 
+extension installation can be further customized (eg file locations, frequency 
+of generation etc) by referring to the Realtime gauge-data extension wiki.

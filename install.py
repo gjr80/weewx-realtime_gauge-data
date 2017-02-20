@@ -15,7 +15,7 @@
 #
 # Revision History
 #   20 February 2017    v0.2.3
-#       - no chnages, bump version number only
+#       - removed min_interval config option
 #   19 February 2017    v0.2.2
 #       - added mile to string formats
 #   15 February 2017    v0.2.1
@@ -54,7 +54,6 @@ class RtgdInstaller(ExtensionInstaller):
             config={
                 'RealtimeGaugeData': {
                     'date_format': '%Y.%m.%d %H:%M',
-                    'min_interval': '9',
                     'rtgd_path': '/home/weewx/public_html',
                     'windrose_points': '16',
                     'windrose_period': '86400',
