@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.3                                        Date: 20 February 2017
+# Version: 0.2.4                                        Date: 20 February 2017
 #
 # Revision History
+#   20 February 2017    v0.2.4
+#       - bumped version number only
 #   20 February 2017    v0.2.3
 #       - removed min_interval config option
 #   19 February 2017    v0.2.2
@@ -32,7 +34,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.3"
+RTGD_VERSION = "0.2.4"
 
 def loader():
     return RtgdInstaller()

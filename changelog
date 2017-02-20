@@ -1,3 +1,7 @@
+v0.2.4
+*   fixed error where rain units could not be changed form mm
+*   pressures now formats to correct number of decimal places
+*   reworked temp and pressure trend formatting
 v0.2.3
 *   Fixed logic error in windrose calculations. 
 *   Minor tweaking of windrose processing.
