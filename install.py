@@ -11,16 +11,18 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.2                                        Date: 19 February 2017
+# Version: 0.2.3                                        Date: 20 February 2017
 #
 # Revision History
-#  19 February 2017    v0.2.2
+#   20 February 2017    v0.2.3
+#       - no chnages, bump version number only
+#   19 February 2017    v0.2.2
 #       - added mile to string formats
-#  15 February 2017    v0.2.1
+#   15 February 2017    v0.2.1
 #       - minor formatting changes
-#  24 January 2017      v0.2
+#   24 January 2017      v0.2
 #       - updated weewx.conf options
-#  10 January 2017      v0.1
+#   10 January 2017      v0.1
 #       - initial implementation
 #
 
@@ -30,7 +32,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.2"
+RTGD_VERSION = "0.2.3"
 
 def loader():
     return RtgdInstaller()

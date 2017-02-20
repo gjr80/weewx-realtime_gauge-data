@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.2                                      Date: 19 February 2017
+# Version: 0.2.3                                      Date: 20 February 2017
 #
 # Revision History
+#  20 February 2017     v0.2.3  - Fixed logic error in windrose calculations. 
+#                                 Minor tweaking of windrose processing.
 #  19 February 2017     v0.2.2  - Added config option apptemp_binding
 #                                 specifying a binding containing appTemp data.
 #                                 apptempTL and apptempTH default to apptemp if
@@ -224,7 +226,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool
 
 # version number of this script
-RTGD_VERSION = '0.2.2'
+RTGD_VERSION = '0.2.3'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 

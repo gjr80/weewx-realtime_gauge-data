@@ -1,3 +1,6 @@
+v0.2.3
+*   Fixed logic error in windrose calculations. 
+*   Minor tweaking of windrose processing.
 v0.2.2
 *   Added config option apptemp_binding specifying a binding containing appTemp
     data. apptempTL and apptempTH default to apptemp if binding not specified
