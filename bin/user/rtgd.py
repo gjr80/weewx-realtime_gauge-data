@@ -17,10 +17,15 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.3                                      Date: 20 February 2017
+# Version: 0.2.4                                      Date: 20 February 2017
 #
 # Revision History
-#  20 February 2017     v0.2.3  - Fixed logic error in windrose calculations. 
+#  20 February 2017     v0.2.4  - fixed error where rain units could not be
+#                                 changed form mm
+#                               - pressures now formats to correct number of
+#                                 decimal places
+#                               - reworked temp and pressure trend formatting
+#  20 February 2017     v0.2.3  - Fixed logic error in windrose calculations.
 #                                 Minor tweaking of windrose processing.
 #  19 February 2017     v0.2.2  - Added config option apptemp_binding
 #                                 specifying a binding containing appTemp data.
@@ -244,7 +249,7 @@ UNITS_TEMP = {'degree_C': 'C',
 UNITS_PRES = {'inHg': 'in',
               'mbar': 'mb',
               'hPa':  'hPa'}
-UNITS_RAIN = {'in': 'in',
+UNITS_RAIN = {'inch': 'in',
               'mm': 'mm'}
 UNITS_CLOUD = {'ft':    'ft',
                'meter': 'm'}
@@ -576,42 +581,52 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.time_format = '%H:%M'
         self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
                                                          'degree_C')
-        self.temp_format = rtgd_config_dict.get(self.temp_group, '%.1f')
-        self.temp_trend_format = '%+.1f'
+        self.temp_format = rtgd_config_dict['StringFormats'].get(self.temp_group,
+                                                                 '%.1f')
         self.hum_group = rtgd_config_dict['Groups'].get('group_percent',
                                                         'percent')
-        self.hum_format = rtgd_config_dict.get(self.hum_group, '%.0f')
+        self.hum_format = rtgd_config_dict['StringFormats'].get(self.hum_group,
+                                                                '%.0f')
         self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
                                                          'hPa')
-        self.pres_format = rtgd_config_dict.get(self.pres_group, '%.1f')
-        self.pres_trend_format = '%+.2f'
+        self.pres_format = rtgd_config_dict['StringFormats'].get(self.pres_group,
+                                                                 '%.1f')
         self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
                                                          'km_per_hour')
-        self.wind_format = rtgd_config_dict.get(self.wind_group, '%.1f')
+        self.wind_format = rtgd_config_dict['StringFormats'].get(self.wind_group,
+                                                                 '%.1f')
         self.rain_group = rtgd_config_dict['Groups'].get('group_rain',
                                                          'mm')
-        self.rain_format = rtgd_config_dict.get(self.rain_group, '%.1f')
+        if self.rain_group == 'cm':
+            self.rain_group = 'mm'
+        self.rain_format = rtgd_config_dict['StringFormats'].get(self.rain_group,
+                                                                 '%.1f')
         self.rainrate_group = rtgd_config_dict['Groups'].get('group_rainrate',
                                                              'mm_per_hour')
         if self.rainrate_group == 'cm_per_hour':
             self.rainrate_group = 'mm_per_hour'
-        self.rainrate_format = rtgd_config_dict.get(self.rainrate_group,
-                                                    '%.1f')
+        self.rainrate_format = rtgd_config_dict['StringFormats'].get(self.rainrate_group,
+                                                                     '%.1f')
         self.dir_group = rtgd_config_dict['Groups'].get('group_direction',
                                                         'degree_compass')
-        self.dir_format = rtgd_config_dict.get(self.dir_group, '%.1f')
+        self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
+                                                                '%.1f')
         self.rad_group = rtgd_config_dict['Groups'].get('group_radiation',
                                                         'watt_per_meter_squared')
-        self.rad_format = rtgd_config_dict.get(self.rad_group, '%.0f')
+        self.rad_format = rtgd_config_dict['StringFormats'].get(self.rad_group,
+                                                                '%.0f')
         self.uv_group = rtgd_config_dict['Groups'].get('group_uv',
                                                        'uv_index')
-        self.uv_format = rtgd_config_dict.get(self.uv_group, '%.1f')
+        self.uv_format = rtgd_config_dict['StringFormats'].get(self.uv_group,
+                                                               '%.1f')
         self.dist_group = rtgd_config_dict['Groups'].get('group_distance',
                                                          'km')
-        self.dist_format = rtgd_config_dict.get(self.dist_group, '%.1f')
+        self.dist_format = rtgd_config_dict['StringFormats'].get(self.dist_group,
+                                                                 '%.1f')
         self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
                                                         'meter')
-        self.alt_format = rtgd_config_dict.get(self.alt_group, '%.1f')
+        self.alt_format = rtgd_config_dict['StringFormats'].get(self.alt_group,
+                                                                '%.1f')
         self.flag_format = '%.0f'
 
         # what units are incoming packets using
@@ -878,9 +893,10 @@ class RealtimeGaugeDataThread(threading.Thread):
         TtempTH = time.localtime(self.day_stats['outTemp'].maxtime) if tempH_loop <= tempTH else time.localtime(self.buffer.tempH_loop[1])
         data['TtempTH'] = time.strftime(self.time_format, TtempTH)
         # temptrend - temperature trend value
-        tempTrend = calc_trend('outTemp', temp_vt, self.temp_group,
-                               self.db_manager, ts - 3600, 300)
-        data['temptrend'] = self.temp_trend_format % tempTrend if tempTrend is not None else "0.0"
+        _temp_trend_val = calc_trend('outTemp', temp_vt, self.temp_group,
+                                     self.db_manager, ts - 3600, 300)
+        temp_trend = _temp_trend_val if _temp_trend_val is not None else 0.0
+        data['temptrend'] = self.temp_format % temp_trend
         # intemp - inside temperature
         intemp_vt = ValueTuple(packet_d['inTemp'],
                                self.p_temp_type,
@@ -1122,9 +1138,10 @@ class RealtimeGaugeDataThread(threading.Thread):
         pressH = convert(pressH_vt, self.pres_group).value
         data['pressH'] = self.pres_format % pressH
         # presstrendval -  pressure trend value
-        presstrendval = calc_trend('barometer', press_vt, self.pres_group,
-                                   self.db_manager, ts - 3600, 300)
-        data['presstrendval'] = self.pres_trend_format % presstrendval if presstrendval is not None else "0.0"
+        _p_trend_val = calc_trend('barometer', press_vt, self.pres_group,
+                                  self.db_manager, ts - 3600, 300)
+        presstrendval = _p_trend_val if _p_trend_val is not None else 0.0
+        data['presstrendval'] = self.pres_format % presstrendval
         # rfall - rain today
         rainDay = self.day_stats['rain'].sum + self.buffer.rainsum
         rainT_vt = ValueTuple(rainDay, self.p_rain_type, self.p_rain_group)
