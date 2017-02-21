@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.4                                      Date: 20 February 2017
+# Version: 0.2.5                                      Date: 21 February 2017
 #
 # Revision History
+#  21 February 2017     v0.2.5  - fixed error where altitude units could not be
+#                                 changed from meter
 #  20 February 2017     v0.2.4  - fixed error where rain units could not be
-#                                 changed form mm
+#                                 changed from mm
 #                               - pressures now formats to correct number of
 #                                 decimal places
 #                               - reworked temp and pressure trend formatting
@@ -231,7 +233,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool
 
 # version number of this script
-RTGD_VERSION = '0.2.3'
+RTGD_VERSION = '0.2.5'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -250,8 +252,8 @@ UNITS_PRES = {'inHg': 'in',
               'mbar': 'mb',
               'hPa':  'hPa'}
 UNITS_RAIN = {'inch': 'in',
-              'mm': 'mm'}
-UNITS_CLOUD = {'ft':    'ft',
+              'mm':   'mm'}
+UNITS_CLOUD = {'foot':  'ft',
                'meter': 'm'}
 
 # Define station lost contact checks for supported stations. Note that at
