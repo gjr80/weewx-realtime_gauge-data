@@ -580,7 +580,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.rainrate_group = ''.join([self.rain_group,'_per_hour'])
         self.rainrate_format = rtgd_config_dict['StringFormats'].get(self.rainrate_group,
                                                                      '%.1f')
-rainrate_format))
         self.dir_group = rtgd_config_dict['Groups'].get('group_direction',
                                                         'degree_compass')
         self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
