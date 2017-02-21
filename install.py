@@ -15,7 +15,7 @@
 #
 # Revision History
 #   21 February 2017    v0.2.5
-#       - bumped version number only
+#       - trimmed a number of config options
 #   20 February 2017    v0.2.4
 #       - bumped version number only
 #   20 February 2017    v0.2.3
@@ -59,15 +59,6 @@ class RtgdInstaller(ExtensionInstaller):
                 'RealtimeGaugeData': {
                     'date_format': '%Y.%m.%d %H:%M',
                     'rtgd_path': '/home/weewx/public_html',
-                    'windrose_points': '16',
-                    'windrose_period': '86400',
-                    'Calculate': {
-                        'atc': '0.8',
-                        'nfac': '2',
-                        'Algorithm': {
-                            'maxSolarRad': 'RS'
-                        },
-                    },
                     'StringFormats': {
                         'degree_C': '%.1f',
                         'degree_F': '%.1f',
@@ -78,7 +69,6 @@ class RtgdInstaller(ExtensionInstaller):
                         'inch_per_hour': '%.2f',
                         'km_per_hour': '%.0f',
                         'km': '%.1f',
-                        'knot': '%.0f',
                         'mbar': '%.1f',
                         'meter': '%.0f',
                         'meter_per_second': '%.1f',
@@ -93,9 +83,7 @@ class RtgdInstaller(ExtensionInstaller):
                     'Groups': {
                         'group_pressure': 'hPa',
                         'group_rain': 'mm',
-                        'group_rainrate': 'mm_per_hour',
                         'group_speed': 'km_per_hour',
-                        'group_distance': 'km',
                         'group_temperature': 'degree_C',
                         'group_percent': 'percent',
                         'group_uv': 'uv_index',
