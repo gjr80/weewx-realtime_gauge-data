@@ -22,6 +22,11 @@
 # Revision History
 #  21 February 2017     v0.2.5  - fixed error where altitude units could not be
 #                                 changed from meter
+#                               - rainrate and windrun unit groups are now
+#                                 derived from rain and speed units groups
+#                                 respectively
+#                               - solar calc config options no longer searched
+#                                 for in [StdWXCalculate]
 #  20 February 2017     v0.2.4  - fixed error where rain units could not be
 #                                 changed from mm
 #                               - pressures now formats to correct number of
@@ -81,13 +86,12 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # seconds have elapsed since the last generation. If min_interval is 0 or
     # omitted generation will occur on every loop packet (as will be the case
     # if min_interval < station loop period)
-
     min_interval = 9.5
 
     # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
     # empty default is HTML_ROOT. If setting omitted altogether default is
     # /var/tmp
-    rtgd_path = ss
+    rtgd_path = /home/weewx/public_html
 
     # Number of compass points to include in WindRoseData, normally 8 or 16.
     # Defaults to 16
@@ -111,7 +115,6 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
             # or Bras
             maxSolarRad = RS
 
-
     [[StringFormats]]
         # String formats
         degree_C = %.1f
@@ -123,7 +126,6 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
         inch_per_hour = %.2f
         km_per_hour = %.0f
         km = %.1f
-        knot = %.0f
         mbar = %.1f
         meter = %.0f
         meter_per_second = %.1f
@@ -136,13 +138,13 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
         watt_per_meter_squared = %.0f
 
     [[Groups]]
-        # Groups
-        group_pressure = hPa            # Options are 'inHg', 'mbar', or 'hPa'
-        group_rain = mm                 # Options are 'inch' or 'mm'
-        group_rainrate = mm_per_hour    # Options are 'inch_per_hour' or 'mm_per_hour'. Note cm_per_hour not supported
-        group_speed = km_per_hour       # Options are 'mile_per_hour', 'km_per_hour', 'knot', or 'meter_per_second'
-        group_distance = km             # Options are 'mile', 'km'
-        group_temperature = degree_C    # Options are 'degree_F' or 'degree_C'
+        # Groups. Note not all weeWX units are supported.
+        group_pressure = hPa         # Options are 'inHg', 'mbar', or 'hPa'
+        group_rain = mm              # Options are 'inch' or 'mm'
+        group_rainrate = mm_per_hour # Options are 'inch_per_hour' or 'mm_per_hour'
+        group_speed = km_per_hour    # Options are 'mile_per_hour', 'km_per_hour' or 'meter_per_second'
+        group_distance = km          # Options are 'mile', 'km'
+        group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
         group_percent = percent
         group_uv = uv_index
         group_direction = degree_compass
@@ -244,8 +246,7 @@ COMPASS_POINTS = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
 # map weeWX unit names to unit names supported by the SteelSeries Weather Gauges
 UNITS_WIND = {'mile_per_hour':      'mph',
               'meter_per_second':   'm/s',
-              'km_per_hour':        'km/h',
-              'knot':               'kts'}
+              'km_per_hour':        'km/h'}
 UNITS_TEMP = {'degree_C': 'C',
               'degree_F': 'F'}
 UNITS_PRES = {'inHg': 'in',
@@ -255,6 +256,9 @@ UNITS_RAIN = {'inch': 'in',
               'mm':   'mm'}
 UNITS_CLOUD = {'foot':  'ft',
                'meter': 'm'}
+GROUP_DIST = {'mile_per_hour':      'mile',
+              'meter_per_second':   'km',
+              'km_per_hour':        'km'}
 
 # Define station lost contact checks for supported stations. Note that at
 # present only Vantage and FOUSB stations lost contact reporting is supported.
@@ -528,54 +532,20 @@ class RealtimeGaugeDataThread(threading.Thread):
         calc_dict = config_dict.get('Calculate', {})
         # algorithm
         algo_dict = calc_dict.get('Algorithm', {})
-        if 'maxSolarRad' in algo_dict:
-            self.solar_algorithm = algo_dict['maxSolarRad', 'RS']
-        else:
-            # do we have an algorithm in [StdWxCalculate], if so use that
-            svc_dict = config_dict.get('StdWXCalculate', {})
-            algo_dict = calc_dict.get('Algorithm', {})
-            self.solar_algorithm = algo_dict.get('maxSolarRad', 'RS')
+        self.solar_algorithm = algo_dict.get('maxSolarRad', 'RS')
         # atmospheric transmission coefficient [0.7-0.91]
-        if calc_dict and 'atc' in calc_dict:
-            self.atc = float(calc_dict.get('atc', 0.8))
-            # Fail hard if out of range:
-            if not 0.7 <= self.atc <= 0.91:
-                raise weewx.ViolatedPrecondition("Atmospheric transmission "
-                                                 "coefficient (%f) out of "
-                                                 "range [.7-.91]" % self.atc)
-        else:
-            # do we have an atc value in [StdWxCalculate], if so use that
-            svc_dict = config_dict.get('StdWXCalculate')
-            if svc_dict:
-                # atmospheric transmission coefficient [0.7-0.91]
-                self.atc = float(svc_dict.get('atc', 0.8))
-                # Fail hard if out of range:
-                if not 0.7 <= self.atc <= 0.91:
-                    raise weewx.ViolatedPrecondition("Atmospheric transmission "
-                                                     "coefficient (%f) out of "
-                                                     "range [.7-.91]" % self.atc)
-            else:
-                self.atc = 0.8
+        self.atc = float(calc_dict.get('atc', 0.8))
+        # Fail hard if out of range:
+        if not 0.7 <= self.atc <= 0.91:
+            raise weewx.ViolatedPrecondition("Atmospheric transmission "
+                                             "coefficient (%f) out of "
+                                             "range [.7-.91]" % self.atc)
         # atmospheric turbidity (2=clear, 4-5=smoggy)
-        if calc_dict and 'nfac' in calc_dict:
-            self.nfac = float(calc_dict.get('nfac', 2))
-            # Fail hard if out of range:
-            if not 2 <= self.nfac <= 5:
-                raise weewx.ViolatedPrecondition("Atmospheric turbidity (%d) "
-                                                 "out of range (2-5)" % self.nfac)
-        else:
-            # do we have an nfac value in [StdWxCalculate], if so use that
-            # otherwise default to 2
-            svc_dict = config_dict.get('StdWXCalculate')
-            if svc_dict:
-                # atmospheric transmission coefficient [0.7-0.91]
-                self.nfac = float(svc_dict.get('nfac', 2))
-                # Fail hard if out of range:
-                if not 2 <= self.nfac <= 5:
-                    raise weewx.ViolatedPrecondition("Atmospheric turbidity (%d) "
-                                                     "out of range (2-5)" % self.nfac)
-            else:
-                self.nfac = 2.0
+        self.nfac = float(calc_dict.get('nfac', 2))
+        # Fail hard if out of range:
+        if not 2 <= self.nfac <= 5:
+            raise weewx.ViolatedPrecondition("Atmospheric turbidity (%d) "
+                                             "out of range (2-5)" % self.nfac)
 
         # Get our groups and format strings
         self.date_format = rtgd_config_dict.get('date_format',
@@ -595,6 +565,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                  '%.1f')
         self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
                                                          'km_per_hour')
+        if self.wind_group == 'knot':
+            self.wind_group = 'mile_per_hour'
         self.wind_format = rtgd_config_dict['StringFormats'].get(self.wind_group,
                                                                  '%.1f')
         self.rain_group = rtgd_config_dict['Groups'].get('group_rain',
@@ -603,12 +575,12 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.rain_group = 'mm'
         self.rain_format = rtgd_config_dict['StringFormats'].get(self.rain_group,
                                                                  '%.1f')
-        self.rainrate_group = rtgd_config_dict['Groups'].get('group_rainrate',
-                                                             'mm_per_hour')
-        if self.rainrate_group == 'cm_per_hour':
-            self.rainrate_group = 'mm_per_hour'
+        # SteelSeries Weather gauges derives rain raten units from rain units,
+        # so must we
+        self.rainrate_group = ''.join([self.rain_group,'_per_hour'])
         self.rainrate_format = rtgd_config_dict['StringFormats'].get(self.rainrate_group,
                                                                      '%.1f')
+rainrate_format))
         self.dir_group = rtgd_config_dict['Groups'].get('group_direction',
                                                         'degree_compass')
         self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
@@ -621,8 +593,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                        'uv_index')
         self.uv_format = rtgd_config_dict['StringFormats'].get(self.uv_group,
                                                                '%.1f')
-        self.dist_group = rtgd_config_dict['Groups'].get('group_distance',
-                                                         'km')
+        # SteelSeries Weather gauges derives windrun units from wind speed
+        # units, so must we
+        self.dist_group = GROUP_DIST[self.wind_group]
         self.dist_format = rtgd_config_dict['StringFormats'].get(self.dist_group,
                                                                  '%.1f')
         self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
