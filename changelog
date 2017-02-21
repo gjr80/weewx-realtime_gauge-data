@@ -1,3 +1,5 @@
+v0.2.5
+*   fixed error where altitude units could not be changed from meter
 v0.2.4
 *   fixed error where rain units could not be changed form mm
 *   pressures now formats to correct number of decimal places
