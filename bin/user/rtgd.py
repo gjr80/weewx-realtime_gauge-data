@@ -17,9 +17,29 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.5                                      Date: 21 February 2017
+# Version: 0.2.6                                      Date: 22 February 2017
 #
 # Revision History
+#  22 February 2017     v0.2.6  - updated docstring config options to reflect
+#                                 current library of available options
+#                               - 'latest' and 'avgbearing' wind directions now
+#                                 return the last non-None wind direction
+#                                 respectively when their feeder direction is
+#                                 None
+#                               - implemented optional scroller_text config
+#                                 option allowing fixed scroller text to be
+#                                 specified in lieu of Zambretti forecast text
+#                               - renamed rtgd thread and queue variables
+#                               - no longer reads unit group config options
+#                                 that have only one possible unit
+#                               - use of mmHg, knot or cm units reverts to hPa,
+#                                 mile_per_hour and mm respectively due to
+#                                 weeWX or SteelSeries Gauges not understanding
+#                                 the unit (or derived unit)
+#                               - made gauge-data.txt unit code determination
+#                                 more robust
+#                               - reworked code that formats gauge-data.txt
+#                                 field data to better handle None values
 #  21 February 2017     v0.2.5  - fixed error where altitude units could not be
 #                                 changed from meter
 #                               - rainrate and windrun unit groups are now
@@ -77,46 +97,60 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Date format to be used in gauge-data.txt. Default is %Y.%m.%d %H:%M
     date_format = %Y.%m.%d %H:%M
 
-    # Ideally gauge-data.txt would be generated on receipt of every loop packet
-    # (there is no point in generating more frequently than this); however, in
-    # some cases the user may wish to generate gauge-data.txt less frequently.
-    # The min_interval option sets the minimum time between successive
-    # gauge-data.txt generations. Generation will always happen upon receipt of
-    # a loop packet; however, generation will be skipped unless min_interval
-    # seconds have elapsed since the last generation. If min_interval is 0 or
-    # omitted generation will occur on every loop packet (as will be the case
-    # if min_interval < station loop period)
-    min_interval = 9.5
-
     # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
     # empty default is HTML_ROOT. If setting omitted altogether default is
     # /var/tmp
     rtgd_path = /home/weewx/public_html
 
-    # Number of compass points to include in WindRoseData, normally 8 or 16.
-    # Defaults to 16
+    # File name (only) of file produced by rtgd. Optional, default is
+    # gauge-data.txt
+    rtgd_file_name = gauge-data.txt
+
+    # Minimum interval (seconds) between file generation. Ideally
+    # gauge-data.txt would be generated on receipt of every loop packet (there
+    # is no point in generating more frequently than this); however, in some
+    # cases the user may wish to generate gauge-data.txt less frequently. The
+    # min_interval option sets the minimum time between successive
+    # gauge-data.txt generations. Generation will be skipped on arrival of a
+    # loop packet if min_interval seconds have NOT elapsed since the last
+    # generation. If min_interval is 0 or omitted generation will occur on
+    # every loop packet (as will be the case if min_interval < station loop
+    period). Optional, default is 0.
+    min_interval =
+
+    # Number of compass points to include in WindRoseData, normally
+    # 8 or 16. Optional, default 16.
     windrose_points = 16
 
-    # Period over which to calculate WindRoseData in seconds. Defaults
-    # to 86400 (24 hours)
+    # Period over which to calculate WindRoseData in seconds. Optional, default
+    # is 86400 (24 hours).
     windrose_period = 86400
 
-    # Binding to use for appTemp data. Defaults 'wx_binding'.
+    # Binding to use for appTemp data. Optional, default 'wx_binding'.
     apptemp_binding = wx_binding
+
+    # Text to display on the scroller. Optional, if omitted then forecast text
+    # is displayed if available.
+    scroller_text = 'some text'
+
+    # Update windrun value each loop period or just on each archive period.
+    # Optional, default is False.
+    windrun_loop = false
 
     # Parameters used in/required by rtgd calculations
     [[Calculate]]
-        # atmospheric transmission coefficient [0.7-0.91]
+        # Atmospheric transmission coefficient [0.7-0.91]. Optional, default
+        # is 0.8
         atc = 0.8
-        # atmospheric turbidity (2=clear, 4-5=smoggy)
+        # Atmospheric turbidity (2=clear, 4-5=smoggy). Optional, default is 2.
         nfac = 2
         [[[Algorithm]]]
-            # theoretical max solar radiation algorithm to use. Must be RS
-            # or Bras
+            # Theoretical max solar radiation algorithm to use, must be RS or
+            # Bras. optional, default is RS
             maxSolarRad = RS
 
     [[StringFormats]]
-        # String formats
+        # String formats. Optional.
         degree_C = %.1f
         degree_F = %.1f
         degree_compass = %.0f
@@ -138,16 +172,14 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
         watt_per_meter_squared = %.0f
 
     [[Groups]]
-        # Groups. Note not all weeWX units are supported.
+        # Groups. Optional. Note not all available weeWX units are supported
+        # for each group.
+        group_altitude = foot        # Options are 'meter' or 'foot'
         group_pressure = hPa         # Options are 'inHg', 'mbar', or 'hPa'
         group_rain = mm              # Options are 'inch' or 'mm'
-        group_rainrate = mm_per_hour # Options are 'inch_per_hour' or 'mm_per_hour'
-        group_speed = km_per_hour    # Options are 'mile_per_hour', 'km_per_hour' or 'meter_per_second'
-        group_distance = km          # Options are 'mile', 'km'
+        group_speed = km_per_hour    # Options are 'mile_per_hour',
+                                       'km_per_hour' or 'meter_per_second'
         group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
-        group_percent = percent
-        group_uv = uv_index
-        group_direction = degree_compass
 
 4.  Add the RealtimeGaugeData service to the list of report services under
 [Engines] [[WxEngine]] in weewx.conf:
@@ -190,10 +222,10 @@ gauge-data.txt is generated.
 To do:
     - hourlyrainTH, ThourlyrainTH and LastRainTipISO. Need to populate these
       fields, presently set to 0.0, 00:00 and 00:00 respectively.
-    - Lost contact with station sensors is implemented for Vantage and Simulator
-      stations only. Need to extend current code to cater for the weeWX
-      supported stations. Current code assume that contact is there unless told
-      otherwise.
+    - Lost contact with station sensors is implemented for Vantage and
+      Simulator stations only. Need to extend current code to cater for the
+      weeWX supported stations. Current code assume that contact is there
+      unless told otherwise.
     - consolidate wind lists into a single list.
     - add windTM to loop packet (a la appTemp in wd.py). windTM is
       calculated as the greater of either (1) max windAv value for the day to
@@ -243,7 +275,8 @@ GAUGE_DATA_VERSION = '13'
 COMPASS_POINTS = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
                   'S','SSW','SW','WSW','W','WNW','NW','NNW','N']
 
-# map weeWX unit names to unit names supported by the SteelSeries Weather Gauges
+# map weeWX unit names to unit names supported by the SteelSeries Weather
+# Gauges
 UNITS_WIND = {'mile_per_hour':      'mph',
               'meter_per_second':   'm/s',
               'km_per_hour':        'km/h'}
@@ -367,7 +400,7 @@ class ZambrettiForecast(object):
             return 'Forecast not available'
 
         # SQL query to get the latest Zambretti forecast code
-        sql = "select dateTime,zcode from %s where method = 'Zambretti' order by dateTime desc limit 1" % self.dbm.table_name
+        sql = "SELECT dateTime,zcode FROM %s WHERE method = 'Zambretti' ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
         # try to execute the query
         for count in range(self.db_max_tries):
             try:
@@ -399,38 +432,38 @@ class RealtimeGaugeData(StdService):
         # initialize my superclass
         super(RealtimeGaugeData, self).__init__(engine, config_dict)
 
-        self.queue = Queue.Queue()
+        self.rtgd_queue = Queue.Queue()
         manager_dict = weewx.manager.get_manager_dict_from_config(config_dict,
                                                                   'wx_binding')
         self.db_manager = weewx.manager.open_manager(manager_dict)
-        self.loop_thread = RealtimeGaugeDataThread(self.queue,
+        self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_queue,
                                                    config_dict,
                                                    manager_dict,
                                                    latitude=engine.stn_info.latitude_f,
                                                    longitude=engine.stn_info.longitude_f,
                                                    altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
-        self.loop_thread.start()
+        self.rtgd_thread.start()
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
         self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
 
     def new_loop_packet(self, event):
-        """Puts new loop packets in the queue."""
+        """Puts new loop packets in the rtgd queue."""
 
         # self.cached_values.update(event.packet, event.packet['dateTime'])
         # logdbg("rtgd", "cached packet: %s" % self.cached_values.get_packet(event.packet['dateTime']))
-        # self.queue.put(self.cached_values.get_packet(event.packet['dateTime']))
+        # self.rtgd_queue.put(self.cached_values.get_packet(event.packet['dateTime']))
         _package = {'type': 'loop',
                     'payload': event.packet}
-        self.queue.put(_package)
+        self.rtgd_queue.put(_package)
         logdbg2("rtgd", "queued loop packet: %s" %  _package['payload'])
 
     def new_archive_record(self, event):
-        """Puts archive records in the queue."""
+        """Puts archive records in the rtgd queue."""
 
         _package = {'type': 'archive',
                     'payload': event.record}
-        self.queue.put(_package)
+        self.rtgd_queue.put(_package)
         logdbg2("rtgd", "queued archive record: %s" %  _package['payload'])
         # get alltime min max baro and put in the queue
         # get the min and max values (incl usUnits)
@@ -439,30 +472,30 @@ class RealtimeGaugeData(StdService):
         if _minmax_baro:
             _package = {'type': 'stats',
                         'payload': _minmax_baro}
-            self.queue.put(_package)
+            self.rtgd_queue.put(_package)
             logdbg2("rtgd", "queued min/max barometer values: %s" %  _package['payload'])
 
     def end_archive_period(self, event):
-        """Puts END_ARCHIVE_PERIOD event in the queue."""
+        """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
 
         _package = {'type': 'event',
                     'payload': weewx.END_ARCHIVE_PERIOD}
-        self.queue.put(_package)
+        self.rtgd_queue.put(_package)
         logdbg2("rtgd", "queued weewx.END_ARCHIVE_PERIOD event")
 
     def shutDown(self):
         """Shut down any threads."""
 
-        if hasattr(self, 'loop_queue') and hasattr(self, 'loop_thread'):
-            if self.queue and self.loop_thread.isAlive():
-                # Put a None in the queue to signal the thread to shutdown
-                self.queue.put(None)
+        if hasattr(self, 'rtgd_queue') and hasattr(self, 'rtgd_thread'):
+            if self.rtgd_queue and self.rtgd_thread.isAlive():
+                # Put a None in the rtgd_queue to signal the thread to shutdown
+                self.rtgd_queue.put(None)
                 # Wait up to 20 seconds for the thread to exit:
-                self.loop_thread.join(20.0)
-                if self.loop_thread.isAlive():
-                    logerr("rtgd", "Unable to shut down %s thread" % self.loop_thread.name)
+                self.rtgd_thread.join(20.0)
+                if self.rtgd_thread.isAlive():
+                    logerr("rtgd", "Unable to shut down %s thread" % self.rtgd_thread.name)
                 else:
-                    logdbg("rtgd", "Shut down %s thread." % self.loop_thread.name)
+                    logdbg("rtgd", "Shut down %s thread." % self.rtgd_thread.name)
 
     def get_minmax_obs(self, obs_type):
         """Obtain the alltime max/min values for and observation."""
@@ -496,7 +529,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         threading.Thread.__init__(self)
 
         self.setDaemon(True)
-        self.queue = queue
+        self.rtgd_queue = queue
         self.config_dict = config_dict
         self.manager_dict = manager_dict
 
@@ -517,9 +550,13 @@ class RealtimeGaugeDataThread(threading.Thread):
                                            rtgd_config_dict.get('rtgd_file_name',
                                                                 'gauge-data.txt'))
 
+        # get scroller text if there is any
+        self.scroller_text = rtgd_config_dict.get('scroller_text', None)
+
         # get windrose settings
         try:
-            self.wr_period = int(rtgd_config_dict.get('windrose_period', 86400))
+            self.wr_period = int(rtgd_config_dict.get('windrose_period',
+                                                      86400))
         except ValueError:
             self.wr_period = 86400
         try:
@@ -555,22 +592,31 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                          'degree_C')
         self.temp_format = rtgd_config_dict['StringFormats'].get(self.temp_group,
                                                                  '%.1f')
-        self.hum_group = rtgd_config_dict['Groups'].get('group_percent',
-                                                        'percent')
+        self.hum_group = 'percent'
         self.hum_format = rtgd_config_dict['StringFormats'].get(self.hum_group,
                                                                 '%.0f')
         self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
                                                          'hPa')
+        # SteelSeries Weather Gauges don't understand mmHg so default to hPa
+        # if we have been told to use mmHg
+        if self.pres_group == 'mmHg':
+            self.pres_group = 'hPa'
         self.pres_format = rtgd_config_dict['StringFormats'].get(self.pres_group,
                                                                  '%.1f')
         self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
                                                          'km_per_hour')
+        # Since the SteelSeries Weather Gauges derives distance units from wind
+        # speed units we cannot use knots becasue weeWX does not know how to
+        # use distance in nautical miles. If we have been told to use knot then
+        # default to mile_per_hour.
         if self.wind_group == 'knot':
             self.wind_group = 'mile_per_hour'
         self.wind_format = rtgd_config_dict['StringFormats'].get(self.wind_group,
                                                                  '%.1f')
         self.rain_group = rtgd_config_dict['Groups'].get('group_rain',
                                                          'mm')
+        # SteelSeries Weather Gauges don't understand cm so default to mm if we
+        # have been told to use cm
         if self.rain_group == 'cm':
             self.rain_group = 'mm'
         self.rain_format = rtgd_config_dict['StringFormats'].get(self.rain_group,
@@ -580,16 +626,13 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.rainrate_group = ''.join([self.rain_group,'_per_hour'])
         self.rainrate_format = rtgd_config_dict['StringFormats'].get(self.rainrate_group,
                                                                      '%.1f')
-        self.dir_group = rtgd_config_dict['Groups'].get('group_direction',
-                                                        'degree_compass')
+        self.dir_group = 'degree_compass'
         self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
                                                                 '%.1f')
-        self.rad_group = rtgd_config_dict['Groups'].get('group_radiation',
-                                                        'watt_per_meter_squared')
+        self.rad_group = 'watt_per_meter_squared'
         self.rad_format = rtgd_config_dict['StringFormats'].get(self.rad_group,
                                                                 '%.0f')
-        self.uv_group = rtgd_config_dict['Groups'].get('group_uv',
-                                                       'uv_index')
+        self.uv_group = 'uv_index'
         self.uv_format = rtgd_config_dict['StringFormats'].get(self.uv_group,
                                                                '%.1f')
         # SteelSeries Weather gauges derives windrun units from wind speed
@@ -605,6 +648,11 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # what units are incoming packets using
         self.packet_units = None
+
+        # initialise last wind directions for use when respective direction is
+        # None. We need latest and average
+        self.last_latest_dir = 0
+        self.last_average_dir = 0
 
         # Are we updating windrun using archive data only or archive and loop
         # data?
@@ -641,20 +689,22 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.version = str(GAUGE_DATA_VERSION)
 
         if self.min_interval is None:
-            _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is None"
+            _msg = "RealTimeGaugeData will generate gauge-data.txt. "\
+                       "min_interval is None"
         elif self.min_interval == 1:
-            _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is 1 second"
+            _msg = "RealTimeGaugeData will generate gauge-data.txt. "\
+                       "min_interval is 1 second"
         else:
             _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is %s seconds" % self.min_interval
         loginf("engine", _msg)
 
 
     def run(self):
-        """Collect packets from the queue and manage their processing.
+        """Collect packets from the rtgd queue and manage their processing.
 
         Now that we are in a thread get a manager for our db so we can
         initialise our forecast and day stats. Once this is done we wait for
-        something in the queue.
+        something in the rtgd queue.
         """
 
         # get a db manager
@@ -678,11 +728,11 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.wr_points)
         logdbg2("rtgdthread", "windrose data calculated")
 
-        # now run a continuous loop, waiting for records to appear in the queue
-        # then processing them.
+        # now run a continuous loop, waiting for records to appear in the rtgd
+        # queue then processing them.
         while True:
             while True:
-                _package = self.queue.get()
+                _package = self.rtgd_queue.get()
                 # a None record is our signal to exit
                 if _package is None:
                     return
@@ -708,9 +758,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                     self.process_stats(_package['payload'])
                     logdbg2("rtgdthread", "processed stats package")
                     continue
-                # if packets have backed up in the queue, trim it until it's no
-                # bigger than the max allowed backlog
-                if self.queue.qsize() <= 5:
+                # if packets have backed up in the rtgd queue, trim it until
+                # it's no bigger than the max allowed backlog
+                if self.rtgd_queue.qsize() <= 5:
                     break
 
             # we now have a packet to process, wrap in a try..except so we can
@@ -736,8 +786,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # do those things that must be done with every loop packet
         # ie update our lows and highs and our 5 and 10 min wind lists
         self.buffer.setLowsAndHighs(packet)
-        # generate if we have no minimum interval setting or if minimum interval
-        # seconds have elapsed since our last generation
+        # generate if we have no minimum interval setting or if minimum
+        # interval seconds have elapsed since our last generation
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
             try:
                 # set our lost contact flag if applicable
@@ -823,21 +873,22 @@ class RealtimeGaugeDataThread(threading.Thread):
         # sensors "Fine Offset only" 0 if contact has been established
         data['SensorContactLost'] = self.flag_format % self.lost_contact_flag
         # tempunit - temperature units - C, F
-        data['tempunit'] = UNITS_TEMP.get(self.temp_group, 'C')
+        data['tempunit'] = UNITS_TEMP[self.temp_group]
         # windunit -wind units - m/s, mph, km/h, kts
-        data['windunit'] = UNITS_WIND.get(self.wind_group, 'km/h')
+        data['windunit'] = UNITS_WIND[self.wind_group]
         # pressunit - pressure units - mb, hPa, in
-        data['pressunit'] = UNITS_PRES.get(self.pres_group, 'hPa')
+        data['pressunit'] = UNITS_PRES[self.pres_group]
         # rainunit - rain units - mm, in
-        data['rainunit'] = UNITS_RAIN.get(self.rain_group, 'mm')
+        data['rainunit'] = UNITS_RAIN[self.rain_group]
         # cloudbaseunit - cloud base units - m, ft
-        data['cloudbaseunit'] = UNITS_CLOUD.get(self.alt_group, 'm')
+        data['cloudbaseunit'] = UNITS_CLOUD[self.alt_group]
         # temp - outside temperature
         temp_vt = ValueTuple(packet_d['outTemp'],
                              self.p_temp_type,
                              self.p_temp_group)
         temp = convert(temp_vt, self.temp_group).value
-        data['temp'] = self.temp_format % temp if temp is not None else 0.0
+        temp = temp if temp is not None else 0.0
+        data['temp'] = self.temp_format % temp
         # tempTL - today's low temperature
         tempTL_vt = ValueTuple(self.day_stats['outTemp'].min,
                                self.p_temp_type,
@@ -876,7 +927,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                self.p_temp_type,
                                self.p_temp_group)
         intemp = convert(intemp_vt, self.temp_group).value
-        data['intemp'] = self.temp_format % intemp if intemp is not None else 0.0
+        intemp = intemp if intemp is not None else 0.0
+        data['intemp'] = self.temp_format % intemp
         # hum - relative humidity
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
@@ -903,7 +955,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_temp_type,
                                      self.p_temp_group)
         dew = convert(dew_vt, self.temp_group).value
-        data['dew'] = self.temp_format % dew if dew is not None else 0.0
+        dew = dew if dew is not None else 0.0
+        data['dew'] = self.temp_format % dew
         # dewpointTL - today's low dew point
         dewpointTL_vt = ValueTuple(self.day_stats['dewpoint'].min,
                                    self.p_temp_type,
@@ -937,7 +990,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                self.p_temp_type,
                                self.p_temp_group)
         wchill = convert(wchill_vt, self.temp_group).value
-        data['wchill'] = self.temp_format % wchill if wchill is not None else 0.0
+        wchill = wchill if wchill is not None else 0.0
+        data['wchill'] = self.temp_format % wchill
         # wchillTL - today's low wind chill
         wchillTL_vt = ValueTuple(self.day_stats['windchill'].min,
                                  self.p_temp_type,
@@ -957,7 +1011,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.p_temp_type,
                                   self.p_temp_group)
         heatindex = convert(heatindex_vt, self.temp_group).value
-        data['heatindex'] = self.temp_format % heatindex if heatindex is not None else 0.0
+        heatindex = heatindex if heatindex is not None else 0.0
+        data['heatindex'] = self.temp_format % heatindex
         # heatindexTH - today's high heat index
         heatindexTH_vt = ValueTuple(self.day_stats['heatindex'].max,
                                     self.p_temp_type,
@@ -992,7 +1047,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                  windspeed_ms)
             apptemp_vt = ValueTuple(apptemp_C, 'degree_C', 'group_temperature')
         apptemp = convert(apptemp_vt, self.temp_group).value
-        data['apptemp'] = self.temp_format % apptemp if apptemp is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        apptemp = apptemp if apptemp is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                              self.temp_group).value
+        data['apptemp'] = self.temp_format % apptemp
         # apptempTL - today's low apparent temperature
         # apptempTH - today's high apparent temperature
         # TapptempTL - time of today's low apparent temperature (hh:mm)
@@ -1029,8 +1086,12 @@ class RealtimeGaugeDataThread(threading.Thread):
             apptempTH = apptemp
             TapptempTL = datetime.date.today().timetuple()
             TapptempTH = datetime.date.today().timetuple()
-        data['apptempTL'] = self.temp_format % apptempTL if apptempTL is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
-        data['apptempTH'] = self.temp_format % apptempTH if apptempTH is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        apptempTL = apptempTL if apptempTL is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                                    self.temp_group).value
+        data['apptempTL'] = self.temp_format % apptempTL
+        apptempTH = apptempTH if apptempTH is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                                    self.temp_group).value
+        data['apptempTH'] = self.temp_format % apptempTH
         data['TapptempTL'] = time.strftime(self.time_format, TapptempTL)
         data['TapptempTH'] = time.strftime(self.time_format, TapptempTH)
         # humidex - humidex
@@ -1048,13 +1109,16 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                   packet_d['outHumidity'])
             humidex_vt = ValueTuple(humidex_C, 'degree_C', 'group_temperature')
             humidex = convert(humidex_vt, self.temp_group).value
-        data['humidex'] = self.temp_format % humidex if humidex is not None else self.temp_format % convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        humidex = humidex if humidex is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                              self.temp_group).value
+        data['humidex'] = self.temp_format % humidex
         # press - barometer
         press_vt = ValueTuple(packet_d['barometer'],
                               self.p_baro_type,
                               self.p_baro_group)
         press = convert(press_vt, self.pres_group).value
-        data['press'] = self.pres_format % press if press is not None else 0.0
+        press = press if press is not None else 0.0
+        data['press'] = self.pres_format % press
         # pressTL - today's low barometer
         # pressTH - today's high barometer
         # TpressTL - time of today's low barometer (hh:mm)
@@ -1120,7 +1184,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         rainDay = self.day_stats['rain'].sum + self.buffer.rainsum
         rainT_vt = ValueTuple(rainDay, self.p_rain_type, self.p_rain_group)
         rainT = convert(rainT_vt, self.rain_group).value
-        data['rfall'] = self.rain_format % rainT if rainT is not None else "0"
+        rainT = rainT if rainT is not None else 0.0
+        data['rfall'] = self.rain_format % rainT
         # rrate - current rain rate (per hour)
         if 'rainRate' in packet_d:
             rrate_vt = ValueTuple(packet_d['rainRate'],
@@ -1128,7 +1193,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.p_rainr_group)
             rrate = convert(rrate_vt, self.rainrate_group).value if rrate_vt.value is not None else 0.0
         else:
-            data['rrate'] = self.rainrate_format % 0.0
+            rrate = 0.0
         data['rrate'] = self.rainrate_format % rrate
         # rrateTM - today's maximum rain rate (per hour)
         if 'rainRate' in self.day_stats:
@@ -1161,13 +1226,15 @@ class RealtimeGaugeDataThread(threading.Thread):
         wlatest_vt = ValueTuple(packet_d['windSpeed'],
                                 self.p_wind_type,
                                 self.p_wind_group)
-        data['wlatest'] = self.wind_format % convert(wlatest_vt, self.wind_group).value if wlatest_vt.value is not None else "0.0"
+        wlatest = convert(wlatest_vt, self.wind_group).value if wlatest_vt.value is not None else 0.0
+        data['wlatest'] = self.wind_format % wlatest
         # wspeed - wind speed (average)
         wspeed_vt = ValueTuple(self.windSpeedAvg,
                                self.p_wind_type,
                                self.p_wind_group)
         wspeed = convert(wspeed_vt, self.wind_group).value
-        data['wspeed'] = self.wind_format % wspeed if wspeed is not None else "0.0"
+        wspeed = wspeed if wspeed is not None else 0.0
+        data['wspeed'] = self.wind_format % wspeed
         # windTM - today's high wind speed (average)
         windTM_vt = ValueTuple(self.day_stats['windSpeed'].max,
                                self.p_wind_type,
@@ -1183,7 +1250,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         wgust = self.buffer.tenMinuteWindGust()
         wgust_vt = ValueTuple(wgust, self.p_wind_type, self.p_wind_group)
         wgust = convert(wgust_vt, self.wind_group).value
-        data['wgust'] = self.wind_format % wgust if wgust is not None else "0.0"
+        wgust = wgust if wgust is not None else 0.0
+        data['wgust'] = self.wind_format % wgust
         # wgustTM - today's high wind gust
         wgustTM_vt = ValueTuple(self.day_stats['wind'].max,
                                 self.p_wind_type,
@@ -1199,10 +1267,13 @@ class RealtimeGaugeDataThread(threading.Thread):
         TwgustTM = time.localtime(self.day_stats['wind'].maxtime) if wgustM_loop <= wgustTM else time.localtime(self.buffer.wgustM_loop[2])
         data['TwgustTM'] = time.strftime(self.time_format, TwgustTM)
         # bearing - wind bearing (degrees)
-        windDir = packet_d['windDir'] if packet_d['windDir'] is not None else 0
-        data['bearing'] = self.dir_format % windDir
+        bearing = packet_d['windDir'] if packet_d['windDir'] is not None else self.last_latest_dir
+        self.last_latest_dir = bearing
+        data['bearing'] = self.dir_format % bearing
         # avgbearing - 10-minute average wind bearing (degrees)
-        data['avgbearing'] = self.dir_format % self.windDirAvg if self.windDirAvg is not None else "0.0"
+        avg_bearing = self.windDirAvg if self.windDirAvg is not None else self.last_average_dir
+        self.last_average_dir = avg_bearing
+        data['avgbearing'] = self.dir_format % avg_bearing
         # bearingTM - The wind bearing at the time of today's high gust
         # As our self.day_stats is really a weeWX accumulator filled with the
         # relevant days stats we need to use .max_dir rather than .gustdir
@@ -1270,7 +1341,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             data['Tbeaufort'] = str(weewx.wxformulas.beaufort(convert(wlatest_vt,
                                                                       'knot').value))
         else:
-            data['Tbeaufort'] = "0.0"
+            data['Tbeaufort'] = "0"
         # UV - UV index
         if 'UV' not in packet_d:
             UV = 0.0
@@ -1289,7 +1360,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             SolarRad = 0.0
         else:
             SolarRad = packet_d['radiation']
-        data['SolarRad'] = self.rad_format % SolarRad if SolarRad is not None else 0.0
+        SolarRad = SolarRad if SolarRad is not None else 0.0
+        data['SolarRad'] = self.rad_format % SolarRad
         # SolarTM - today's maximum solar radiation W/m2
         if 'radiation' not in self.day_stats:
             SolarTM = 0.0
@@ -1310,7 +1382,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                            self.altitude_m,
                                                            ts,
                                                            self.atc)
-        data['CurrentSolarMax'] = self.rad_format % curr_solar_max if curr_solar_max is not None else "0.0"
+        curr_solar_max = curr_solar_max if curr_solar_max is not None else 0.0
+        data['CurrentSolarMax'] = self.rad_format % curr_solar_max
         if 'cloudbase' in packet_d:
             cb = packet_d['cloudbase']
             cb_vt = ValueTuple(cb, self.p_alt_type, self.p_alt_group)
@@ -1321,9 +1394,15 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                    self.altitude_m)
             cb_vt = ValueTuple(cb, 'meter', self.p_alt_group)
         cloudbase = convert(cb_vt, self.alt_group).value
-        data['cloudbasevalue'] = self.alt_format % cloudbase if cloudbase is not None else 0.0
+        cloudbase = cloudbase if cloudbase is not None else 0.0
+        data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
-        data['forecast'] = self.forecast.get_zambretti_text()
+        # if we have any scoller text set then display that otehrwise use the
+        # Zambretti text
+        if self.scroller_text is not None:
+            data['forecast'] = self.scroller_text
+        else:
+            data['forecast'] = self.forecast.get_zambretti_text()
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
         # build -
@@ -1712,11 +1791,14 @@ def calc_windrose(now, db_manager, period, points):
                   'ts': ts,
                   'angle': angle}
     # the query to be used
-    windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) FROM %(table_name)s WHERE dateTime>%(ts)s GROUP BY ROUND(windDir/%(angle)s)"
+    windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) "\
+                       "FROM %(table_name)s WHERE dateTime>%(ts)s "\
+                       "GROUP BY ROUND(windDir/%(angle)s)"
 
     # we expect at least 'points' rows in our result so use genSql
     for _row in db_manager.genSql(windrose_sql % inter_dict):
-        # for windDir==None we expect some results with None, we can ignore those
+        # for windDir==None we expect some results with None, we can ignore
+        # those
         if _row is None or None in _row:
             pass
         else:
