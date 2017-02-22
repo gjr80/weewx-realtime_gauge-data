@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.5                                        Date: 21 February 2017
+# Version: 0.2.6                                        Date: 22 February 2017
 #
 # Revision History
+#   22 February 2017    v0.2.6
+#       - reworked Groups
 #   21 February 2017    v0.2.5
 #       - trimmed a number of config options
 #   20 February 2017    v0.2.4
@@ -36,7 +38,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.5"
+RTGD_VERSION = "0.2.6"
 
 def loader():
     return RtgdInstaller()
@@ -81,13 +83,11 @@ class RtgdInstaller(ExtensionInstaller):
                         'watt_per_meter_squared': '%.0f'
                     },
                     'Groups': {
+                        'group_altitude': 'foot',
                         'group_pressure': 'hPa',
                         'group_rain': 'mm',
                         'group_speed': 'km_per_hour',
-                        'group_temperature': 'degree_C',
-                        'group_percent': 'percent',
-                        'group_uv': 'uv_index',
-                        'group_direction': 'degree_compass'
+                        'group_temperature': 'degree_C'
                     }
                 }
             },

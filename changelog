@@ -1,3 +1,18 @@
+v0.2.6
+*   updated docstring config options to reflect current library of available
+    options
+*   'latest' and 'avgbearing' wind directions now return the last non-None
+    wind direction respectively when their feeder direction is None
+*   implemented optional scroller_text config option allowing fixed scroller
+    text to be specified in lieu of Zambretti forecast text
+*   renamed rtgd thread and queue variables
+*   no longer reads unit group config options that have only one possible unit
+*   use of mmHg, knot or cm units reverts to hPa, mile_per_hour and mm
+    respectively due to weeWX or SteelSeries Gauges not understanding the unit
+    (or derived unit)
+*   made gauge-data.txt unit code determination more robust
+*   reworked code that formats gauge-data.txt field data to better handle None
+    values
 v0.2.5
 *   fixed error where altitude units could not be changed from meter
 *   rainrate and windrun unit groups are now derived from rain and speed units
@@ -8,7 +23,7 @@ v0.2.4
 *   pressures now formats to correct number of decimal places
 *   reworked temp and pressure trend formatting
 v0.2.3
-*   Fixed logic error in windrose calculations. 
+*   Fixed logic error in windrose calculations.
 *   Minor tweaking of windrose processing.
 v0.2.2
 *   Added config option apptemp_binding specifying a binding containing appTemp
