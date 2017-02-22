@@ -606,7 +606,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
                                                          'km_per_hour')
         # Since the SteelSeries Weather Gauges derives distance units from wind
-        # speed units we cannot use knots becasue weeWX does not know how to
+        # speed units we cannot use knots because weeWX does not know how to
         # use distance in nautical miles. If we have been told to use knot then
         # default to mile_per_hour.
         if self.wind_group == 'knot':
@@ -621,7 +621,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.rain_group = 'mm'
         self.rain_format = rtgd_config_dict['StringFormats'].get(self.rain_group,
                                                                  '%.1f')
-        # SteelSeries Weather gauges derives rain raten units from rain units,
+        # SteelSeries Weather gauges derives rain rate units from rain units,
         # so must we
         self.rainrate_group = ''.join([self.rain_group,'_per_hour'])
         self.rainrate_format = rtgd_config_dict['StringFormats'].get(self.rainrate_group,
@@ -1079,8 +1079,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         else:
             # There are no appTemp day stats. Normally we would return None but
             # the SteelSeries Gauges do not like None/null. Return the current
-            # appTemp value so as to not upset the gauge autoscaling. The day
-            # apptemp range wedge will not show, and the mouseover low/highs
+            # appTemp value so as to not upset the gauge auto scaling. The day
+            # apptemp range wedge will not show, and the mouse-over low/highs
             # will be wrong but it is the best we can do.
             apptempTL = apptemp
             apptempTH = apptemp
@@ -1336,7 +1336,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         else:
             windrun = windrun_day_average
         data['windrun'] = self.dist_format % windrun
-        # Tbeaufort - wind speed (beaufort)
+        # Tbeaufort - wind speed (Beaufort)
         if packet_d['windSpeed'] is not None:
             data['Tbeaufort'] = str(weewx.wxformulas.beaufort(convert(wlatest_vt,
                                                                       'knot').value))
@@ -1397,7 +1397,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         cloudbase = cloudbase if cloudbase is not None else 0.0
         data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
-        # if we have any scoller text set then display that otehrwise use the
+        # if we have any scroller text set then display that otherwise use the
         # Zambretti text
         if self.scroller_text is not None:
             data['forecast'] = self.scroller_text
@@ -1587,7 +1587,7 @@ class RtgdBuffer(object):
         return gust
 
     def setLowsAndHighs(self, packet):
-        """ Update loop highs an dlows with new loop data.
+        """ Update loop highs and lows with new loop data.
 
         Almost operates as a mini weeWX accumulator but wind data is stored in
         lists to allow samples to be added at one end and old samples dropped
