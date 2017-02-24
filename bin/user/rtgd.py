@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.6                                      Date: 22 February 2017
+# Version: 0.2.7                                      Date: 23 February 2017
 #
 # Revision History
+#  23 February 2017     v0.2.7  - loop packets are now cached to support
+#                                 stations that emit partial packets
 #  22 February 2017     v0.2.6  - updated docstring config options to reflect
 #                                 current library of available options
 #                               - 'latest' and 'avgbearing' wind directions now
@@ -136,6 +138,11 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Update windrun value each loop period or just on each archive period.
     # Optional, default is False.
     windrun_loop = false
+
+    # Stations that provide partial packets are supported through a cache that
+    # caches packet data. max_cache_age is the maximum age  in seconds for
+    # which cached data is retained. Optional, default is 600 seconds.
+    max_cache_age = 600
 
     # Parameters used in/required by rtgd calculations
     [[Calculate]]
@@ -267,7 +274,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool
 
 # version number of this script
-RTGD_VERSION = '0.2.5'
+RTGD_VERSION = '0.2.7'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -426,7 +433,13 @@ class ZambrettiForecast(object):
 
 
 class RealtimeGaugeData(StdService):
-    """Service that generates gauge-data.txt in near realtime."""
+    """Service that generates gauge-data.txt in near realtime.
+    
+    The RealtimeGaugeData class creates and controls a threaded object of class
+    RealtimeGaugeDataThread that generates gauge-data.txt. Class 
+    RealtimeGaugeData feeds the RealtimeGaugeDataThread object with data via an 
+    instance of Queue.Queue.
+    """
 
     def __init__(self, engine, config_dict):
         # initialize my superclass
@@ -436,6 +449,8 @@ class RealtimeGaugeData(StdService):
         manager_dict = weewx.manager.get_manager_dict_from_config(config_dict,
                                                                   'wx_binding')
         self.db_manager = weewx.manager.open_manager(manager_dict)
+        # get an instance of class RealtimeGaugeDataThread and start the 
+        # thread running
         self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_queue,
                                                    config_dict,
                                                    manager_dict,
@@ -443,6 +458,7 @@ class RealtimeGaugeData(StdService):
                                                    longitude=engine.stn_info.longitude_f,
                                                    altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
         self.rtgd_thread.start()
+        # bind ourself to the relevant weeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
         self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
@@ -450,9 +466,8 @@ class RealtimeGaugeData(StdService):
     def new_loop_packet(self, event):
         """Puts new loop packets in the rtgd queue."""
 
-        # self.cached_values.update(event.packet, event.packet['dateTime'])
-        # logdbg("rtgd", "cached packet: %s" % self.cached_values.get_packet(event.packet['dateTime']))
-        # self.rtgd_queue.put(self.cached_values.get_packet(event.packet['dateTime']))
+        # package the loop packet in a dict since this is not the only data 
+        # we send via the queue
         _package = {'type': 'loop',
                     'payload': event.packet}
         self.rtgd_queue.put(_package)
@@ -461,6 +476,8 @@ class RealtimeGaugeData(StdService):
     def new_archive_record(self, event):
         """Puts archive records in the rtgd queue."""
 
+        # package the archive record in a dict since this is not the only data 
+        # we send via the queue
         _package = {'type': 'archive',
                     'payload': event.record}
         self.rtgd_queue.put(_package)
@@ -468,7 +485,8 @@ class RealtimeGaugeData(StdService):
         # get alltime min max baro and put in the queue
         # get the min and max values (incl usUnits)
         _minmax_baro = self.get_minmax_obs('barometer')
-        # if we have some data then package it and put it in the queue
+        # if we have some data then package it in a dict since this is not the 
+        # only data we send via the queue
         if _minmax_baro:
             _package = {'type': 'stats',
                         'payload': _minmax_baro}
@@ -478,6 +496,8 @@ class RealtimeGaugeData(StdService):
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
 
+        # package the event in a dict since this is not the only data we send 
+        # via the queue
         _package = {'type': 'event',
                     'payload': weewx.END_ARCHIVE_PERIOD}
         self.rtgd_queue.put(_package)
@@ -498,7 +518,7 @@ class RealtimeGaugeData(StdService):
                     logdbg("rtgd", "Shut down %s thread." % self.rtgd_thread.name)
 
     def get_minmax_obs(self, obs_type):
-        """Obtain the alltime max/min values for and observation."""
+        """Obtain the alltime max/min values for an observation."""
 
         # create an interpolation dict
         inter_dict = {'table_name': self.db_manager.table_name,
@@ -649,6 +669,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         # what units are incoming packets using
         self.packet_units = None
 
+        # get max cache age
+        self.max_cache_age = rtgd_config_dict.get('max_cache_age', 600)
+        # get a CachedPacket object as our loop packet cache
+        self.packet_cache = CachedPacket()
+
         # initialise last wind directions for use when respective direction is
         # None. We need latest and average
         self.last_latest_dir = 0
@@ -783,6 +808,8 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get time for debug timing
         t1 = time.time()
+        # update the packet cache with this packet
+        self.packet_cache.update(packet, packet['dateTime'])
         # do those things that must be done with every loop packet
         # ie update our lows and highs and our 5 and 10 min wind lists
         self.buffer.setLowsAndHighs(packet)
@@ -790,19 +817,23 @@ class RealtimeGaugeDataThread(threading.Thread):
         # interval seconds have elapsed since our last generation
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
             try:
+                # get a cached packet
+                cached_packet = self.packet_cache.get_packet(packet['dateTime'],
+                                                             self.max_cache_age)
+                logdbg2("rtgdthread", "cached loop packet: %s" % (cached_packet,))
                 # set our lost contact flag if applicable
                 if self.station_type in LOOP_STATIONS:
-                    self.lost_contact_flag = packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
+                    self.lost_contact_flag = cached_packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
                 data = {}
                 # get a data dict from which to construct our file
-                data = self.calculate(packet)
+                data = self.calculate(cached_packet)
                 # write our file
                 self.write_data(data)
                 # set our write time
                 self.last_write = time.time()
                 # log the generation
                 logdbg("rtgdthread",
-                       "packet (%s) gauge-data.txt generated in %.5f seconds" % (packet['dateTime'],
+                       "packet (%s) gauge-data.txt generated in %.5f seconds" % (cached_packet['dateTime'],
                                                                                  (self.last_write-t1)))
             except Exception, e:
                 weeutil.weeutil.log_traceback('rtgdthread: **** ')
@@ -1609,74 +1640,77 @@ class RtgdBuffer(object):
         ts = packet_d['dateTime']
 
         # process temp
-        outTemp = packet_d['outTemp']
+        outTemp = packet_d.get('outTemp', None)
         if outTemp is not None:
             self.tempL_loop = [outTemp, ts] if (outTemp < self.tempL_loop[0] or self.tempL_loop[0] is None) else self.tempL_loop
             self.tempH_loop = [outTemp, ts] if outTemp > self.tempH_loop[0] else self.tempH_loop
 
         # process dewpoint
-        dewpoint = packet_d['dewpoint']
+        dewpoint = packet_d.get('dewpoint', None)
         if dewpoint is not None:
             self.dewpointL_loop = [dewpoint, ts] if (dewpoint < self.dewpointL_loop[0] or self.dewpointL_loop[0] is None) else self.dewpointL_loop
             self.dewpointH_loop = [dewpoint, ts] if dewpoint > self.dewpointH_loop[0] else self.dewpointH_loop
 
         # process appTemp
-        appTemp = packet_d['appTemp']
+        appTemp = packet_d.get('appTemp', None)
         if appTemp is not None:
             self.apptempL_loop = [appTemp, ts] if (appTemp < self.apptempL_loop[0] or self.apptempL_loop[0] is None) else self.apptempL_loop
             self.apptempH_loop = [appTemp, ts] if appTemp > self.apptempH_loop[0] else self.apptempH_loop
 
         # process windchill
-        windchill = packet_d['windchill']
+        windchill = packet_d.get('windchill', None)
         if windchill is not None:
             self.wchillL_loop = [windchill, ts] if (windchill < self.wchillL_loop[0] or self.wchillL_loop[0] is None) else self.wchillL_loop
 
         # process heatindex
-        heatindex = packet_d['heatindex']
+        heatindex = packet_d.get('heatindex', None)
         if heatindex is not None:
             self.heatindexH_loop = [heatindex, ts] if heatindex > self.heatindexH_loop[0] else self.heatindexH_loop
 
         # process barometer
-        barometer = packet_d['barometer']
+        barometer = packet_d.get('barometer', None)
         if barometer is not None:
             self.pressL_loop = [barometer, ts] if (barometer < self.pressL_loop[0] or self.pressL_loop[0] is None) else self.pressL_loop
             self.pressH_loop = [barometer, ts] if barometer > self.pressH_loop[0] else self.pressH_loop
 
         # process rain
-        if 'rain' in packet_d and packet_d['rain'] is not None:
-            self.rainsum += packet_d['rain']
+        rain = packet_d.get('rain', None)
+        self.rainsum += rain if rain is not None else self.rainsum
 
         # process rainRate
-        if 'rainRate' in packet_d:
-            rainRate = packet_d['rainRate']
-            if rainRate is not None:
-                self.rrateH_loop = [rainRate, ts] if rainRate > self.rrateH_loop[0] else self.rrateH_loop
+        rainRate = packet_d.get('rainRate', None)
+        if rainRate is not None:
+            self.rrateH_loop = [rainRate, ts] if rainRate > self.rrateH_loop[0] else self.rrateH_loop
 
         # process humidity
-        outHumidity = packet_d['outHumidity']
+        outHumidity = packet_d.get('outHumidity', None)
         if outHumidity is not None:
             self.humL_loop = [outHumidity, ts] if (outHumidity < self.humL_loop[0] or self.humL_loop[0] is None) else self.humL_loop
             self.humH_loop = [outHumidity, ts] if outHumidity > self.humH_loop[0] else self.humH_loop
 
         # process UV
-        if 'UV' in packet_d:
-            UV = packet_d['UV']
-            if UV is not None:
-                self.UVH_loop = [UV, ts] if UV > self.UVH_loop[0] else self.UVH_loop
+        UV = packet_d.get('UV', None)
+        if UV is not None:
+            self.UVH_loop = [UV, ts] if UV > self.UVH_loop[0] else self.UVH_loop
 
         # process radiation
-        if 'radiation' in packet_d:
-            radiation = packet_d['radiation']
-            if radiation is not None:
-                self.SolarH_loop = [radiation, ts] if radiation > self.SolarH_loop[0] else self.SolarH_loop
+        radiation = packet_d.get('radiation', None)
+        if radiation is not None:
+            self.SolarH_loop = [radiation, ts] if radiation > self.SolarH_loop[0] else self.SolarH_loop
 
         # process windSpeed/windDir
-        windDir = packet_d['windDir'] if packet_d['windDir'] is not None else 0.0
-        windSpeed = packet_d['windSpeed'] if packet_d['windSpeed'] is not None else 0.0
+        # if windDir exists then get it, if it does not exist get None
+        windDir = packet_d.get('windDir', None)
+        # if windSpeed exists get it, if it does not exist or is None then
+        # get 0.0
+        windSpeed = packet_d.get('windSpeed', 0.0)
+        windSpeed = 0.0 if windSpeed is None else windSpeed
         self.windsum += windSpeed
         self.windcount += 1
-        # have we seen a new high gust? if so update self.wgustM_loop
-        self.wgustM_loop = [windSpeed, windDir, ts] if windSpeed > self.wgustM_loop[0] else self.wgustM_loop
+        # Have we seen a new high gust? If so update self.wgustM_loop but only
+        # if we have a corresponding wind direction
+        if windSpeed > self.wgustM_loop[0] and windDir is not None:
+            self.wgustM_loop = [windSpeed, windDir, ts]
         # average wind speed
         self.wind_list.append([windSpeed, ts])
         # if we have samples in our list then delete any too old
@@ -1693,10 +1727,12 @@ class RtgdBuffer(object):
         # have we seen a new high (archive_interval) avg wind? if so update
         # self.windM_loop
         self.windM_loop = [windM_loop, ts] if windM_loop > self.windM_loop[0] else self.windM_loop
-        # 10 minute average wind direction
-        self.wind_dir_list.append([windSpeed * math.cos(math.radians(90.0 - windDir)),
-                                   windSpeed * math.sin(math.radians(90.0 - windDir)),
-                                   windSpeed, windDir, ts])
+        # Update the 10 minute wind direction list, but only if windDir is not
+        # None
+        if windDir is not None:
+            self.wind_dir_list.append([windSpeed * math.cos(math.radians(90.0 - windDir)),
+                                      windSpeed * math.sin(math.radians(90.0 - windDir)),
+                                      windSpeed, windDir, ts])
         # if we have samples in our list then delete any too old
         if len(self.wind_dir_list) > 0:
             # calc ts of oldest sample we want to retain
@@ -1706,6 +1742,70 @@ class RtgdBuffer(object):
             self.tenMinuteWind_valid = self.wind_dir_list[0][4] <= old_ts
             # Remove any samples older than 10 minutes
             self.wind_dir_list = [s for s in self.wind_dir_list if s[4] > old_ts]
+
+
+# ============================================================================
+#                            Class CachedPacket
+# ============================================================================
+
+
+class CachedPacket():
+    """Class to cache loop packets.
+
+    Cache consists of a dictionary of value, timestamp pairs where timestamp is
+    the timestamp of the packet when obs was last seen and value is the value
+    of the obs at that time. None values may be cached.
+
+    A cached loop packet may be obtained by calling the get_packet() method.
+    """
+
+    def __init__(self):
+        # These fields must be available in every loop packet read from the
+        # cache. Initialise them to None.
+        OBS = ["cloudbase", "windDir", "windrun", "inHumidity", "outHumidity",
+               "barometer", "radiation", "rain", "rainRate","windSpeed",
+               "appTemp", "dewpoint", "heatindex", "humidex", "inTemp",
+               "outTemp", "windchill", "UV"]
+
+        self.cache = dict()
+        _ts = int(time.time() + 0.5)
+        for _obs in OBS:
+            self.cache[_obs] = {'value': None, 'ts': _ts}
+        self.unit_system = None
+
+    def update(self, packet, ts):
+        """Update the cache from a loop packet."""
+
+        if self.unit_system is None:
+            self.unit_system = packet['usUnits']
+        elif self.unit_system != packet['usUnits']:
+            packet = weewx.units.to_std_system(packet, self.unit_system)
+        for obs in [x for x in packet if x not in ['dateTime', 'usUnits']]:
+            if packet[obs] is not None:
+                self.cache[obs] = {'value': packet[obs], 'ts': ts}
+
+    def get_value(self, obs, ts, max_age):
+        """Get an obs value from the cache.
+
+        Return a value for a given obs from the cache. If the value is older
+        than max_age then None is returned.
+        """
+
+        if obs in self.cache and ts - self.cache[obs]['ts'] < max_age:
+            return self.cache[obs]['value']
+        return None
+
+    def get_packet(self, ts=None, max_age=600):
+        """Get a loop packet from the cache.
+
+        """
+
+        if ts is None:
+            ts = int(time.time() + 0.5)
+        pkt = {'dateTime': ts, 'usUnits': self.unit_system}
+        for obs in self.cache:
+            pkt[obs] = self.get_value(obs, ts, max_age)
+        return pkt
 
 
 # ============================================================================
