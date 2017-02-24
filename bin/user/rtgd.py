@@ -752,6 +752,19 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.wr_period,
                                   self.wr_points)
         logdbg2("rtgdthread", "windrose data calculated")
+        
+        _ts = self.db_manager.lastGoodStamp()
+        _rec = self.db_manager.getRecord(_ts)
+        # save the windSpeed value to use as our archive period average
+        if 'windSpeed' in _rec:
+            self.windSpeedAvg = _rec['windSpeed']
+        else:
+            self.windSpeedAvg = None
+        # save the windDir value to use as our archive period average
+        if 'windDir' in _rec:
+            self.windDirAvg = _rec['windDir']
+        else:
+            self.windDirAvg = None
 
         # now run a continuous loop, waiting for records to appear in the rtgd
         # queue then processing them.
@@ -1449,12 +1462,12 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.station_type in ARCHIVE_STATIONS:
             self.lost_contact_flag = record[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
         # save the windSpeed value to use as our archive period average
-        if 'windSpeed' in record and record['windSpeed'] is not None:
+        if 'windSpeed' in record:
             self.windSpeedAvg = record['windSpeed']
         else:
             self.windSpeedAvg = None
         # save the windDir value to use as our archive period average
-        if 'windDir' in record and record['windDir'] is not None:
+        if 'windDir' in record:
             self.windDirAvg = record['windDir']
         else:
             self.windDirAvg = None
