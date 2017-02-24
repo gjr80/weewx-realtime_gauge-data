@@ -1791,21 +1791,22 @@ class CachedPacket():
         than max_age then None is returned.
         """
 
-        if obs in self.cache and ts - self.cache[obs]['ts'] < max_age:
+        if obs in self.cache and ts - self.cache[obs]['ts'] <= max_age:
             return self.cache[obs]['value']
         return None
 
     def get_packet(self, ts=None, max_age=600):
         """Get a loop packet from the cache.
 
+        REsulting packet may contain None values.
         """
 
         if ts is None:
             ts = int(time.time() + 0.5)
-        pkt = {'dateTime': ts, 'usUnits': self.unit_system}
+        packet = {'dateTime': ts, 'usUnits': self.unit_system}
         for obs in self.cache:
-            pkt[obs] = self.get_value(obs, ts, max_age)
-        return pkt
+            packet[obs] = self.get_value(obs, ts, max_age)
+        return packet
 
 
 # ============================================================================
