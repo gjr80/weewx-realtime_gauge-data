@@ -1,3 +1,5 @@
+v0.2.7
+*   loop packets are now cached to support partial loop packet stations
 v0.2.6
 *   updated docstring config options to reflect current library of available
     options
