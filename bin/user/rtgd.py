@@ -22,6 +22,7 @@
 # Revision History
 #  23 February 2017     v0.2.7  - loop packets are now cached to support
 #                                 stations that emit partial packets
+#                               - average wind speed and
 #  22 February 2017     v0.2.6  - updated docstring config options to reflect
 #                                 current library of available options
 #                               - 'latest' and 'avgbearing' wind directions now
@@ -434,10 +435,10 @@ class ZambrettiForecast(object):
 
 class RealtimeGaugeData(StdService):
     """Service that generates gauge-data.txt in near realtime.
-    
+
     The RealtimeGaugeData class creates and controls a threaded object of class
-    RealtimeGaugeDataThread that generates gauge-data.txt. Class 
-    RealtimeGaugeData feeds the RealtimeGaugeDataThread object with data via an 
+    RealtimeGaugeDataThread that generates gauge-data.txt. Class
+    RealtimeGaugeData feeds the RealtimeGaugeDataThread object with data via an
     instance of Queue.Queue.
     """
 
@@ -449,7 +450,7 @@ class RealtimeGaugeData(StdService):
         manager_dict = weewx.manager.get_manager_dict_from_config(config_dict,
                                                                   'wx_binding')
         self.db_manager = weewx.manager.open_manager(manager_dict)
-        # get an instance of class RealtimeGaugeDataThread and start the 
+        # get an instance of class RealtimeGaugeDataThread and start the
         # thread running
         self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_queue,
                                                    config_dict,
@@ -466,7 +467,7 @@ class RealtimeGaugeData(StdService):
     def new_loop_packet(self, event):
         """Puts new loop packets in the rtgd queue."""
 
-        # package the loop packet in a dict since this is not the only data 
+        # package the loop packet in a dict since this is not the only data
         # we send via the queue
         _package = {'type': 'loop',
                     'payload': event.packet}
@@ -476,7 +477,7 @@ class RealtimeGaugeData(StdService):
     def new_archive_record(self, event):
         """Puts archive records in the rtgd queue."""
 
-        # package the archive record in a dict since this is not the only data 
+        # package the archive record in a dict since this is not the only data
         # we send via the queue
         _package = {'type': 'archive',
                     'payload': event.record}
@@ -485,7 +486,7 @@ class RealtimeGaugeData(StdService):
         # get alltime min max baro and put in the queue
         # get the min and max values (incl usUnits)
         _minmax_baro = self.get_minmax_obs('barometer')
-        # if we have some data then package it in a dict since this is not the 
+        # if we have some data then package it in a dict since this is not the
         # only data we send via the queue
         if _minmax_baro:
             _package = {'type': 'stats',
@@ -496,7 +497,7 @@ class RealtimeGaugeData(StdService):
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
 
-        # package the event in a dict since this is not the only data we send 
+        # package the event in a dict since this is not the only data we send
         # via the queue
         _package = {'type': 'event',
                     'payload': weewx.END_ARCHIVE_PERIOD}
@@ -752,9 +753,17 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.wr_period,
                                   self.wr_points)
         logdbg2("rtgdthread", "windrose data calculated")
-        
+
+        # prime our loop cache and set some starting wind values
         _ts = self.db_manager.lastGoodStamp()
-        _rec = self.db_manager.getRecord(_ts)
+        if _ts is not None:
+            _rec = self.db_manager.getRecord(_ts)
+            # We could leave our cache primed with None values or, if there is
+            # at least one record in the archive, we could prime the cache from
+            # the latest archive record. This gets us in the ball park.
+            self.packet_cache.prime(_rec, _rec['dateTime'])
+        else:
+            _rec = {}
         # save the windSpeed value to use as our archive period average
         if 'windSpeed' in _rec:
             self.windSpeedAvg = _rec['windSpeed']
@@ -1772,19 +1781,31 @@ class CachedPacket():
     A cached loop packet may be obtained by calling the get_packet() method.
     """
 
+    # These fields must be available in every loop packet read from the
+    # cache. Initialise them to None.
+    OBS = ["cloudbase", "windDir", "windrun", "inHumidity", "outHumidity",
+           "barometer", "radiation", "rain", "rainRate","windSpeed",
+           "appTemp", "dewpoint", "heatindex", "humidex", "inTemp",
+           "outTemp", "windchill", "UV"]
+
     def __init__(self):
-        # These fields must be available in every loop packet read from the
-        # cache. Initialise them to None.
-        OBS = ["cloudbase", "windDir", "windrun", "inHumidity", "outHumidity",
-               "barometer", "radiation", "rain", "rainRate","windSpeed",
-               "appTemp", "dewpoint", "heatindex", "humidex", "inTemp",
-               "outTemp", "windchill", "UV"]
 
         self.cache = dict()
         _ts = int(time.time() + 0.5)
-        for _obs in OBS:
+        for _obs in CachedPacket.OBS:
             self.cache[_obs] = {'value': None, 'ts': _ts}
         self.unit_system = None
+
+    def prime(self, record, ts):
+        """Prime the cache from an archive record."""
+
+        if self.unit_system is None:
+            self.unit_system = record['usUnits']
+        elif self.unit_system != record['usUnits']:
+            record = weewx.units.to_std_system(record, self.unit_system)
+        for obs in record:
+            if record[obs] is not None and obs in CachedPacket.OBS:
+                self.cache[obs] = {'value': record[obs], 'ts': ts}
 
     def update(self, packet, ts):
         """Update the cache from a loop packet."""
@@ -1811,7 +1832,7 @@ class CachedPacket():
     def get_packet(self, ts=None, max_age=600):
         """Get a loop packet from the cache.
 
-        REsulting packet may contain None values.
+        Resulting packet may contain None values.
         """
 
         if ts is None:
