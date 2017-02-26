@@ -1,5 +1,7 @@
 v0.2.7
 *   loop packets are now cached to support partial loop packet stations
+*   windSpeed obtained from archive is now only handled as a ValueTuple to
+    avoid units issues
 v0.2.6
 *   updated docstring config options to reflect current library of available
     options
