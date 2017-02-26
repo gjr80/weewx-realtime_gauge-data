@@ -17,12 +17,13 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.7                                      Date: 23 February 2017
+# Version: 0.2.7                                      Date: 26 February 2017
 #
 # Revision History
-#  23 February 2017     v0.2.7  - loop packets are now cached to support
+#  26 February 2017     v0.2.7  - loop packets are now cached to support
 #                                 stations that emit partial packets
-#                               - average wind speed and
+#                               - windSpeed obtained from archive is now only
+#                                 handled as a ValueTuple to avoid units issues
 #  22 February 2017     v0.2.6  - updated docstring config options to reflect
 #                                 current library of available options
 #                               - 'latest' and 'avgbearing' wind directions now
@@ -557,7 +558,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get our RealtimeGaugeData config dictionary
         rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
 
-        # setup every nth record or every n seconds file generation
+        # setup file generation timing
         self.min_interval = rtgd_config_dict.get('min_interval', None)
         self.last_write = 0 # ts (actual) of last generation
 
@@ -672,8 +673,6 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get max cache age
         self.max_cache_age = rtgd_config_dict.get('max_cache_age', 600)
-        # get a CachedPacket object as our loop packet cache
-        self.packet_cache = CachedPacket()
 
         # initialise last wind directions for use when respective direction is
         # None. We need latest and average
@@ -700,7 +699,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.lost_contact_flag = False
 
         # initialise some properties used to hold archive period wind data
-        self.windSpeedAvg = None
+        self.windSpeedAvg_vt = ValueTuple(None, 'km_per_hour', 'group_speed')
         self.windDirAvg = None
         self.min_barometer = None
         self.max_barometer = None
@@ -733,6 +732,10 @@ class RealtimeGaugeDataThread(threading.Thread):
         something in the rtgd queue.
         """
 
+        # would normally do this in our objects __init__ but since we are are
+        # running in a thread we need to wait until the thread is actually
+        # running before getting db managers
+
         # get a db manager
         self.db_manager = weewx.manager.open_manager(self.manager_dict)
         # get a db manager for appTemp
@@ -754,26 +757,24 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.wr_points)
         logdbg2("rtgdthread", "windrose data calculated")
 
-        # prime our loop cache and set some starting wind values
+        # setup our loop cache and set some starting wind values
         _ts = self.db_manager.lastGoodStamp()
         if _ts is not None:
             _rec = self.db_manager.getRecord(_ts)
-            # We could leave our cache primed with None values or, if there is
-            # at least one record in the archive, we could prime the cache from
-            # the latest archive record. This gets us in the ball park.
-            self.packet_cache.prime(_rec, _rec['dateTime'])
         else:
-            _rec = {}
-        # save the windSpeed value to use as our archive period average
+            _rec = {'usUnits': None}
+        # get a CachedPacket object as our loop packet cache and prime it with
+        # values from the last good archive record if available
+        logdbg2("rtgdthread", "initialising loop packet cache ...")
+        self.packet_cache = CachedPacket(_rec)
+        logdbg2("rtgdthread", "loop packet cache initialised")
+        # save the windSpeed value to use as our archive period average, this
+        # needs to be a ValueTuple since we may need to convert units
         if 'windSpeed' in _rec:
-            self.windSpeedAvg = _rec['windSpeed']
-        else:
-            self.windSpeedAvg = None
+            self.windSpeedAvg_vt = weewx.units.as_value_tuple(_rec, 'windSpeed')
         # save the windDir value to use as our archive period average
         if 'windDir' in _rec:
             self.windDirAvg = _rec['windDir']
-        else:
-            self.windDirAvg = None
 
         # now run a continuous loop, waiting for records to appear in the rtgd
         # queue then processing them.
@@ -1282,10 +1283,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         wlatest = convert(wlatest_vt, self.wind_group).value if wlatest_vt.value is not None else 0.0
         data['wlatest'] = self.wind_format % wlatest
         # wspeed - wind speed (average)
-        wspeed_vt = ValueTuple(self.windSpeedAvg,
-                               self.p_wind_type,
-                               self.p_wind_group)
-        wspeed = convert(wspeed_vt, self.wind_group).value
+        wspeed = convert(self.windSpeedAvg_vt, self.wind_group).value
         wspeed = wspeed if wspeed is not None else 0.0
         data['wspeed'] = self.wind_format % wspeed
         # windTM - today's high wind speed (average)
@@ -1472,9 +1470,9 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.lost_contact_flag = record[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
         # save the windSpeed value to use as our archive period average
         if 'windSpeed' in record:
-            self.windSpeedAvg = record['windSpeed']
+            self.windSpeedAvg_vt = weewx.units.as_value_tuple(_rec, 'windSpeed')
         else:
-            self.windSpeedAvg = None
+            self.windSpeedAvg_vt = ValueTuple(None, 'km_per_hour', 'group_speed')
         # save the windDir value to use as our archive period average
         if 'windDir' in record:
             self.windDirAvg = record['windDir']
@@ -1774,41 +1772,69 @@ class RtgdBuffer(object):
 class CachedPacket():
     """Class to cache loop packets.
 
-    Cache consists of a dictionary of value, timestamp pairs where timestamp is
-    the timestamp of the packet when obs was last seen and value is the value
-    of the obs at that time. None values may be cached.
+    The purpose of the cache is to ensure that necessary fields for the
+    generation of gauge-data.txt are continuousl available on systems whose
+    station emits partial packets. The key requirement is that the field
+    exists, the value (numerical or None) is handled by method calculate().
+    Method calculate() could be refactored to deal with missing fields, but
+    this would either result in the gauges dials oscillating when a loop packet
+    is missing an essential field, or overly complex code in method calcualte()
+    if field caching was to occur.
+
+    The cache consists of a dictionary of value, timestamp pairs where
+    timestamp is the timestamp of the packet when obs was last seen and value
+    is the value of the obs at that time. None values may be cached.
 
     A cached loop packet may be obtained by calling the get_packet() method.
     """
 
     # These fields must be available in every loop packet read from the
-    # cache. Initialise them to None.
+    # cache.
     OBS = ["cloudbase", "windDir", "windrun", "inHumidity", "outHumidity",
            "barometer", "radiation", "rain", "rainRate","windSpeed",
            "appTemp", "dewpoint", "heatindex", "humidex", "inTemp",
            "outTemp", "windchill", "UV"]
 
-    def __init__(self):
+    def __init__(self, rec):
+        """Initialise our cache object.
+
+        The cache needs to be initialised to include all of the fields required
+        by method calculate(). We could initialise all field values to None
+        (method calculate() will interpret the None values to be '0' in most
+        cases). The result on the gauge display may be misleading. We can get
+        ballpark values for all fields by priming them with values from the
+        last archive record. As the archive may have many more fields than rtgd
+        requires, only prime those fields that rtgd requires.
+
+        This approach does have the drawback that in situations where the
+        archive unit system is different to the loop packet unit system the
+        entire loop packet will be converted each time the cache is updated.
+        This is inefficient.
+        """
 
         self.cache = dict()
-        _ts = int(time.time() + 0.5)
+        # if we have a dateTime field in our record source use that otherwise
+        # use the current system time
+        _ts = rec['dateTime'] if 'dateTime' in rec else int(time.time() + 0.5)
+        # only prime those fields in CachedPacket.OBS
         for _obs in CachedPacket.OBS:
-            self.cache[_obs] = {'value': None, 'ts': _ts}
-        self.unit_system = None
-
-    def prime(self, record, ts):
-        """Prime the cache from an archive record."""
-
-        if self.unit_system is None:
-            self.unit_system = record['usUnits']
-        elif self.unit_system != record['usUnits']:
-            record = weewx.units.to_std_system(record, self.unit_system)
-        for obs in record:
-            if record[obs] is not None and obs in CachedPacket.OBS:
-                self.cache[obs] = {'value': record[obs], 'ts': ts}
+            if _obs in rec and 'usUnits' in rec:
+                # only add a value if it exists and we know what units its in
+                self.cache[_obs] = {'value': rec[_obs], 'ts': _ts}
+            else:
+                # otherwise set it to None
+                self.cache[_obs] = {'value': None, 'ts': _ts}
+        # set the cache unit system if known
+        self.unit_system = rec['usUnits'] if 'usUnits' in rec else None
 
     def update(self, packet, ts):
-        """Update the cache from a loop packet."""
+        """Update the cache from a loop packet.
+
+        If the loop packet uses a different unit system to that of the cache
+        then convert the loop packet before adding it to the cache. Update any
+        previously seen cache fields and add any loop fields that have not been
+        seen before.
+        """
 
         if self.unit_system is None:
             self.unit_system = packet['usUnits']
