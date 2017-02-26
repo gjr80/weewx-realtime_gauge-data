@@ -1470,7 +1470,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.lost_contact_flag = record[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
         # save the windSpeed value to use as our archive period average
         if 'windSpeed' in record:
-            self.windSpeedAvg_vt = weewx.units.as_value_tuple(_rec, 'windSpeed')
+            self.windSpeedAvg_vt = weewx.units.as_value_tuple(record, 'windSpeed')
         else:
             self.windSpeedAvg_vt = ValueTuple(None, 'km_per_hour', 'group_speed')
         # save the windDir value to use as our archive period average
