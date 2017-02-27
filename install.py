@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.7                                        Date: 26 February 2017
+# Version: 0.2.8                                        Date: 27 February 2017
 #
 # Revision History
+#   27 February 2017    v0.2.8
+#       - bumped version number only
 #   26 February 2017    v0.2.7
 #       - bumped version number only
 #   22 February 2017    v0.2.6

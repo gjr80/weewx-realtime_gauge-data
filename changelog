@@ -1,3 +1,7 @@
+v0.2.8
+*   Reworked day max/min calculations to better handle missing historical data. 
+    If historical max/min data is missing day max/min will default to the 
+    current value for the obs concerned.
 v0.2.7
 *   loop packets are now cached to support partial loop packet stations
 *   windSpeed obtained from archive is now only handled as a ValueTuple to
