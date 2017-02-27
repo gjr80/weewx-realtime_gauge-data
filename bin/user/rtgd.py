@@ -17,9 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.7                                      Date: 26 February 2017
+# Version: 0.2.8                                      Date: 27 February 2017
 #
 # Revision History
+#  28 February 2017     v0.2.8  - Reworked day max/min calculations to better 
+#                                 handle missing historical data. If historical 
+#                                 max/min data is missing day max/min will 
+#                                 default to the current value for the obs 
+#                                 concerned.
 #  26 February 2017     v0.2.7  - loop packets are now cached to support
 #                                 stations that emit partial packets
 #                               - windSpeed obtained from archive is now only
@@ -941,7 +946,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                              self.p_temp_type,
                              self.p_temp_group)
         temp = convert(temp_vt, self.temp_group).value
-        temp = temp if temp is not None else 0.0
+        temp = temp if temp is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                     self.temp_group).value
         data['temp'] = self.temp_format % temp
         # tempTL - today's low temperature
         tempTL_vt = ValueTuple(self.day_stats['outTemp'].min,
@@ -952,7 +958,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                     self.p_temp_type,
                                     self.p_temp_group)
         tempL_loop = convert(tempTL_loop_vt, self.temp_group).value
-        tempTL = min(i for i in [tempL_loop, tempTL] if i is not None)
+        tempTL = weeutil.weeutil.min_with_none([tempL_loop, tempTL])
+        tempTL = tempTL if tempTL is not None else temp
         data['tempTL'] = self.temp_format % tempTL
         # tempTH - today's high temperature
         tempTH_vt = ValueTuple(self.day_stats['outTemp'].max,
@@ -964,6 +971,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                     self.p_temp_group)
         tempH_loop = convert(tempTH_loop_vt, self.temp_group).value
         tempTH = max(tempH_loop, tempTH)
+        tempTH = tempTH if tempTH is not None else temp
         data['tempTH'] = self.temp_format % tempTH
         # TtempTL - time of today's low temp (hh:mm)
         TtempTL = time.localtime(self.day_stats['outTemp'].mintime) if tempL_loop >= tempTL else time.localtime(self.buffer.tempL_loop[1])
@@ -987,10 +995,12 @@ class RealtimeGaugeDataThread(threading.Thread):
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
         # humTL - today's low relative humidity
-        humTL = min(i for i in [self.buffer.humL_loop[0], self.day_stats['outHumidity'].min] if i is not None)
+        humTL = weeutil.weeutil.min_with_none([self.buffer.humL_loop[0], self.day_stats['outHumidity'].min])
+        humTL = humTL if humTL is not None else hum
         data['humTL'] = self.hum_format % humTL
         # humTH - today's high relative humidity
-        humTH = max(self.buffer.humH_loop[0], self.day_stats['outHumidity'].max)
+        humTH = max(self.buffer.humH_loop[0], self.day_stats['outHumidity'].max, 0.0)
+        humTH = humTH if humTH is not None else hum
         data['humTH'] = self.hum_format % humTH
         # ThumTL - time of today's low relative humidity (hh:mm)
         ThumTL = time.localtime(self.day_stats['outHumidity'].mintime) if self.buffer.humL_loop[0] >= humTL else time.localtime(self.buffer.humL_loop[1])
@@ -1009,7 +1019,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_temp_type,
                                      self.p_temp_group)
         dew = convert(dew_vt, self.temp_group).value
-        dew = dew if dew is not None else 0.0
+        dew = dew if dew is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                  self.temp_group).value
         data['dew'] = self.temp_format % dew
         # dewpointTL - today's low dew point
         dewpointTL_vt = ValueTuple(self.day_stats['dewpoint'].min,
@@ -1020,7 +1031,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                         self.p_temp_type,
                                         self.p_temp_group)
         dewpointL_loop = convert(dewpointTL_loop_vt, self.temp_group).value
-        dewpointTL = min(i for i in [dewpointL_loop, dewpointTL] if i is not None)
+        dewpointTL = weeutil.weeutil.min_with_none([dewpointL_loop, dewpointTL])
+        dewpointTL = dewpointTL if dewpointTL is not None else dew
         data['dewpointTL'] = self.temp_format % dewpointTL
         # dewpointTH - today's high dew point
         dewpointTH_vt = ValueTuple(self.day_stats['dewpoint'].max,
@@ -1032,6 +1044,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                         self.p_temp_group)
         dewpointH_loop = convert(dewpointTH_loop_vt, self.temp_group).value
         dewpointTH = max(dewpointH_loop, dewpointTH)
+        dewpointTH = dewpointTH if dewpointTH is not None else dew
         data['dewpointTH'] = self.temp_format % dewpointTH
         # TdewpointTL - time of today's low dew point (hh:mm)
         TdewpointTL = time.localtime(self.day_stats['dewpoint'].mintime) if dewpointL_loop >= dewpointTL else time.localtime(self.buffer.dewpointL_loop[1])
@@ -1044,7 +1057,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                self.p_temp_type,
                                self.p_temp_group)
         wchill = convert(wchill_vt, self.temp_group).value
-        wchill = wchill if wchill is not None else 0.0
+        wchill = wchill if wchill is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                           self.temp_group).value
         data['wchill'] = self.temp_format % wchill
         # wchillTL - today's low wind chill
         wchillTL_vt = ValueTuple(self.day_stats['windchill'].min,
@@ -1055,7 +1069,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                       self.p_temp_type,
                                       self.p_temp_group)
         wchillL_loop = convert(wchillTL_loop_vt, self.temp_group).value
-        wchillTL = min(i for i in [wchillL_loop, wchillTL] if i is not None)
+        wchillTL = weeutil.weeutil.min_with_none([wchillL_loop, wchillTL])
+        wchillTL = wchillTL if wchillTL is not None else wchill
         data['wchillTL'] = self.temp_format % wchillTL
         # TwchillTL - time of today's low wind chill (hh:mm)
         TwchillTL = time.localtime(self.day_stats['windchill'].mintime) if wchillL_loop >= wchillTL else time.localtime(self.buffer.wchillL_loop[1])
@@ -1065,7 +1080,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.p_temp_type,
                                   self.p_temp_group)
         heatindex = convert(heatindex_vt, self.temp_group).value
-        heatindex = heatindex if heatindex is not None else 0.0
+        heatindex = heatindex if heatindex is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+                                                                    self.temp_group).value
         data['heatindex'] = self.temp_format % heatindex
         # heatindexTH - today's high heat index
         heatindexTH_vt = ValueTuple(self.day_stats['heatindex'].max,
@@ -1077,6 +1093,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                          self.p_temp_group)
         heatindexH_loop = convert(heatindexTH_loop_vt, self.temp_group).value
         heatindexTH = max(heatindexH_loop, heatindexTH)
+        heatindexTH = heatindexTH if heatindexTH is not None else heatindex
         data['heatindexTH'] = self.temp_format % heatindexTH
         # TheatindexTH - time of today's high heat index (hh:mm)
         TheatindexTH = time.localtime(self.day_stats['heatindex'].maxtime) if heatindexH_loop >= heatindexTH else time.localtime(self.buffer.heatindexH_loop[1])
@@ -1118,7 +1135,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                            self.p_temp_type,
                                            self.p_temp_group)
             apptempL_loop = convert(apptempTL_loop_vt, self.temp_group).value
-            apptempTL = min(i for i in [apptempL_loop, apptempTL] if i is not None)
+            apptempTL = weeutil.weeutil.min_with_none([apptempL_loop, apptempTL])
             apptempTH_vt = ValueTuple(self.apptemp_day_stats['appTemp'].max,
                                       self.p_temp_type,
                                       self.p_temp_group)
@@ -1186,7 +1203,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                         self.p_baro_type,
                                         self.p_baro_group)
             pressL_loop = convert(pressL_loop_vt, self.pres_group).value
-            pressTL = min(i for i in [pressL_loop, pressTL] if i is not None)
+            pressTL = weeutil.weeutil.min_with_none([pressL_loop, pressTL])
+            pressTL = pressTL if pressTL is not None else press
             data['pressTL'] = self.pres_format % pressTL
             pressTH_vt = ValueTuple(self.day_stats['barometer'].max,
                                     self.p_baro_type,
@@ -1196,7 +1214,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                         self.p_baro_type,
                                         self.p_baro_group)
             pressH_loop = convert(pressH_loop_vt, self.pres_group).value
-            pressTH = max(pressH_loop, pressTH)
+            pressTH = max(pressH_loop, pressTH, 0.0)
             data['pressTH'] = self.pres_format % pressTH
             TpressTL = time.localtime(self.day_stats['barometer'].mintime) if pressL_loop >= pressTL else time.localtime(self.buffer.pressL_loop[1])
             data['TpressTL'] = time.strftime(self.time_format, TpressTL)
@@ -1213,9 +1231,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                    self.p_baro_type,
                                    self.p_baro_group)
         else:
-            pressL_vt = ValueTuple(850,
-                                   'hPa',
-                                   self.p_baro_group)
+            pressL_vt = ValueTuple(850, 'hPa', self.p_baro_group)
         pressL = convert(pressL_vt, self.pres_group).value
         data['pressL'] = self.pres_format % pressL
         # pressH - all time high barometer
@@ -1224,9 +1240,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                    self.p_baro_type,
                                    self.p_baro_group)
         else:
-            pressH_vt = ValueTuple(1100,
-                                   'hPa',
-                                   self.p_baro_group)
+            pressH_vt = ValueTuple(1100, 'hPa', self.p_baro_group)
         pressH = convert(pressH_vt, self.pres_group).value
         data['pressH'] = self.pres_format % pressH
         # presstrendval -  pressure trend value
@@ -1259,7 +1273,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             rrateTM = 0
         rrateTM_loop_vt = ValueTuple(self.buffer.rrateH_loop[0], self.p_rainr_type, self.p_rainr_group)
         rrateH_loop = convert(rrateTM_loop_vt, self.rainrate_group).value
-        rrateTM = max(rrateH_loop, rrateTM, rrate)
+        rrateTM = max(rrateH_loop, rrateTM, rrate, 0.0)
         data['rrateTM'] = self.rainrate_format % rrateTM
         # TrrateTM - time of today's maximum rain rate (per hour)
         if 'rainRate' not in self.day_stats:
@@ -1295,7 +1309,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                     self.p_wind_type,
                                     self.p_wind_group)
         windM_loop = convert(windTM_loop_vt, self.wind_group).value
-        windTM = max(windM_loop, windTM)
+        windTM = max(windM_loop, windTM, 0.0)
         data['windTM'] = self.wind_format % windTM
         # wgust - 10 minute high gust
         wgust = self.buffer.tenMinuteWindGust()
@@ -1312,7 +1326,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                     self.p_wind_type,
                                     self.p_wind_group)
         wgustM_loop = convert(wgustM_loop_vt, self.wind_group).value
-        wgustTM = max(wgustM_loop, wgustTM)
+        wgustTM = max(wgustM_loop, wgustTM, 0.0)
         data['wgustTM'] = self.wind_format % wgustTM
         # TwgustTM - time of today's high wind gust (hh:mm)
         TwgustTM = time.localtime(self.day_stats['wind'].maxtime) if wgustM_loop <= wgustTM else time.localtime(self.buffer.wgustM_loop[2])
@@ -1401,10 +1415,10 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['UV'] = self.uv_format % UV
         # UVTH - today's high UV index
         if 'UV' not in self.day_stats:
-            UVTH = 0.0
+            UVTH = UV
         else:
             UVTH = self.day_stats['UV'].max
-        UVTH = max(self.buffer.UVH_loop[0], UVTH, UV)
+        UVTH = max(self.buffer.UVH_loop[0], UVTH, UV, 0.0)
         data['UVTH'] = self.uv_format % UVTH
         # SolarRad - solar radiation W/m2
         if 'radiation' not in packet_d:
@@ -1418,7 +1432,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             SolarTM = 0.0
         else:
             SolarTM = self.day_stats['radiation'].max
-        SolarTM = max(self.buffer.SolarH_loop[0], SolarTM, SolarRad)
+        SolarTM = max(self.buffer.SolarH_loop[0], SolarTM, SolarRad, 0.0)
         data['SolarTM'] = self.rad_format % SolarTM
         # CurrentSolarMax - Current theoretical maximum solar radiation
         if self.solar_algorithm == 'Bras':
