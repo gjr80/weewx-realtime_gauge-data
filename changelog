@@ -1,6 +1,9 @@
+v0.2.9
+*   Reworked ten minute gust calculation to fix problem where red gust 'wedge'
+    would occassionally temporarily disappear from wind speed gauge.
 v0.2.8
-*   Reworked day max/min calculations to better handle missing historical data. 
-    If historical max/min data is missing day max/min will default to the 
+*   Reworked day max/min calculations to better handle missing historical data.
+    If historical max/min data is missing day max/min will default to the
     current value for the obs concerned.
 v0.2.7
 *   loop packets are now cached to support partial loop packet stations
