@@ -17,13 +17,17 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.8                                      Date: 27 February 2017
+# Version: 0.2.9                                      Date: 7 March 2017
 #
 # Revision History
-#  28 February 2017     v0.2.8  - Reworked day max/min calculations to better 
-#                                 handle missing historical data. If historical 
-#                                 max/min data is missing day max/min will 
-#                                 default to the current value for the obs 
+#  7 March 2017         v0.2.9  - Reworked ten minute gust calculation to fix
+#                                 problem where red gust 'wedge' would
+#                                 occassionally temporarily disappear from wind
+#                                 speed gauge
+#  28 February 2017     v0.2.8  - Reworked day max/min calculations to better
+#                                 handle missing historical data. If historical
+#                                 max/min data is missing day max/min will
+#                                 default to the current value for the obs
 #                                 concerned.
 #  26 February 2017     v0.2.7  - loop packets are now cached to support
 #                                 stations that emit partial packets
@@ -1350,7 +1354,10 @@ class RealtimeGaugeDataThread(threading.Thread):
         # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
         # down to nearest 10 degrees
         if self.windDirAvg is not None:
-            fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
+            try:
+                fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list)
+            except TypeError:
+                fromBearing = None
             BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
             if BearingRangeFrom10 < 0:
                 BearingRangeFrom10 += 360
@@ -1363,7 +1370,10 @@ class RealtimeGaugeDataThread(threading.Thread):
         # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
         # up to the nearest 10 degrees
         if self.windDirAvg is not None:
-            toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list) if self.buffer.tenMinuteWind_valid else None
+            try:
+                toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list)
+            except TypeError:
+                fromBearing = None
             BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
             if BearingRangeTo10 < 0:
                 BearingRangeTo10 += 360
@@ -1530,8 +1540,6 @@ class RtgdBuffer(object):
         # Setup lists/flags for 5 and 10 minute wind stats
         self.wind_list = []
         self.wind_dir_list = []
-        self.averageWind_valid = False
-        self.tenMinuteWind_valid = False
 
         # set length of time to retain wind obs
         self.wind_period = 600
@@ -1579,8 +1587,7 @@ class RtgdBuffer(object):
         Units used are loop data units so unit conversion of the result may be
         required.
         Result is only considered valid if a full 'archive interval' of loop
-        wind data is held. self.averageWind_valid is used to check whether the
-        result is valid or not.
+        wind data is held.
 
         Inputs:
             Nothing
@@ -1589,11 +1596,8 @@ class RtgdBuffer(object):
             Average wind speed over the last 'archive interval' seconds
         """
 
-        if self.averageWind_valid:
-            if len(self.wind_list) > 0:
-                average = sum(w for w,_ in self.wind_list)/float(len(self.wind_list))
-            else:
-                average = 0.0
+        if len(self.wind_list) > 0:
+            average = sum(w for w,_ in self.wind_list)/float(len(self.wind_list))
         else:
             average = 0.0
         return average
@@ -1604,8 +1608,7 @@ class RtgdBuffer(object):
         Takes list of last 10 minutes of loop wind speed and direction data and
         calculates a vector average direction.
         Result is only considered valid if a full 10 minutes of loop wind data
-        is held. self.tenMinuteWind_valid is used to check whether the result
-        is valid or not.
+        is held.
 
         Inputs:
             Nothing
@@ -1614,13 +1617,10 @@ class RtgdBuffer(object):
             10 minute vector average wind direction
         """
 
-        if self.tenMinuteWind_valid:
-            if len(self.wind_dir_list) > 0:
-                avg_dir = 90.0 - math.degrees(math.atan2(sum(y for x,y,s,d,t in self.wind_dir_list),
-                                                         sum(x for x,y,s,d,t in self.wind_dir_list)))
-                avg_dir = avg_dir if avg_dir > 0 else avg_dir + 360.0
-            else:
-                avg_dir = None
+        if len(self.wind_dir_list) > 0:
+            avg_dir = 90.0 - math.degrees(math.atan2(sum(y for x,y,s,d,t in self.wind_dir_list),
+                                                     sum(x for x,y,s,d,t in self.wind_dir_list)))
+            avg_dir = avg_dir if avg_dir > 0 else avg_dir + 360.0
         else:
             avg_dir = None
         return avg_dir
@@ -1632,8 +1632,7 @@ class RtgdBuffer(object):
         value.  Units used are loop data units so unit conversion of the result
         may be required.
         Result is only considered valid if a full 10 minutes of loop wind data
-        is held. self.tenMinuteWind_valid is used to check whether the result
-        is valid or not.
+        is held.
 
         Inputs:
             Nothing
@@ -1642,13 +1641,9 @@ class RtgdBuffer(object):
             10 minute wind gust
         """
 
-        if self.tenMinuteWind_valid:
-            if len(self.wind_dir_list) > 0:
-                gust = max(s for x,y,s,d,t in self.wind_dir_list)
-            else:
-                gust = None
-        else:
-            gust = None
+        gust = None
+        if len(self.wind_list) > 0:
+            gust = max(s for s,t in self.wind_list)
         return gust
 
     def setLowsAndHighs(self, packet):
@@ -1751,13 +1746,10 @@ class RtgdBuffer(object):
         if len(self.wind_list) > 0:
             # calc ts of oldest sample we want to retain
             old_ts = ts - self.wind_period
-            # if we have (archive_interval) of data in our list set flag that
-            # averageWind result is valid
-            self.averageWind_valid = self.wind_list[0][1] <= old_ts
             # Remove any samples older than 5 minutes
             self.wind_list = [s for s in self.wind_list if s[1] > old_ts]
         # get our latest (archive_interval) average wind
-        windM_loop = self.averageWind() if self.averageWind_valid else 0.0
+        windM_loop = self.averageWind()
         # have we seen a new high (archive_interval) avg wind? if so update
         # self.windM_loop
         self.windM_loop = [windM_loop, ts] if windM_loop > self.windM_loop[0] else self.windM_loop
@@ -1771,9 +1763,6 @@ class RtgdBuffer(object):
         if len(self.wind_dir_list) > 0:
             # calc ts of oldest sample we want to retain
             old_ts = ts - self.wind_period
-            # if we have 10 minutes of data in our list set flag that
-            # calcTenMinuteAverageWindDir result is valid
-            self.tenMinuteWind_valid = self.wind_dir_list[0][4] <= old_ts
             # Remove any samples older than 10 minutes
             self.wind_dir_list = [s for s in self.wind_dir_list if s[4] > old_ts]
 
