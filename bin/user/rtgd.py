@@ -17,10 +17,13 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.9                                      Date: 7 March 2017
+# Version: 0.2.10                                     Date: 17 March 2017
 #
 # Revision History
-#  7 March 2017         v0.2.9  - Reworked ten minute gust calculation to fix
+#  17 March 2017        v0.2.10 - now supports reading scroller text from a
+#                                 text file specified by the scroller_text
+#                                 config option in [RealtimeGaugeData]
+#  7 March 2017         v0.2.9  - reworked ten minute gust calculation to fix
 #                                 problem where red gust 'wedge' would
 #                                 occasionally temporarily disappear from wind
 #                                 speed gauge
@@ -142,9 +145,14 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Binding to use for appTemp data. Optional, default 'wx_binding'.
     apptemp_binding = wx_binding
 
-    # Text to display on the scroller. Optional, if omitted then forecast text
-    # is displayed if available.
+    # Text to display on the scroller. Must be enclosed in quotes if spaces
+    # included. Optional.
     scroller_text = 'some text'
+
+    # File to use as source for the scroller text. File must be a text file,
+    # first line only of file is read. Only used if scroller_text is blank or
+    # omitted. Optional.
+    scroller_file = /var/tmp/scroller.txt
 
     # Update windrun value each loop period or just on each archive period.
     # Optional, default is False.
@@ -583,6 +591,8 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get scroller text if there is any
         self.scroller_text = rtgd_config_dict.get('scroller_text', None)
+        if self.scroller_text is not None and self.scroller_text.strip() == '':
+            self.scroller_text = None
         # get scroller file if specified, check it refers to a file
         self.scroller_file = rtgd_config_dict.get('scroller_file', None)
         if self.scroller_file is not None and not os.path.isfile(self.scroller_file):
@@ -905,21 +915,28 @@ class RealtimeGaugeDataThread(threading.Thread):
     def get_scroller_text(self):
         """Obtain the text string to be used in the scroller.
 
-        Scroller text may come from any one of the following sources:
+        Scroller text may come from any one of four sources, each is checked in
+        the following order and the first non-zero length string result found
+        is used:
         - string in weewx.conf [RealtimeGaugeData]
         - string in a text file
         - a field in a database
         - Zambretti forecast
+
+        If nothing is found then a zero length string is returned.
         """
 
         # first look for a string in weewx.conf
         if self.scroller_text is not None:
             _scroller = self.scroller_text
+        # if nothign then look for a file
         elif self.scroller_file is not None:
             with open(self.scroller_file, 'r') as f:
                 _scroller = f.readline().strip()
+        # if nothing look for a Zambretti forecast
         elif self.forecast.is_installed():
-                _scroller = self.forecast.get_zambretti_text()
+            _scroller = self.forecast.get_zambretti_text()
+        # finally there is nothing so return a 0 length string
         else:
             _scroller = ''
         return _scroller
