@@ -22,7 +22,7 @@
 # Revision History
 #  7 March 2017         v0.2.9  - Reworked ten minute gust calculation to fix
 #                                 problem where red gust 'wedge' would
-#                                 occassionally temporarily disappear from wind
+#                                 occasionally temporarily disappear from wind
 #                                 speed gauge
 #  28 February 2017     v0.2.8  - Reworked day max/min calculations to better
 #                                 handle missing historical data. If historical
@@ -290,8 +290,8 @@ RTGD_VERSION = '0.2.7'
 GAUGE_DATA_VERSION = '13'
 
 # ordinal compass points supported
-COMPASS_POINTS = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
-                  'S','SSW','SW','WSW','W','WNW','NW','NNW','N']
+COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N']
 
 # map weeWX unit names to unit names supported by the SteelSeries Weather
 # Gauges
@@ -583,6 +583,10 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get scroller text if there is any
         self.scroller_text = rtgd_config_dict.get('scroller_text', None)
+        # get scroller file if specified, check it refers to a file
+        self.scroller_file = rtgd_config_dict.get('scroller_file', None)
+        if self.scroller_file is not None and not os.path.isfile(self.scroller_file):
+            self.scroller_file = None
 
         # get windrose settings
         try:
@@ -897,7 +901,28 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         with open(self.rtgd_path_file, 'w') as f:
             json.dump(data, f)
-            f.close()
+
+    def get_scroller_text(self):
+        """Obtain the text string to be used in the scroller.
+
+        Scroller text may come from any one of the following sources:
+        - string in weewx.conf [RealtimeGaugeData]
+        - string in a text file
+        - a field in a database
+        - Zambretti forecast
+        """
+
+        # first look for a string in weewx.conf
+        if self.scroller_text is not None:
+            _scroller = self.scroller_text
+        elif self.scroller_file is not None:
+            with open(self.scroller_file, 'r') as f:
+                _scroller = f.readline().strip()
+        elif self.forecast.is_installed():
+                _scroller = self.forecast.get_zambretti_text()
+        else:
+            _scroller = ''
+        return _scroller
 
     def calculate(self, packet):
         """Construct a data dict for gauge-data.txt.
@@ -950,7 +975,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                              self.p_temp_type,
                              self.p_temp_group)
         temp = convert(temp_vt, self.temp_group).value
-        temp = temp if temp is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        temp = temp if temp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                      self.temp_group).value
         data['temp'] = self.temp_format % temp
         # tempTL - today's low temperature
@@ -1472,12 +1497,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         cloudbase = cloudbase if cloudbase is not None else 0.0
         data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
-        # if we have any scroller text set then display that otherwise use the
-        # Zambretti text
-        if self.scroller_text is not None:
-            data['forecast'] = self.scroller_text
-        else:
-            data['forecast'] = self.forecast.get_zambretti_text()
+        data['forecast'] = self.get_scroller_text()
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
         # build -
