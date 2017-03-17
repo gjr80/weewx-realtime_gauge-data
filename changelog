@@ -1,6 +1,9 @@
+v0.2.10
+*   now supports reading scroller text from a text file specified by the
+    scroller_text config option in [RealtimeGaugeData]
 v0.2.9
-*   Reworked ten minute gust calculation to fix problem where red gust 'wedge'
-    would occassionally temporarily disappear from wind speed gauge.
+*   reworked ten minute gust calculation to fix problem where red gust 'wedge'
+    would occassionally temporarily disappear from wind speed gauge
 v0.2.8
 *   Reworked day max/min calculations to better handle missing historical data.
     If historical max/min data is missing day max/min will default to the

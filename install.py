@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.9                                        Date: 7 March 2017
+# Version: 0.2.10                                       Date: 17 March 2017
 #
 # Revision History
+#   17 March 2017       v0.2.10
+#       - bumped version only
 #   7 March 2017        v0.2.9
 #       - bumped version number only
 #   27 February 2017    v0.2.8
@@ -44,7 +46,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.9"
+RTGD_VERSION = "0.2.10"
 
 def loader():
     return RtgdInstaller()
@@ -61,7 +63,7 @@ class RtgdInstaller(ExtensionInstaller):
             name='Rtgd',
             description='weeWX support for near realtime updating of the SteelSeries Weather Gauges.',
             author="Gary Roderick",
-            author_email="gjroderick@gmail.com",
+            author_email="gjroderick<@>gmail.com",
             report_services=['user.rtgd.RealtimeGaugeData'],
             config={
                 'RealtimeGaugeData': {
