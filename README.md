@@ -4,9 +4,17 @@
 
 The *Realtime gauge-data* extension generates a loop data based *gauge-data.txt* file that provides for near realtime updating of the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub") by weeWX.
 
-## Pre-Requisites ##
+## Pre-requisites ##
 
 The *Realtime gauge-data* extension requires weeWX v3.4.0 or greater. Use of the *Realtime gauge-data* extension with the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub") requires the installation and configuration for use with weeWX of the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub").
+
+A number of fields have additional pre-requisites:
+
+-   *CurrentSolarMax*. Requires the [pyephem](http://weewx.com/docs/setup.htm "pyephem installation") module be installed.
+-   *forecast*. Requires one of the following:
+
+    -   the weeWX *forecast* extension be installed, or
+    -   a text file containing the final forecast text be accessible to the weeWX machine.
 
 ## Installation ##
 
