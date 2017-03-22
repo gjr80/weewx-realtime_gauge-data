@@ -26,8 +26,6 @@
 #                               - gauge-data.txt content can now be sent to a
 #                                 remote URL via HTTP POST. Thanks to
 #                                 Alec Bennett for his idea
-#                               - saving gauge-data.txt content to file can be
-#                                 disabled by setting rtgd_file_name = None
 #  17 March 2017        v0.2.10 - now supports reading scroller text from a
 #                                 text file specified by the scroller_text
 #                                 config option in [RealtimeGaugeData]
@@ -130,7 +128,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     rtgd_path = /home/weewx/public_html
 
     # File name (only) of file produced by rtgd. Optional, default is
-    # gauge-data.txt, setting to None will disable file output.
+    # gauge-data.txt.
     rtgd_file_name = gauge-data.txt
 
     # Remote URL to which the gauge-data.txt data will be posted via HTTP POST.
@@ -608,8 +606,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   config_dict['StdReport'].get('HTML_ROOT', ''))
 
         rtgd_path = os.path.join(_html_root, _path)
-        self.rtgd_file = rtgd_config_dict.get('rtgd_file_name', 'gauge-data.txt')
-        self.rtgd_path_file = os.path.join(rtgd_path, self.rtgd_file)
+        self.rtgd_path_file = os.path.join(rtgd_path, 
+                                           rtgd_config_dict.get('rtgd_file_name', 
+                                                                'gauge-data.txt'))
 
         # get the remote server URL if it exists, if it doesn't set it to None
         self.remote_server_url = rtgd_config_dict.get('remote_server_url', None)
@@ -904,9 +903,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                     self.lost_contact_flag = cached_packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
                 # get a data dict from which to construct our file
                 data = self.calculate(cached_packet)
-                # write to our file if required
-                if self.rtgd_file is not None:
-                    self.write_data(data)
+                # write to our file
+                self.write_data(data)
                 # set our write time
                 self.last_write = time.time()
                 # if required send the data to a remote URL via HTTP POST
