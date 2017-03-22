@@ -344,17 +344,17 @@ GROUP_DIST = {'mile_per_hour':      'mile',
 
 # Define station lost contact checks for supported stations. Note that at
 # present only Vantage and FOUSB stations lost contact reporting is supported.
-STATION_LOST_CONTACT = {'Vantage' : {'field':'rxCheckPercent', 'value': 0},
-                        'FineOffsetUSB' : {'field':'status', 'value': 0x40},
-                        'Ultimeter' : {'field':'rxCheckPercent', 'value': 0},
-                        'WMR100': {'field':'rxCheckPercent', 'value': 0},
-                        'WMR200': {'field':'rxCheckPercent', 'value': 0},
-                        'WMR9x8': {'field':'rxCheckPercent', 'value': 0},
-                        'WS23xx': {'field':'rxCheckPercent', 'value': 0},
-                        'WS28xx': {'field':'rxCheckPercent', 'value': 0},
-                        'TE923': {'field':'rxCheckPercent', 'value': 0},
-                        'WS1': {'field':'rxCheckPercent', 'value': 0},
-                        'CC3000': {'field':'rxCheckPercent', 'value': 0}}
+STATION_LOST_CONTACT = {'Vantage': {'field': 'rxCheckPercent', 'value': 0},
+                        'FineOffsetUSB': {'field': 'status', 'value': 0x40},
+                        'Ultimeter': {'field': 'rxCheckPercent', 'value': 0},
+                        'WMR100': {'field': 'rxCheckPercent', 'value': 0},
+                        'WMR200': {'field': 'rxCheckPercent', 'value': 0},
+                        'WMR9x8': {'field': 'rxCheckPercent', 'value': 0},
+                        'WS23xx': {'field': 'rxCheckPercent', 'value': 0},
+                        'WS28xx': {'field': 'rxCheckPercent', 'value': 0},
+                        'TE923': {'field': 'rxCheckPercent', 'value': 0},
+                        'WS1': {'field': 'rxCheckPercent', 'value': 0},
+                        'CC3000': {'field': 'rxCheckPercent', 'value': 0}}
 # stations supporting lost contact reporting through their archive record
 ARCHIVE_STATIONS = ['Vantage']
 # stations supporting lost contact reporting through their loop packet
@@ -513,7 +513,7 @@ class RealtimeGaugeData(StdService):
         _package = {'type': 'loop',
                     'payload': event.packet}
         self.rtgd_queue.put(_package)
-        logdbg2("rtgd", "queued loop packet: %s" %  _package['payload'])
+        logdbg2("rtgd", "queued loop packet: %s" % _package['payload'])
 
     def new_archive_record(self, event):
         """Puts archive records in the rtgd queue."""
@@ -523,7 +523,7 @@ class RealtimeGaugeData(StdService):
         _package = {'type': 'archive',
                     'payload': event.record}
         self.rtgd_queue.put(_package)
-        logdbg2("rtgd", "queued archive record: %s" %  _package['payload'])
+        logdbg2("rtgd", "queued archive record: %s" % _package['payload'])
         # get alltime min max baro and put in the queue
         # get the min and max values (incl usUnits)
         _minmax_baro = self.get_minmax_obs('barometer')
@@ -533,7 +533,7 @@ class RealtimeGaugeData(StdService):
             _package = {'type': 'stats',
                         'payload': _minmax_baro}
             self.rtgd_queue.put(_package)
-            logdbg2("rtgd", "queued min/max barometer values: %s" %  _package['payload'])
+            logdbg2("rtgd", "queued min/max barometer values: %s" % _package['payload'])
 
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
@@ -697,7 +697,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                  '%.1f')
         # SteelSeries Weather gauges derives rain rate units from rain units,
         # so must we
-        self.rainrate_group = ''.join([self.rain_group,'_per_hour'])
+        self.rainrate_group = ''.join([self.rain_group, '_per_hour'])
         self.rainrate_format = rtgd_config_dict['StringFormats'].get(self.rainrate_group,
                                                                      '%.1f')
         self.dir_group = 'degree_compass'
@@ -774,7 +774,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         else:
             _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is %s seconds" % self.min_interval
         loginf("engine", _msg)
-
 
     def run(self):
         """Collect packets from the rtgd queue and manage their processing.
@@ -903,7 +902,6 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # set our lost contact flag if applicable
                 if self.station_type in LOOP_STATIONS:
                     self.lost_contact_flag = cached_packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
-                data = {}
                 # get a data dict from which to construct our file
                 data = self.calculate(cached_packet)
                 # write to our file if required
@@ -1163,7 +1161,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_temp_type,
                                      self.p_temp_group)
         dew = convert(dew_vt, self.temp_group).value
-        dew = dew if dew is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        dew = dew if dew is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                   self.temp_group).value
         data['dew'] = self.temp_format % dew
         # dewpointTL - today's low dew point
@@ -1201,7 +1199,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                self.p_temp_type,
                                self.p_temp_group)
         wchill = convert(wchill_vt, self.temp_group).value
-        wchill = wchill if wchill is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        wchill = wchill if wchill is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                            self.temp_group).value
         data['wchill'] = self.temp_format % wchill
         # wchillTL - today's low wind chill
@@ -1224,7 +1222,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.p_temp_type,
                                   self.p_temp_group)
         heatindex = convert(heatindex_vt, self.temp_group).value
-        heatindex = heatindex if heatindex is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        heatindex = heatindex if heatindex is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                                     self.temp_group).value
         data['heatindex'] = self.temp_format % heatindex
         # heatindexTH - today's high heat index
@@ -1262,7 +1260,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                  windspeed_ms)
             apptemp_vt = ValueTuple(apptemp_C, 'degree_C', 'group_temperature')
         apptemp = convert(apptemp_vt, self.temp_group).value
-        apptemp = apptemp if apptemp is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        apptemp = apptemp if apptemp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                               self.temp_group).value
         data['apptemp'] = self.temp_format % apptemp
         # apptempTL - today's low apparent temperature
@@ -1301,10 +1299,10 @@ class RealtimeGaugeDataThread(threading.Thread):
             apptempTH = apptemp
             TapptempTL = datetime.date.today().timetuple()
             TapptempTH = datetime.date.today().timetuple()
-        apptempTL = apptempTL if apptempTL is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        apptempTL = apptempTL if apptempTL is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                                     self.temp_group).value
         data['apptempTL'] = self.temp_format % apptempTL
-        apptempTH = apptempTH if apptempTH is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        apptempTH = apptempTH if apptempTH is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                                     self.temp_group).value
         data['apptempTH'] = self.temp_format % apptempTH
         data['TapptempTL'] = time.strftime(self.time_format, TapptempTL)
@@ -1324,7 +1322,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                   packet_d['outHumidity'])
             humidex_vt = ValueTuple(humidex_C, 'degree_C', 'group_temperature')
             humidex = convert(humidex_vt, self.temp_group).value
-        humidex = humidex if humidex is not None else convert(ValueTuple(0.0,'degree_C','group_temperature'),
+        humidex = humidex if humidex is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                               self.temp_group).value
         data['humidex'] = self.temp_format % humidex
         # press - barometer
@@ -1426,13 +1424,13 @@ class RealtimeGaugeDataThread(threading.Thread):
             TrrateTM = time.localtime(self.day_stats['rainRate'].maxtime) if rrateH_loop <= rrateTM else time.localtime(self.buffer.rrateH_loop[1])
             data['TrrateTM'] = time.strftime(self.time_format, TrrateTM)
         # hourlyrainTH - Today's highest hourly rain
-        ###FIX ME - need to determine hourlyrainTH
+        # ###FIX ME - need to determine hourlyrainTH
         data['hourlyrainTH'] = "0.0"
         # ThourlyrainTH - time of Today's highest hourly rain
-        ###FIX ME - need to determine ThourlyrainTH
+        # ###FIX ME - need to determine ThourlyrainTH
         data['ThourlyrainTH'] = "00:00"
         # LastRainTipISO -
-        ###FIX ME - need to determine LastRainTipISO
+        # ###FIX ME - need to determine LastRainTipISO
         data['LastRainTipISO'] = "00:00"
         # wlatest - latest wind speed reading
         wlatest_vt = ValueTuple(packet_d['windSpeed'],
@@ -1495,7 +1493,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # down to nearest 10 degrees
         if self.windDirAvg is not None:
             try:
-                fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list)
+                fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else None for x, y, s, d, t in self.buffer.wind_dir_list)
             except TypeError:
                 fromBearing = None
             BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
@@ -1511,7 +1509,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # up to the nearest 10 degrees
         if self.windDirAvg is not None:
             try:
-                toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x,y,s,d,t in self.buffer.wind_dir_list)
+                toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x, y, s, d, t in self.buffer.wind_dir_list)
             except TypeError:
                 fromBearing = None
             BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
@@ -1537,7 +1535,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_wind_group)
             windrun_day_average = (last_ts - weeutil.weeutil.startOfDay(ts))/3600.0 * convert(wind_sum_vt,
                                                                                               self.wind_group).value/self.day_stats['wind'].count
-        except:
+        except (ValueError, TypeError):
             windrun_day_average = 0.0
         if self.windrun_loop:   # is loop/realtime estimate
             loop_hours = (ts - last_ts)/3600.0
@@ -1545,8 +1543,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                 windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum,
                                                                       self.p_wind_type,
                                                                       self.p_wind_group),
-                                                                     self.wind_group).value/self.buffer.windcount
-            except:
+                                                                      self.wind_group).value/self.buffer.windcount
+            except (ValueError, TypeError):
                 windrun = windrun_day_average
         else:
             windrun = windrun_day_average
@@ -1659,7 +1657,7 @@ class RtgdBuffer(object):
     """Class to buffer various loop packet obs.
 
     If archive based stats are an efficient means of getting stats for today.
-    However, their use would mean that any daily stat (eg todays max outTemp)
+    However, their use would mean that any daily stat (eg today's max outTemp)
     that 'occurs' after the most recent archive record but before the next
     archive record is written to archive will not be captured. For this reason
     selected loop data is buffered to ensure that such stats are correctly
@@ -1733,7 +1731,7 @@ class RtgdBuffer(object):
         """
 
         if len(self.wind_list) > 0:
-            average = sum(w for w,_ in self.wind_list)/float(len(self.wind_list))
+            average = sum(w for w, _ in self.wind_list)/float(len(self.wind_list))
         else:
             average = 0.0
         return average
@@ -1754,8 +1752,8 @@ class RtgdBuffer(object):
         """
 
         if len(self.wind_dir_list) > 0:
-            avg_dir = 90.0 - math.degrees(math.atan2(sum(y for x,y,s,d,t in self.wind_dir_list),
-                                                     sum(x for x,y,s,d,t in self.wind_dir_list)))
+            avg_dir = 90.0 - math.degrees(math.atan2(sum(y for x, y, s, d, t in self.wind_dir_list),
+                                                     sum(x for x, y, s, d, t in self.wind_dir_list)))
             avg_dir = avg_dir if avg_dir > 0 else avg_dir + 360.0
         else:
             avg_dir = None
@@ -1912,12 +1910,12 @@ class CachedPacket():
     """Class to cache loop packets.
 
     The purpose of the cache is to ensure that necessary fields for the
-    generation of gauge-data.txt are continuousl available on systems whose
+    generation of gauge-data.txt are continuously available on systems whose
     station emits partial packets. The key requirement is that the field
     exists, the value (numerical or None) is handled by method calculate().
     Method calculate() could be refactored to deal with missing fields, but
     this would either result in the gauges dials oscillating when a loop packet
-    is missing an essential field, or overly complex code in method calcualte()
+    is missing an essential field, or overly complex code in method calculate()
     if field caching was to occur.
 
     The cache consists of a dictionary of value, timestamp pairs where
@@ -2017,7 +2015,7 @@ def degreeToCompass(x):
     """Convert degrees to ordinal compass point.
 
     Input:
-        x:      degrees
+        x: degrees
 
     Returns:
         Corresponding ordinal compass point from COMPASS_POINTS. Can return
@@ -2028,6 +2026,7 @@ def degreeToCompass(x):
         return None
     idx = int((x + 11.25) / 22.5)
     return COMPASS_POINTS[idx]
+
 
 def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
     """ Calculate change in an observation over a specified period.
@@ -2060,6 +2059,7 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
             then = convert(then_vt, group).value
             return now - then
 
+
 def calc_windrose(now, db_manager, period, points):
     """Calculate a SteelSeries Weather Gauges windrose array.
 
@@ -2077,7 +2077,6 @@ def calc_windrose(now, db_manager, period, points):
     Return:
         List containing windrose data with 'points' elements.
     """
-
 
     # initialise our result
     rose = [0.0 for x in range(points)]
@@ -2110,4 +2109,4 @@ def calc_windrose(now, db_manager, period, points):
             else:
                 rose[0] += _row[1]
     # now  round our results and return
-    return [round(x,1) for x in rose]
+    return [round(x, 1) for x in rose]

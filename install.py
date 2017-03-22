@@ -50,8 +50,10 @@ from setup import ExtensionInstaller
 REQUIRED_VERSION = "3.4.0"
 RTGD_VERSION = "0.2.11"
 
+
 def loader():
     return RtgdInstaller()
+
 
 class RtgdInstaller(ExtensionInstaller):
     def __init__(self):
