@@ -1,3 +1,10 @@
+v0.2.11
+*   can now include local date/time in scroller text by including strftime()
+    format directives in the scroller text
+*   gauge-data.txt content can now be sent to a remote URL via HTTP POST.
+    Thanks to Alec Bennett for his idea
+*   saving gauge-data.txt content to file can be disabled by setting
+    rtgd_file_name = None
 v0.2.10
 *   now supports reading scroller text from a text file specified by the
     scroller_text config option in [RealtimeGaugeData]
