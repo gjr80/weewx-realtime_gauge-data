@@ -17,9 +17,17 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.10                                     Date: 17 March 2017
+# Version: 0.2.11                                     Date: 22 March 2017
 #
 # Revision History
+#  22 March 2017        v0.2.11 - can now include local date/time in scroller
+#                                 text by including strftime() format
+#                                 directives in the scroller text
+#                               - gauge-data.txt content can now be sent to a
+#                                 remote URL via HTTP POST. Thanks to
+#                                 Alec Bennett for his idea
+#                               - saving gauge-data.txt content to file can be
+#                                 disabled by setting rtgd_file_name = None
 #  17 March 2017        v0.2.10 - now supports reading scroller text from a
 #                                 text file specified by the scroller_text
 #                                 config option in [RealtimeGaugeData]
@@ -99,6 +107,9 @@ Used to update the SteelSeries Weather Gauges in near real time.
 Inspired by crt.py v0.5 by Matthew Wall, a weeWX service to emit loop data to
 file in Cumulus realtime format. Refer http://wiki.sandaysoft.com/a/Realtime.txt
 
+Use of HTTP POST to send gauge-data.txt content to a remote URL inspired by
+work by Alec Bennett. Refer https://github.com/wrybread/weewx-realtime_gauge-data.
+
 Abbreviated instructions for use:
 
 1.  Install the SteelSeries Weather Gauges for weeWX and confirm correct
@@ -119,8 +130,17 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     rtgd_path = /home/weewx/public_html
 
     # File name (only) of file produced by rtgd. Optional, default is
-    # gauge-data.txt
+    # gauge-data.txt, setting to None will disable file output.
     rtgd_file_name = gauge-data.txt
+
+    # Remote URL to which the gauge-data.txt data will be posted via HTTP POST.
+    # Optional, omit to disable HTTP POST.
+    remote_server_url = http://remote/address
+    # timeout in seconds for remote URL posts. Optional, default is 2
+    timeout = 1
+    # text returned from remote URL indicating success. Optional, default is no
+    # response text.
+    response_text = success
 
     # Minimum interval (seconds) between file generation. Ideally
     # gauge-data.txt would be generated on receipt of every loop packet (there
@@ -275,12 +295,15 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
 # python imports
 import Queue
 import datetime
+import httplib
 import json
 import math
 import os.path
+import socket
 import syslog
 import threading
 import time
+import urllib2
 
 # weeWX imports
 import weedb
@@ -290,7 +313,7 @@ import weewx.units
 import weewx.wxformulas
 from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
-from weeutil.weeutil import to_bool
+from weeutil.weeutil import to_bool, to_int
 
 # version number of this script
 RTGD_VERSION = '0.2.7'
@@ -585,9 +608,15 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   config_dict['StdReport'].get('HTML_ROOT', ''))
 
         rtgd_path = os.path.join(_html_root, _path)
-        self.rtgd_path_file = os.path.join(rtgd_path,
-                                           rtgd_config_dict.get('rtgd_file_name',
-                                                                'gauge-data.txt'))
+        self.rtgd_file = rtgd_config_dict.get('rtgd_file_name', 'gauge-data.txt')
+        self.rtgd_path_file = os.path.join(rtgd_path, self.rtgd_file)
+
+        # get the remote server URL if it exists, if it doesn't set it to None
+        self.remote_server_url = rtgd_config_dict.get('remote_server_url', None)
+        # timeout to be used for remote URL posts
+        self.timeout = to_int(rtgd_config_dict.get('timeout', 2))
+        # response text from remote URL if post was successful
+        self.response = rtgd_config_dict.get('response_text', None)
 
         # get scroller text if there is any
         self.scroller_text = rtgd_config_dict.get('scroller_text', None)
@@ -850,7 +879,11 @@ class RealtimeGaugeDataThread(threading.Thread):
                 return
 
     def process_packet(self, packet):
-        """Process incoming loop packets and generate gauge-data.txt."""
+        """Process incoming loop packets and generate gauge-data.txt.
+
+        Input:
+            packet: dict containing the loop packet to be processed
+        """
 
         # get time for debug timing
         t1 = time.time()
@@ -873,10 +906,15 @@ class RealtimeGaugeDataThread(threading.Thread):
                 data = {}
                 # get a data dict from which to construct our file
                 data = self.calculate(cached_packet)
-                # write our file
-                self.write_data(data)
+                # write to our file if required
+                if self.rtgd_file is not None:
+                    self.write_data(data)
                 # set our write time
                 self.last_write = time.time()
+                # if required send the data to a remote URL via HTTP POST
+                if self.remote_server_url is not None:
+                    # post the data
+                    self.post_data(data)
                 # log the generation
                 logdbg("rtgdthread",
                        "packet (%s) gauge-data.txt generated in %.5f seconds" % (cached_packet['dateTime'],
@@ -890,13 +928,73 @@ class RealtimeGaugeDataThread(threading.Thread):
     def process_stats(self, package):
         """Process a stats package.
 
-        Inputs:
-            package: dict containing the stats data
+        Input:
+            package: dict containing the stats data to process
         """
 
         if package is not None:
             for key, value in package.iteritems():
                 setattr(self, key, value)
+
+    def post_data(self, data):
+        """Post data to a remote URL via HTTP POST.
+
+        This code is modelled on the weeWX restFUL API, but rather then
+        retrying a failed post the failure is logged and then ignored. If
+        remote posts are not working then the user should set debug=1 and
+        restart weeWX to see what the log says.
+
+        The data to be posted is sent as a JSON string.
+
+        Inputs:
+            data: dict to sent as JSON string
+        """
+
+        # get a Request object
+        req = urllib2.Request(self.remote_server_url)
+        # set our content type to json
+        req.add_header('Content-Type', 'application/json')
+        # POST the data but wrap in a try..except so we can trap any errors
+        try:
+            response = self.post_request(req, json.dumps(data))
+            if 200 <= response.code <= 299:
+                # No exception thrown and we got a good response code, but did
+                # we get self.response back in a return message? Check for
+                # self.response, if its there then we can return. If it's
+                # not there then log it and return.
+                if self.response is not None and self.response not in response:
+                    # didn't get 'success' so log it and continue
+                    logdbg("post_data",
+                           "Failed to post data: Unexpected response")
+                return
+            # we received a bad response code, log it and continue
+            logdbg("post_data",
+                   "Failed to post data: Code %s" % response.code())
+        except (urllib2.URLError, socket.error,
+                httplib.BadStatusLine, httplib.IncompleteRead), e:
+            # an exception was thrown, log it and continue
+            logdbg("post_data", "Failed to post data: %s" % e)
+
+    def post_request(self, request, payload):
+        """Post a Request object.
+
+        Inputs:
+            request: urllib2 Request object
+            payload: the data to sent
+
+        Returns:
+            The urllib2.urlopen() response
+        """
+
+        try:
+            # Python 2.5 and earlier do not have a "timeout" parameter.
+            # Including one could cause a TypeError exception. Be prepared
+            # to catch it.
+            _response = urllib2.urlopen(request, data=payload, timeout=self.timeout)
+        except TypeError:
+            # Must be Python 2.5 or early. Use a simple, unadorned request
+            _response = urllib2.urlopen(request, data=payload)
+        return _response
 
     def write_data(self, data):
         """Write the gauge-data.txt file.
@@ -1514,7 +1612,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         cloudbase = cloudbase if cloudbase is not None else 0.0
         data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
-        data['forecast'] = self.get_scroller_text()
+        _text = self.get_scroller_text()
+        data['forecast'] = time.strftime(_text, time.localtime(ts))
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
         # build -
