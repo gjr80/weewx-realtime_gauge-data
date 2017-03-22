@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.10                                       Date: 17 March 2017
+# Version: 0.2.12                                       Date: 22 March 2017
 #
 # Revision History
+#   22 March 2017       v0.2.11
+#       - added foot StringFormat config option
 #   17 March 2017       v0.2.10
 #       - bumped version only
 #   7 March 2017        v0.2.9
@@ -46,7 +48,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.10"
+RTGD_VERSION = "0.2.11"
 
 def loader():
     return RtgdInstaller()
@@ -73,6 +75,7 @@ class RtgdInstaller(ExtensionInstaller):
                         'degree_C': '%.1f',
                         'degree_F': '%.1f',
                         'degree_compass': '%.0f',
+                        'foot': '%.1f',
                         'hPa': '%.1f',
                         'inHg': '%.3f',
                         'inch': '%.2f',
