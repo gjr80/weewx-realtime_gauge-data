@@ -17,9 +17,13 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.11                                     Date: 22 March 2017
+# Version: 0.2.12                                     Date: 27 March 2017
 #
 # Revision History
+#  27 March 2017        v0.2.12 - fix BearingRangeTo10 error
+#                               - fix division by zero error in windrun 
+#                                 calculations for first archive period of the 
+#                                 day
 #  22 March 2017        v0.2.11 - can now include local date/time in scroller
 #                                 text by including strftime() format
 #                                 directives in the scroller text
@@ -314,7 +318,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int
 
 # version number of this script
-RTGD_VERSION = '0.2.7'
+RTGD_VERSION = '0.2.12'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -1509,7 +1513,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             try:
                 toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x, y, s, d, t in self.buffer.wind_dir_list)
             except TypeError:
-                fromBearing = None
+                toBearing = None
             BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
             if BearingRangeTo10 < 0:
                 BearingRangeTo10 += 360
@@ -1533,7 +1537,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_wind_group)
             windrun_day_average = (last_ts - weeutil.weeutil.startOfDay(ts))/3600.0 * convert(wind_sum_vt,
                                                                                               self.wind_group).value/self.day_stats['wind'].count
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, ZeroDivisionError):
             windrun_day_average = 0.0
         if self.windrun_loop:   # is loop/realtime estimate
             loop_hours = (ts - last_ts)/3600.0
