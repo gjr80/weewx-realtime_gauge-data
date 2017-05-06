@@ -20,33 +20,36 @@
 # Version: 0.2.12                                     Date: 27 March 2017
 #
 # Revision History
-#  27 March 2017        v0.2.12 - fix BearingRangeTo10 error
-#                               - fix division by zero error in windrun 
-#                                 calculations for first archive period of the 
+#   6 May 2017          v0.2.13 - Unnecessary whitespace removed from JSON
+#                                 output. Addresses issue #2.
+#                               - JSON output now sorted alphabetically by key
+#   27 March 2017       v0.2.12 - fix BearingRangeTo10 error
+#                               - fix division by zero error in windrun
+#                                 calculations for first archive period of the
 #                                 day
-#  22 March 2017        v0.2.11 - can now include local date/time in scroller
+#   22 March 2017       v0.2.11 - can now include local date/time in scroller
 #                                 text by including strftime() format
 #                                 directives in the scroller text
 #                               - gauge-data.txt content can now be sent to a
 #                                 remote URL via HTTP POST. Thanks to
 #                                 Alec Bennett for his idea
-#  17 March 2017        v0.2.10 - now supports reading scroller text from a
+#   17 March 2017       v0.2.10 - now supports reading scroller text from a
 #                                 text file specified by the scroller_text
 #                                 config option in [RealtimeGaugeData]
-#  7 March 2017         v0.2.9  - reworked ten minute gust calculation to fix
+#   7 March 2017        v0.2.9  - reworked ten minute gust calculation to fix
 #                                 problem where red gust 'wedge' would
 #                                 occasionally temporarily disappear from wind
 #                                 speed gauge
-#  28 February 2017     v0.2.8  - Reworked day max/min calculations to better
+#   28 February 2017    v0.2.8  - Reworked day max/min calculations to better
 #                                 handle missing historical data. If historical
 #                                 max/min data is missing day max/min will
 #                                 default to the current value for the obs
 #                                 concerned.
-#  26 February 2017     v0.2.7  - loop packets are now cached to support
+#   26 February 2017    v0.2.7  - loop packets are now cached to support
 #                                 stations that emit partial packets
 #                               - windSpeed obtained from archive is now only
 #                                 handled as a ValueTuple to avoid units issues
-#  22 February 2017     v0.2.6  - updated docstring config options to reflect
+#   22 February 2017    v0.2.6  - updated docstring config options to reflect
 #                                 current library of available options
 #                               - 'latest' and 'avgbearing' wind directions now
 #                                 return the last non-None wind direction
@@ -66,28 +69,28 @@
 #                                 more robust
 #                               - reworked code that formats gauge-data.txt
 #                                 field data to better handle None values
-#  21 February 2017     v0.2.5  - fixed error where altitude units could not be
+#   21 February 2017    v0.2.5  - fixed error where altitude units could not be
 #                                 changed from meter
 #                               - rainrate and windrun unit groups are now
 #                                 derived from rain and speed units groups
 #                                 respectively
 #                               - solar calc config options no longer searched
 #                                 for in [StdWXCalculate]
-#  20 February 2017     v0.2.4  - fixed error where rain units could not be
+#   20 February 2017    v0.2.4  - fixed error where rain units could not be
 #                                 changed from mm
 #                               - pressures now formats to correct number of
 #                                 decimal places
 #                               - reworked temp and pressure trend formatting
-#  20 February 2017     v0.2.3  - Fixed logic error in windrose calculations.
+#   20 February 2017    v0.2.3  - Fixed logic error in windrose calculations.
 #                                 Minor tweaking of windrose processing.
-#  19 February 2017     v0.2.2  - Added config option apptemp_binding
+#   19 February 2017    v0.2.2  - Added config option apptemp_binding
 #                                 specifying a binding containing appTemp data.
 #                                 apptempTL and apptempTH default to apptemp if
 #                                 binding not specified or it does not contain
 #                                 appTemp data.
-#  15 February 2017     v0.2.1  - fixed error that resulted in incorrect pressL
+#   15 February 2017    v0.2.1  - fixed error that resulted in incorrect pressL
 #                                 and pressH values
-#  24 January 2017      v0.2.0  - now runs in a thread to eliminate blocking
+#   24 January 2017     v0.2.0  - now runs in a thread to eliminate blocking
 #                                 impact on weeWX
 #                               - now calculates WindRoseData
 #                               - now calculates pressL and pressH
@@ -97,10 +100,10 @@
 #                                 by rtgd_path config option
 #                               - added config options for windrose period and
 #                                 number of compass points to be generated
-#  19 January 2017      v0.1.2  - fix error that occurred when stations do not
+#   19 January 2017     v0.1.2  - fix error that occurred when stations do not
 #                                 emit radiation
-#  18 January 2017      v0.1.1  - better handles loop observations that are None
-#  3 January 2017       v0.1.0  - initial release
+#   18 January 2017     v0.1.1  - better handles loop observations that are None
+#   3 January 2017      v0.1.0  - initial release
 #
 """A weeWX service to generate a loop based gauge-data.txt.
 
@@ -610,8 +613,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   config_dict['StdReport'].get('HTML_ROOT', ''))
 
         rtgd_path = os.path.join(_html_root, _path)
-        self.rtgd_path_file = os.path.join(rtgd_path, 
-                                           rtgd_config_dict.get('rtgd_file_name', 
+        self.rtgd_path_file = os.path.join(rtgd_path,
+                                           rtgd_config_dict.get('rtgd_file_name',
                                                                 'gauge-data.txt'))
 
         # get the remote server URL if it exists, if it doesn't set it to None
@@ -956,7 +959,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         req.add_header('Content-Type', 'application/json')
         # POST the data but wrap in a try..except so we can trap any errors
         try:
-            response = self.post_request(req, json.dumps(data))
+            response = self.post_request(req, json.dumps(data,
+                                                         separators=(',', ':'),
+                                                         sort_keys=True))
             if 200 <= response.code <= 299:
                 # No exception thrown and we got a good response code, but did
                 # we get self.response back in a return message? Check for
@@ -1008,7 +1013,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         """
 
         with open(self.rtgd_path_file, 'w') as f:
-            json.dump(data, f)
+            json.dump(data, f, separators=(',', ':'), sort_keys=True)
 
     def get_scroller_text(self):
         """Obtain the text string to be used in the scroller.
