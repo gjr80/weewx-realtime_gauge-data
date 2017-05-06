@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.12                                     Date: 27 March 2017
+# Version: 0.2.13                                     Date: 6 May 2017
 #
 # Revision History
 #   6 May 2017          v0.2.13 - Unnecessary whitespace removed from JSON
 #                                 output. Addresses issue #2.
 #                               - JSON output now sorted alphabetically by key
+#                               - fixed empty sequence ValueError associated
+#                                 with BearingRangeFrom10 and BearingRangeTo10
 #   27 March 2017       v0.2.12 - fix BearingRangeTo10 error
 #                               - fix division by zero error in windrun
 #                                 calculations for first archive period of the
@@ -1501,7 +1503,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.windDirAvg is not None:
             try:
                 fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else None for x, y, s, d, t in self.buffer.wind_dir_list)
-            except TypeError:
+            except TypeError, ValueError:
                 fromBearing = None
             BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
             if BearingRangeFrom10 < 0:
@@ -1517,7 +1519,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.windDirAvg is not None:
             try:
                 toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x, y, s, d, t in self.buffer.wind_dir_list)
-            except TypeError:
+            except TypeError, ValueError:
                 toBearing = None
             BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
             if BearingRangeTo10 < 0:
