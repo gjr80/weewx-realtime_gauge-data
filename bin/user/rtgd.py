@@ -1503,7 +1503,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.windDirAvg is not None:
             try:
                 fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else None for x, y, s, d, t in self.buffer.wind_dir_list)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 fromBearing = None
             BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
             if BearingRangeFrom10 < 0:
@@ -1519,7 +1519,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.windDirAvg is not None:
             try:
                 toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x, y, s, d, t in self.buffer.wind_dir_list)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 toBearing = None
             BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
             if BearingRangeTo10 < 0:
