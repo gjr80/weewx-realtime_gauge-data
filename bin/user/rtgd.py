@@ -25,6 +25,17 @@
 #                               - JSON output now sorted alphabetically by key
 #                               - fixed empty sequence ValueError associated
 #                                 with BearingRangeFrom10 and BearingRangeTo10
+#                               - Revised debug logging. Now supports
+#                                 debug=0,1,2 and 3:
+#                                 0 - standard weeWX output, no debug info
+#                                 1 - as per debug=0, advises whether Zambretti
+#                                     is available, logs minor non-fatal erros
+#                                     (eg posting)
+#                                 2 - as per debug=1, logs events that occur,
+#                                     eg packets queued, packets processed,
+#                                     output generated
+#                                 3   as per debug=2, logs packet/record
+#                                     contents
 #   27 March 2017       v0.2.12 - fix BearingRangeTo10 error
 #                               - fix division by zero error in windrun
 #                                 calculations for first archive period of the
@@ -384,6 +395,9 @@ def logdbg2(id, msg):
     if weewx.debug >= 2:
         logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
 
+def logdbg3(id, msg):
+    if weewx.debug >= 3:
+        logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
 
 def loginf(id, msg):
     logmsg(syslog.LOG_INFO, '%s: %s' % (id, msg))
@@ -520,7 +534,11 @@ class RealtimeGaugeData(StdService):
         _package = {'type': 'loop',
                     'payload': event.packet}
         self.rtgd_queue.put(_package)
-        logdbg2("rtgd", "queued loop packet: %s" % _package['payload'])
+        if weewx.debug == 2:
+            logdbg("rtgd",
+                   "queued loop packet (%s)" % _package['payload']['dateTime'])
+        elif weewx.debug >= 3:
+            logdbg("rtgd", "queued loop packet: %s" % _package['payload'])
 
     def new_archive_record(self, event):
         """Puts archive records in the rtgd queue."""
@@ -530,7 +548,11 @@ class RealtimeGaugeData(StdService):
         _package = {'type': 'archive',
                     'payload': event.record}
         self.rtgd_queue.put(_package)
-        logdbg2("rtgd", "queued archive record: %s" % _package['payload'])
+        if weewx.debug == 2:
+            logdbg("rtgd",
+                   "queued archive record (%s)" % _package['payload']['dateTime'])
+        elif weewx.debug >= 3:
+            logdbg("rtgd", "queued archive record: %s" % _package['payload'])
         # get alltime min max baro and put in the queue
         # get the min and max values (incl usUnits)
         _minmax_baro = self.get_minmax_obs('barometer')
@@ -540,8 +562,11 @@ class RealtimeGaugeData(StdService):
             _package = {'type': 'stats',
                         'payload': _minmax_baro}
             self.rtgd_queue.put(_package)
-            logdbg2("rtgd", "queued min/max barometer values: %s" % _package['payload'])
-
+            if weewx.debug == 2:
+                logdbg("rtgd", "queued min/max barometer values")
+            elif weewx.debug >= 3:
+                logdbg("rtgd",
+                       "queued min/max barometer values: %s" % _package['payload'])
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
 
@@ -809,13 +834,14 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
         # get a windrose to start with since it is only on receipt of an
         # archive record
-        logdbg2("rtgdthread", "calculating windrose data ...")
         self.rose = calc_windrose(int(time.time()),
                                   self.db_manager,
                                   self.wr_period,
                                   self.wr_points)
-        logdbg2("rtgdthread", "windrose data calculated")
-
+        if weewx.debug == 2:
+            logdbg("rtgdthread", "windrose data calculated")
+        elif weewx.debug >= 3:
+            logdbg("rtgdthread", "windrose data calculated: %s" % (self.rose,))
         # setup our loop cache and set some starting wind values
         _ts = self.db_manager.lastGoodStamp()
         if _ts is not None:
@@ -824,7 +850,6 @@ class RealtimeGaugeDataThread(threading.Thread):
             _rec = {'usUnits': None}
         # get a CachedPacket object as our loop packet cache and prime it with
         # values from the last good archive record if available
-        logdbg2("rtgdthread", "initialising loop packet cache ...")
         self.packet_cache = CachedPacket(_rec)
         logdbg2("rtgdthread", "loop packet cache initialised")
         # save the windSpeed value to use as our archive period average, this
@@ -844,14 +869,22 @@ class RealtimeGaugeDataThread(threading.Thread):
                 if _package is None:
                     return
                 elif _package['type'] == 'archive':
+                    if weewx.debug == 2:
+                        logdbg("rtgdthread",
+                               "received archive record (%s)" % _package['payload']['dateTime'])
+                    elif weewx.debug >= 3:
+                        logdbg("rtgdthread",
+                               "received archive record: %s" % _package['payload'])
                     self.new_archive_record(_package['payload'])
-                    logdbg2("rtgdthread", "received archive record")
-                    logdbg2("rtgdthread", "calculating windrose data ...")
                     self.rose = calc_windrose(_package['payload']['dateTime'],
                                               self.db_manager,
                                               self.wr_period,
                                               self.wr_points)
-                    logdbg2("rtgdthread", "windrose data calculated")
+                    if weewx.debug == 2:
+                        logdbg("rtgdthread", "windrose data calculated")
+                    elif weewx.debug >= 3:
+                        logdbg("rtgdthread",
+                               "windrose data calculated: %s" % (self.rose,))
                     continue
                 elif _package['type'] == 'event':
                     if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
@@ -860,10 +893,13 @@ class RealtimeGaugeDataThread(threading.Thread):
                         self.end_archive_period()
                     continue
                 elif _package['type'] == 'stats':
-                    logdbg2("rtgdthread",
-                            "received stats package payload=%s" % (_package['payload'], ))
+                    if weewx.debug == 2:
+                        logdbg("rtgdthread",
+                               "received stats package")
+                    elif weewx.debug >= 3:
+                        logdbg("rtgdthread",
+                               "received stats package: %s" % _package['payload'])
                     self.process_stats(_package['payload'])
-                    logdbg2("rtgdthread", "processed stats package")
                     continue
                 # if packets have backed up in the rtgd queue, trim it until
                 # it's no bigger than the max allowed backlog
@@ -873,8 +909,12 @@ class RealtimeGaugeDataThread(threading.Thread):
             # we now have a packet to process, wrap in a try..except so we can
             # catch any errors
             try:
-                logdbg2("rtgdthread",
-                        "received packet: %s" % _package['payload'])
+                if weewx.debug == 2:
+                    logdbg("rtgdthread",
+                           "received loop packet (%s)" % _package['payload']['dateTime'])
+                elif weewx.debug >= 3:
+                    logdbg("rtgdthread",
+                           "received loop packet: %s" % _package['payload'])
                 self.process_packet(_package['payload'])
             except Exception, e:
                 # Some unknown exception occurred. This is probably a serious
@@ -906,7 +946,12 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # get a cached packet
                 cached_packet = self.packet_cache.get_packet(packet['dateTime'],
                                                              self.max_cache_age)
-                logdbg2("rtgdthread", "cached loop packet: %s" % (cached_packet,))
+                if weewx.debug == 2:
+                    logdbg("rtgdthread",
+                           "created cached loop packet (%s)" % cached_packet['dateTime'])
+                elif weewx.debug >= 3:
+                    logdbg("rtgdthread",
+                           "reated cached loop packet: %s" % (cached_packet,))
                 # set our lost contact flag if applicable
                 if self.station_type in LOOP_STATIONS:
                     self.lost_contact_flag = cached_packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
@@ -921,14 +966,14 @@ class RealtimeGaugeDataThread(threading.Thread):
                     # post the data
                     self.post_data(data)
                 # log the generation
-                logdbg("rtgdthread",
-                       "packet (%s) gauge-data.txt generated in %.5f seconds" % (cached_packet['dateTime'],
-                                                                                 (self.last_write-t1)))
+                logdbg2("rtgdthread",
+                        "gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
+                                                                           (self.last_write-t1)))
             except Exception, e:
                 weeutil.weeutil.log_traceback('rtgdthread: **** ')
         else:
             # we skipped this packet so log it
-            logdbg("rtgdthread", "packet (%s) skipped" % packet['dateTime'])
+            logdbg2("rtgdthread", "packet (%s) skipped" % packet['dateTime'])
 
     def process_stats(self, package):
         """Process a stats package.
@@ -971,16 +1016,16 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # not there then log it and return.
                 if self.response is not None and self.response not in response:
                     # didn't get 'success' so log it and continue
-                    logdbg("post_data",
+                    logdbg("rtgdthread",
                            "Failed to post data: Unexpected response")
                 return
             # we received a bad response code, log it and continue
-            logdbg("post_data",
+            logdbg("rtgdthread",
                    "Failed to post data: Code %s" % response.code())
         except (urllib2.URLError, socket.error,
                 httplib.BadStatusLine, httplib.IncompleteRead), e:
             # an exception was thrown, log it and continue
-            logdbg("post_data", "Failed to post data: %s" % e)
+            logdbg("rtgdthread", "Failed to post data: %s" % e)
 
     def post_request(self, request, payload):
         """Post a Request object.
