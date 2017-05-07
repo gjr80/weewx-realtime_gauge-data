@@ -1,3 +1,20 @@
+v0.2.13
+*   unnecessary whitespace removed from JSON output (issue #2)
+*   JSON output now sorted alphabetically by key (issue #2)
+*   revised debug logging (issue #7). Now supports debug=0,1,2 and 3:
+    0 - standard weeWX output, no debug info
+    1 - as per debug=0, advises whether Zambretti is available, logs minor
+        non-fatal errors (eg posting)
+    2 - as per debug=1, logs events that occur, eg packets queued, packets
+        processed, output generated
+    3 - as per debug=2, logs packet/record contents
+*   gauge-data.txt destination directory tree is created if it does not exist
+    (issue #8)
+v0.2.12 (never released)
+*   fixed empty sequence ValueError associated with BearingRangeFrom10 and
+    BearingRangeTo10
+*   fixed division by zero error when calculating windrun during first archive
+    period of the day
 v0.2.11
 *   can now include local date/time in scroller text by including strftime()
     format directives in the scroller text

@@ -11,9 +11,13 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.12                                       Date: 22 March 2017
+# Version: 0.2.13                                       Date: 6 May 2017
 #
 # Revision History
+#   6 May 2017          v0.2.13
+#       - bumped version only
+#   29 March 2017       v0.2.12
+#       - never released
 #   22 March 2017       v0.2.11
 #       - added foot StringFormat config option
 #   17 March 2017       v0.2.10
@@ -48,7 +52,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.11"
+RTGD_VERSION = "0.2.13"
 
 
 def loader():
