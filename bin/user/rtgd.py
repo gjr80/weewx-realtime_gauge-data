@@ -36,8 +36,10 @@
 #                                     output generated
 #                                 3   as per debug=2, logs packet/record
 #                                     contents
-#   27 March 2017       v0.2.12 - fix BearingRangeTo10 error
-#                               - fix division by zero error in windrun
+#                               - gauge-data.txt destination directory tree is
+#                                 created if it does not exist
+#   27 March 2017       v0.2.12 - fixed BearingRangeTo10 error
+#   (never released)            - fixed division by zero error in windrun
 #                                 calculations for first archive period of the
 #                                 day
 #   22 March 2017       v0.2.11 - can now include local date/time in scroller
@@ -313,6 +315,7 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
 # python imports
 import Queue
 import datetime
+import errno
 import httplib
 import json
 import math
@@ -334,7 +337,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int
 
 # version number of this script
-RTGD_VERSION = '0.2.12'
+RTGD_VERSION = '0.2.13'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -639,8 +642,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         _html_root = os.path.join(config_dict['WEEWX_ROOT'],
                                   config_dict['StdReport'].get('HTML_ROOT', ''))
 
-        rtgd_path = os.path.join(_html_root, _path)
-        self.rtgd_path_file = os.path.join(rtgd_path,
+        self.rtgd_path = os.path.join(_html_root, _path)
+        self.rtgd_path_file = os.path.join(self.rtgd_path,
                                            rtgd_config_dict.get('rtgd_file_name',
                                                                 'gauge-data.txt'))
 
@@ -1052,13 +1055,23 @@ class RealtimeGaugeDataThread(threading.Thread):
         """Write the gauge-data.txt file.
 
         Takes dictionary of data elements, converts them to JSON format and
-        writes them to file. Order of data elements may vary from time to time
-        but not an issue as gauge-data.txt is just a JSON format data file.
+        writes them to file. JSON output is sorted by key and any non-critical
+        whitespace removed before being written to file. Destination directory
+        is created if it does not exist.
 
         Inputs:
-            data:   dictionary of gauge-data.txt data elements
+            data: dictionary of gauge-data.txt data elements
         """
 
+        # make the destination directory, wrapping it in a try block to catch
+        # any errors
+        try:
+            os.makedirs(self.rtgd_path)
+        except OSError as error:
+            # raise if the error is anything other than the dir already exists
+            if error.errno != errno.EEXIST:
+                raise
+        # now write to file
         with open(self.rtgd_path_file, 'w') as f:
             json.dump(data, f, separators=(',', ':'), sort_keys=True)
 
