@@ -23,8 +23,6 @@
 #   6 May 2017          v0.2.13 - Unnecessary whitespace removed from JSON
 #                                 output. Addresses issue #2.
 #                               - JSON output now sorted alphabetically by key
-#                               - fixed empty sequence ValueError associated
-#                                 with BearingRangeFrom10 and BearingRangeTo10
 #                               - Revised debug logging. Now supports
 #                                 debug=0,1,2 and 3:
 #                                 0 - standard weeWX output, no debug info
@@ -38,8 +36,9 @@
 #                                     contents
 #                               - gauge-data.txt destination directory tree is
 #                                 created if it does not exist
-#   27 March 2017       v0.2.12 - fixed BearingRangeTo10 error
-#   (never released)            - fixed division by zero error in windrun
+#   27 March 2017       v0.2.12 - fixed empty sequence ValueError associated
+#   (never released)              with BearingRangeFrom10 and BearingRangeTo10
+#                               - fixed division by zero error in windrun
 #                                 calculations for first archive period of the
 #                                 day
 #   22 March 2017       v0.2.11 - can now include local date/time in scroller
