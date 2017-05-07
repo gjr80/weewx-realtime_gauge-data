@@ -20,14 +20,15 @@
 # Version: 0.2.13                                     Date: 6 May 2017
 #
 # Revision History
-#   6 May 2017          v0.2.13 - Unnecessary whitespace removed from JSON
-#                                 output. Addresses issue #2.
+#   6 May 2017          v0.2.13 - unnecessary whitespace removed from JSON
+#                                 output(issue #2)
 #                               - JSON output now sorted alphabetically by key
+#                                 (issue #2)
 #                               - Revised debug logging. Now supports
-#                                 debug=0,1,2 and 3:
+#                                 debug=0,1,2 and 3: (issue #7)
 #                                 0 - standard weeWX output, no debug info
 #                                 1 - as per debug=0, advises whether Zambretti
-#                                     is available, logs minor non-fatal erros
+#                                     is available, logs minor non-fatal errors
 #                                     (eg posting)
 #                                 2 - as per debug=1, logs events that occur,
 #                                     eg packets queued, packets processed,
@@ -35,7 +36,7 @@
 #                                 3   as per debug=2, logs packet/record
 #                                     contents
 #                               - gauge-data.txt destination directory tree is
-#                                 created if it does not exist
+#                                 created if it does not exist(issue #8)
 #   27 March 2017       v0.2.12 - fixed empty sequence ValueError associated
 #   (never released)              with BearingRangeFrom10 and BearingRangeTo10
 #                               - fixed division by zero error in windrun
@@ -953,7 +954,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                            "created cached loop packet (%s)" % cached_packet['dateTime'])
                 elif weewx.debug >= 3:
                     logdbg("rtgdthread",
-                           "reated cached loop packet: %s" % (cached_packet,))
+                           "created cached loop packet: %s" % (cached_packet,))
                 # set our lost contact flag if applicable
                 if self.station_type in LOOP_STATIONS:
                     self.lost_contact_flag = cached_packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
@@ -1091,7 +1092,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # first look for a string in weewx.conf
         if self.scroller_text is not None:
             _scroller = self.scroller_text
-        # if nothign then look for a file
+        # if nothing then look for a file
         elif self.scroller_file is not None:
             with open(self.scroller_file, 'r') as f:
                 _scroller = f.readline().strip()
