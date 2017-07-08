@@ -1,3 +1,8 @@
+v0.2.14
+*   changed default decimal places for foot, inHg, km_per_hour and
+    mile_per_hour
+*   reformatted rtgd.py change summary
+*   minor refactoring of RtgdBuffer class
 v0.2.13
 *   unnecessary whitespace removed from JSON output (issue #2)
 *   JSON output now sorted alphabetically by key (issue #2)

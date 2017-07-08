@@ -17,108 +17,103 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.13                                     Date: 6 May 2017
+# Version: 0.2.14                                     Date: 8 July 2017
 #
 # Revision History
-#   6 May 2017          v0.2.13 - unnecessary whitespace removed from JSON
-#                                 output(issue #2)
-#                               - JSON output now sorted alphabetically by key
-#                                 (issue #2)
-#                               - Revised debug logging. Now supports
-#                                 debug=0,1,2 and 3: (issue #7)
-#                                 0 - standard weeWX output, no debug info
-#                                 1 - as per debug=0, advises whether Zambretti
-#                                     is available, logs minor non-fatal errors
-#                                     (eg posting)
-#                                 2 - as per debug=1, logs events that occur,
-#                                     eg packets queued, packets processed,
-#                                     output generated
-#                                 3   as per debug=2, logs packet/record
-#                                     contents
-#                               - gauge-data.txt destination directory tree is
-#                                 created if it does not exist(issue #8)
-#   27 March 2017       v0.2.12 - fixed empty sequence ValueError associated
-#   (never released)              with BearingRangeFrom10 and BearingRangeTo10
-#                               - fixed division by zero error in windrun
-#                                 calculations for first archive period of the
-#                                 day
-#   22 March 2017       v0.2.11 - can now include local date/time in scroller
-#                                 text by including strftime() format
-#                                 directives in the scroller text
-#                               - gauge-data.txt content can now be sent to a
-#                                 remote URL via HTTP POST. Thanks to
-#                                 Alec Bennett for his idea
-#   17 March 2017       v0.2.10 - now supports reading scroller text from a
-#                                 text file specified by the scroller_text
-#                                 config option in [RealtimeGaugeData]
-#   7 March 2017        v0.2.9  - reworked ten minute gust calculation to fix
-#                                 problem where red gust 'wedge' would
-#                                 occasionally temporarily disappear from wind
-#                                 speed gauge
-#   28 February 2017    v0.2.8  - Reworked day max/min calculations to better
-#                                 handle missing historical data. If historical
-#                                 max/min data is missing day max/min will
-#                                 default to the current value for the obs
-#                                 concerned.
-#   26 February 2017    v0.2.7  - loop packets are now cached to support
-#                                 stations that emit partial packets
-#                               - windSpeed obtained from archive is now only
-#                                 handled as a ValueTuple to avoid units issues
-#   22 February 2017    v0.2.6  - updated docstring config options to reflect
-#                                 current library of available options
-#                               - 'latest' and 'avgbearing' wind directions now
-#                                 return the last non-None wind direction
-#                                 respectively when their feeder direction is
-#                                 None
-#                               - implemented optional scroller_text config
-#                                 option allowing fixed scroller text to be
-#                                 specified in lieu of Zambretti forecast text
-#                               - renamed rtgd thread and queue variables
-#                               - no longer reads unit group config options
-#                                 that have only one possible unit
-#                               - use of mmHg, knot or cm units reverts to hPa,
-#                                 mile_per_hour and mm respectively due to
-#                                 weeWX or SteelSeries Gauges not understanding
-#                                 the unit (or derived unit)
-#                               - made gauge-data.txt unit code determination
-#                                 more robust
-#                               - reworked code that formats gauge-data.txt
-#                                 field data to better handle None values
-#   21 February 2017    v0.2.5  - fixed error where altitude units could not be
-#                                 changed from meter
-#                               - rainrate and windrun unit groups are now
-#                                 derived from rain and speed units groups
-#                                 respectively
-#                               - solar calc config options no longer searched
-#                                 for in [StdWXCalculate]
-#   20 February 2017    v0.2.4  - fixed error where rain units could not be
-#                                 changed from mm
-#                               - pressures now formats to correct number of
-#                                 decimal places
-#                               - reworked temp and pressure trend formatting
-#   20 February 2017    v0.2.3  - Fixed logic error in windrose calculations.
-#                                 Minor tweaking of windrose processing.
-#   19 February 2017    v0.2.2  - Added config option apptemp_binding
-#                                 specifying a binding containing appTemp data.
-#                                 apptempTL and apptempTH default to apptemp if
-#                                 binding not specified or it does not contain
-#                                 appTemp data.
-#   15 February 2017    v0.2.1  - fixed error that resulted in incorrect pressL
-#                                 and pressH values
-#   24 January 2017     v0.2.0  - now runs in a thread to eliminate blocking
-#                                 impact on weeWX
-#                               - now calculates WindRoseData
-#                               - now calculates pressL and pressH
-#                               - frequency of generation is now specified by
-#                                 a single config option min_interval
-#                               - gauge-data.txt output path is now specified
-#                                 by rtgd_path config option
-#                               - added config options for windrose period and
-#                                 number of compass points to be generated
-#   19 January 2017     v0.1.2  - fix error that occurred when stations do not
-#                                 emit radiation
-#   18 January 2017     v0.1.1  - better handles loop observations that are None
-#   3 January 2017      v0.1.0  - initial release
+#   8 July 2017         v0.2.14
+#       - changed default decimal places for foot, inHg, km_per_hour and
+#         mile_per_hour
+#       - reformatted change summary
+#       - minor refactoring of RtgdBuffer class
+#   6 May 2017          v0.2.13
+#       - unnecessary whitespace removed from JSON output(issue #2)
+#       - JSON output now sorted alphabetically by key (issue #2)
+#       - Revised debug logging. Now supports debug=0,1,2 and 3: (issue #7)
+#         0 - standard weeWX output, no debug info
+#         1 - as per debug=0, advises whether Zambretti is available, logs
+#             minor non-fatal errors (eg posting)
+#         2 - as per debug=1, logs events that occur, eg packets queued,
+#             packets processed, output generated
+#         3   as per debug=2, logs packet/record contents
+#       - gauge-data.txt destination directory tree is created if it does not
+#         exist(issue #8)
+#   27 March 2017       v0.2.12(never released)
+#       - fixed empty sequence ValueError associated with BearingRangeFrom10
+#         and BearingRangeTo10
+#       - fixed division by zero error in windrun calculations for first
+#         archive period of the day
+#   22 March 2017       v0.2.11
+#       - can now include local date/time in scroller text by including
+#         strftime() format directives in the scroller text
+#       - gauge-data.txt content can now be sent to a remote URL via HTTP POST.
+#         Thanks to Alec Bennett for his idea.
+#   17 March 2017       v0.2.10
+#       - now supports reading scroller text from a text file specified by the
+#         scroller_text config option in [RealtimeGaugeData]
+#   7 March 2017        v0.2.9
+#       - reworked ten minute gust calculation to fix problem where red gust
+#         'wedge' would occasionally temporarily disappear from wind speed
+#         gauge
+#   28 February 2017    v0.2.8
+#       - Reworked day max/min calculations to better handle missing historical
+#         data. If historical max/min data is missing day max/min will default
+#         to the current value for the obs concerned.
+#   26 February 2017    v0.2.7
+#       - loop packets are now cached to support stations that emit partial
+#         packets
+#       - windSpeed obtained from archive is now only handled as a ValueTuple
+#         to avoid units issues
+#   22 February 2017    v0.2.6
+#       - updated docstring config options to reflect current library of
+#         available options
+#       - 'latest' and 'avgbearing' wind directions now return the last
+#         non-None wind direction respectively when their feeder direction is
+#         None
+#       - implemented optional scroller_text config option allowing fixed
+#         scroller text to be specified in lieu of Zambretti forecast text
+#       - renamed rtgd thread and queue variables
+#       - no longer reads unit group config options that have only one possible
+#         unit
+#       - use of mmHg, knot or cm units reverts to hPa, mile_per_hour and mm
+#         respectively due to weeWX or SteelSeries Gauges not understanding the
+#         unit (or derived unit)
+#       - made gauge-data.txt unit code determination more robust
+#       - reworked code that formats gauge-data.txt field data to better handle
+#         None values
+#   21 February 2017    v0.2.5
+#       - fixed error where altitude units could not be changed from meter
+#       - rainrate and windrun unit groups are now derived from rain and speed
+#         units groups respectively
+#       - solar calc config options no longer searched for in [StdWXCalculate]
+#   20 February 2017    v0.2.4
+#       - fixed error where rain units could not be changed from mm
+#       - pressures now formats to correct number of decimal places
+#       - reworked temp and pressure trend formatting
+#   20 February 2017    v0.2.3
+#       - Fixed logic error in windrose calculations. Minor tweaking of
+#         windrose processing.
+#   19 February 2017    v0.2.2
+#       - Added config option apptemp_binding specifying a binding containing
+#         appTemp data. apptempTL and apptempTH default to apptemp if binding
+#         not specified or it does not contain appTemp data.
+#   15 February 2017    v0.2.1
+#       - fixed error that resulted in incorrect pressL and pressH values
+#   24 January 2017     v0.2.0
+#       - now runs in a thread to eliminate blocking impact on weeWX
+#       - now calculates WindRoseData
+#       - now calculates pressL and pressH
+#       - frequency of generation is now specified by a single config option
+#         min_interval
+#       - gauge-data.txt output path is now specified by rtgd_path config
+#         option
+#       - added config options for windrose period and number of compass points
+#         to be generated
+#   19 January 2017     v0.1.2
+#       - fix error that occurred when stations do not emit radiation
+#   18 January 2017     v0.1.1
+#       - better handles loop observations that are None
+#   3 January 2017      v0.1.0
+#       - initial release
 #
 """A weeWX service to generate a loop based gauge-data.txt.
 
@@ -221,15 +216,15 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
         degree_F = %.1f
         degree_compass = %.0f
         hPa = %.1f
-        inHg = %.3f
+        inHg = %.2f
         inch = %.2f
         inch_per_hour = %.2f
-        km_per_hour = %.0f
+        km_per_hour = %.1f
         km = %.1f
         mbar = %.1f
         meter = %.0f
         meter_per_second = %.1f
-        mile_per_hour = %.0f
+        mile_per_hour = %.1f
         mile = %.1f
         mm = %.1f
         mm_per_hour = %.1f
@@ -337,7 +332,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int
 
 # version number of this script
-RTGD_VERSION = '0.2.13'
+RTGD_VERSION = '0.2.14'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -398,9 +393,11 @@ def logdbg2(id, msg):
     if weewx.debug >= 2:
         logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
 
+
 def logdbg3(id, msg):
     if weewx.debug >= 3:
         logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+
 
 def loginf(id, msg):
     logmsg(syslog.LOG_INFO, '%s: %s' % (id, msg))
@@ -570,6 +567,7 @@ class RealtimeGaugeData(StdService):
             elif weewx.debug >= 3:
                 logdbg("rtgd",
                        "queued min/max barometer values: %s" % _package['payload'])
+
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
 
@@ -635,7 +633,7 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # setup file generation timing
         self.min_interval = rtgd_config_dict.get('min_interval', None)
-        self.last_write = 0 # ts (actual) of last generation
+        self.last_write = 0  # ts (actual) of last generation
 
         # get our file paths and names
         _path = rtgd_config_dict.get('rtgd_path', '/var/tmp')
@@ -781,7 +779,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                     'wx_binding')
 
         # create a RtgdBuffer object to hold our loop 'stats'
-        self.buffer = RtgdBuffer(config_dict)
+        self.buffer = RtgdBuffer()
 
         # Set our lost contact flag. Assume we start off with contact
         self.lost_contact_flag = False
@@ -1225,8 +1223,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             data['inhum'] = self.hum_format % inhum
         # dew - dew point
         dew_vt = ValueTuple(packet_d['dewpoint'],
-                                     self.p_temp_type,
-                                     self.p_temp_group)
+                            self.p_temp_type,
+                            self.p_temp_group)
         dew = convert(dew_vt, self.temp_group).value
         dew = dew if dew is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                   self.temp_group).value
@@ -1323,8 +1321,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             windspeed_ms = convert(windspeed_vt, 'meter_per_second').value
             # now calculate it
             apptemp_C = weewx.wxformulas.apptempC(temp_C,
-                                                 packet_d['outHumidity'],
-                                                 windspeed_ms)
+                                                  packet_d['outHumidity'],
+                                                  windspeed_ms)
             apptemp_vt = ValueTuple(apptemp_C, 'degree_C', 'group_temperature')
         apptemp = convert(apptemp_vt, self.temp_group).value
         apptemp = apptemp if apptemp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
@@ -1610,7 +1608,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                 windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum,
                                                                       self.p_wind_type,
                                                                       self.p_wind_group),
-                                                                      self.wind_group).value/self.buffer.windcount
+                                                                     self.wind_group).value/self.buffer.windcount
             except (ValueError, TypeError):
                 windrun = windrun_day_average
         else:
@@ -1731,12 +1729,34 @@ class RtgdBuffer(object):
     reflected.
     """
 
-    def __init__(self, config_dict):
+    def __init__(self):
         """Initialise an instance of our class."""
 
         # Initialise min/max for loop data received since last archive record
         # and sum/counter for windrun calculator
-        self.reset_loop_stats()
+        # initialise sum/counter for windrun calculator and sum for rain
+        self.windsum = 0
+        self.windcount = 0
+        self.rainsum = 0
+
+        # initialise loop period low/high/max stats
+        self.tempL_loop = [None, None]
+        self.tempH_loop = [None, None]
+        self.dewpointL_loop = [None, None]
+        self.dewpointH_loop = [None, None]
+        self.apptempL_loop = [None, None]
+        self.apptempH_loop = [None, None]
+        self.wchillL_loop = [None, None]
+        self.heatindexH_loop = [None, None]
+        self.wgustM_loop = [None, None, None]
+        self.pressL_loop = [None, None]
+        self.pressH_loop = [None, None]
+        self.rrateH_loop = [None, None]
+        self.humL_loop = [None, None]
+        self.humH_loop = [None, None]
+        self.windM_loop = [None, None]
+        self.UVH_loop = [None, None]
+        self.SolarH_loop = [None, None]
 
         # Setup lists/flags for 5 and 10 minute wind stats
         self.wind_list = []
@@ -1758,23 +1778,23 @@ class RtgdBuffer(object):
         self.rainsum = 0
 
         # reset loop period low/high/max stats
-        self.tempL_loop = [None,None]
-        self.tempH_loop = [None,None]
-        self.dewpointL_loop = [None,None]
-        self.dewpointH_loop = [None,None]
-        self.apptempL_loop = [None,None]
-        self.apptempH_loop = [None,None]
-        self.wchillL_loop = [None,None]
-        self.heatindexH_loop = [None,None]
-        self.wgustM_loop = [None,None,None]
-        self.pressL_loop = [None,None]
-        self.pressH_loop = [None,None]
-        self.rrateH_loop = [None,None]
-        self.humL_loop = [None,None]
-        self.humH_loop = [None,None]
+        self.tempL_loop = [None, None]
+        self.tempH_loop = [None, None]
+        self.dewpointL_loop = [None, None]
+        self.dewpointH_loop = [None, None]
+        self.apptempL_loop = [None, None]
+        self.apptempH_loop = [None, None]
+        self.wchillL_loop = [None, None]
+        self.heatindexH_loop = [None, None]
+        self.wgustM_loop = [None, None, None]
+        self.pressL_loop = [None, None]
+        self.pressH_loop = [None, None]
+        self.rrateH_loop = [None, None]
+        self.humL_loop = [None, None]
+        self.humH_loop = [None, None]
         self.windM_loop = [None, None]
-        self.UVH_loop = [None,None]
-        self.SolarH_loop = [None,None]
+        self.UVH_loop = [None, None]
+        self.SolarH_loop = [None, None]
 
     def averageWind(self):
         """ Calculate average wind speed over an archive interval period.
@@ -1995,7 +2015,7 @@ class CachedPacket():
     # These fields must be available in every loop packet read from the
     # cache.
     OBS = ["cloudbase", "windDir", "windrun", "inHumidity", "outHumidity",
-           "barometer", "radiation", "rain", "rainRate","windSpeed",
+           "barometer", "radiation", "rain", "rainRate", "windSpeed",
            "appTemp", "dewpoint", "heatindex", "humidex", "inTemp",
            "outTemp", "windchill", "UV"]
 
@@ -2158,8 +2178,8 @@ def calc_windrose(now, db_manager, period, points):
                   'angle': angle}
     # the query to be used
     windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) "\
-                       "FROM %(table_name)s WHERE dateTime>%(ts)s "\
-                       "GROUP BY ROUND(windDir/%(angle)s)"
+                   "FROM %(table_name)s WHERE dateTime>%(ts)s "\
+                   "GROUP BY ROUND(windDir/%(angle)s)"
 
     # we expect at least 'points' rows in our result so use genSql
     for _row in db_manager.genSql(windrose_sql % inter_dict):

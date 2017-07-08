@@ -11,9 +11,12 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.13                                       Date: 6 May 2017
+# Version: 0.2.14                                       Date: 8 July 2017
 #
 # Revision History
+#   8 July 2017         v0.2.14
+#       - changed default decimal places for foot, inHg, km_per_hour and 
+#         mile_per_hour
 #   6 May 2017          v0.2.13
 #       - bumped version only
 #   29 March 2017       v0.2.12
@@ -52,7 +55,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.13"
+RTGD_VERSION = "0.2.14"
 
 
 def loader():
@@ -81,18 +84,18 @@ class RtgdInstaller(ExtensionInstaller):
                         'degree_C': '%.1f',
                         'degree_F': '%.1f',
                         'degree_compass': '%.0f',
-                        'foot': '%.1f',
+                        'foot': '%.0f',
                         'hPa': '%.1f',
-                        'inHg': '%.3f',
+                        'inHg': '%.2f',
                         'inch': '%.2f',
                         'inch_per_hour': '%.2f',
-                        'km_per_hour': '%.0f',
+                        'km_per_hour': '%.1f',
                         'km': '%.1f',
                         'mbar': '%.1f',
                         'meter': '%.0f',
                         'meter_per_second': '%.1f',
                         'mile': '%.1f',
-                        'mile_per_hour': '%.0f',
+                        'mile_per_hour': '%.1f',
                         'mm': '%.1f',
                         'mm_per_hour': '%.1f',
                         'percent': '%.0f',
