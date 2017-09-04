@@ -17,9 +17,12 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.2.14                                     Date: 8 July 2017
+# Version: 0.3.0                                      Date: 4 September 2017
 #
 # Revision History
+#   4 September 2017    v0.3.0
+#       - added new feature to include Weather Underground forecast text as the
+#         scrolling message in the SteelSeries scroller.
 #   8 July 2017         v0.2.14
 #       - changed default decimal places for foot, inHg, km_per_hour and
 #         mile_per_hour
@@ -242,6 +245,42 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
                                        'km_per_hour' or 'meter_per_second'
         group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
 
+    [[WU]]
+        # WU API key to be used when calling the WU API
+        api_key = xxxxxxxxxxxxxxxx
+
+        # Interval (in seconds) between forecast downloads. Default
+        # is 1800.
+        interval = 1800
+
+        # Minimum period (in seconds) between  API calls. This prevents
+        # conditions where a misbehaving program could call the WU API
+        # repeatedly thus violating the API usage conditions.
+        # Default is 60.
+        api_lockout_period = 60
+
+        # Maximum number attempts to obtain an API response. Default is 3.
+        max_WU_tries = 3
+
+        # The location for the forecast and current conditions can be one
+        # of the following:
+        #   CA/San_Francisco     - US state/city
+        #   60290                - US zip code
+        #   Australia/Sydney     - Country/City
+        #   37.8,-122.4          - latitude,longitude
+        #   KJFK                 - airport code
+        #   pws:KCASANFR70       - PWS id
+        #   autoip               - AutoIP address location
+        #   autoip.json?geo_ip=38.102.136.138 - specific IP address
+        #                                       location
+        # If no location is specified, station latitude and longitude are
+        # used
+        location = enter location here
+
+        # The forecast text can be presented using either US imperial or Metric
+        # units. Optional string 'US' or 'Metric', default is 'Metric'
+        units =
+
 4.  Add the RealtimeGaugeData service to the list of report services under
 [Engines] [[WxEngine]] in weewx.conf:
 
@@ -408,86 +447,12 @@ def logerr(id, msg):
 
 
 # ============================================================================
-#                          class ZambrettiForecast
+#                     Exceptions that could get thrown
 # ============================================================================
 
 
-class ZambrettiForecast(object):
-    """Class to extract Zambretti forecast text.
-
-    Requires the weeWX forecast extension to be installed and configured to
-    provide the Zambretti forecast otherwise 'Forecast not available' will be
-    returned."""
-
-    DEFAULT_FORECAST_BINDING = 'forecast_binding'
-    DEFAULT_BINDING_DICT = {'database': 'forecast_sqlite',
-                            'manager': 'weewx.manager.Manager',
-                            'table_name': 'archive',
-                            'schema': 'user.forecast.schema'}
-
-    def __init__(self, config_dict):
-        """Initialise the ZambrettiForecast object."""
-
-        # flag as to whether the weeWX forecasting extension is installed
-        self.forecasting_installed = False
-        # set some forecast db access parameters
-        self.db_max_tries = 3
-        self.db_retry_wait = 3
-        # Get a db manager for the forecast database and import the Zambretti
-        # label lookup dict. If an exception is raised then we can assume the
-        # forecast extension is not installed.
-        try:
-            # create a db manager config dict
-            dbm_dict = weewx.manager.get_manager_dict(config_dict['DataBindings'],
-                                                      config_dict['Databases'],
-                                                      ZambrettiForecast.DEFAULT_FORECAST_BINDING,
-                                                      default_binding_dict=ZambrettiForecast.DEFAULT_BINDING_DICT)
-            # get a db manager for the forecast database
-            self.dbm = weewx.manager.open_manager(dbm_dict)
-            # import the Zambretti forecast text
-            from user.forecast import zambretti_label_dict
-            self.zambretti_label_dict = zambretti_label_dict
-            # if we made it this far the forecast extension is installed and we
-            # can do business
-            self.forecasting_installed = True
-        except (weewx.UnknownBinding, weedb.DatabaseError,
-                weewx.UnsupportedFeature, KeyError, ImportError):
-            # something went wrong, our forecasting_installed flag will not
-            # have been set so we can just continue on
-            pass
-
-    def is_installed(self):
-        """Is the forecasting extension installed."""
-
-        return self.forecasting_installed
-
-    def get_zambretti_text(self):
-        """Return the current Zambretti forecast text."""
-
-        # if the forecast extension is not installed then return an appropriate
-        # message
-        if not self.forecasting_installed:
-            return 'Forecast not available'
-
-        # SQL query to get the latest Zambretti forecast code
-        sql = "SELECT dateTime,zcode FROM %s WHERE method = 'Zambretti' ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
-        # try to execute the query
-        for count in range(self.db_max_tries):
-            try:
-                record = self.dbm.getSql(sql)
-                # if we get a non-None response then return the decoded
-                # forecast text
-                if record is not None:
-                    return self.zambretti_label_dict[record[1]]
-            except Exception, e:
-                logerr('rtgdthread: zambretti:', 'get zambretti failed (attempt %d of %d): %s' %
-                       ((count + 1), self.db_max_tries, e))
-                logdbg('rtgdthread: zambretti', 'waiting %d seconds before retry' %
-                       self.db_retry_wait)
-                time.sleep(self.db_retry_wait)
-        # if we made it here we have been unable to get a response from the
-        # forecast db so return a suitable message
-        return 'Forecast not available'
+class MissingApiKey(IOError):
+    """Raised when a WU API key cannot be found"""
 
 
 # ============================================================================
@@ -508,19 +473,41 @@ class RealtimeGaugeData(StdService):
         # initialize my superclass
         super(RealtimeGaugeData, self).__init__(engine, config_dict)
 
-        self.rtgd_queue = Queue.Queue()
+        self.rtgd_ctl_queue = Queue.Queue()
+        # get our RealtimeGaugeData config dictionary
+        rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
         manager_dict = weewx.manager.get_manager_dict_from_config(config_dict,
                                                                   'wx_binding')
         self.db_manager = weewx.manager.open_manager(manager_dict)
+
+        #
+        wu_config_dict = rtgd_config_dict.get('WU', None)
+        if wu_config_dict is not None:
+            self.wu_ctl_queue = Queue.Queue()
+            self.result_queue = Queue.Queue()
+            self.wu_thread = WUThread(self.wu_ctl_queue,
+                                      self.result_queue,
+                                      config_dict,
+                                      wu_config_dict,
+                                      lat=engine.stn_info.latitude_f,
+                                      long=engine.stn_info.longitude_f,
+                                      )
+            self.wu_thread.start()
+        else:
+            self.wu_thread = None
+            self.result_queue = none
+        
         # get an instance of class RealtimeGaugeDataThread and start the
         # thread running
-        self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_queue,
+        self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_ctl_queue,
+                                                   self.result_queue,
                                                    config_dict,
                                                    manager_dict,
                                                    latitude=engine.stn_info.latitude_f,
                                                    longitude=engine.stn_info.longitude_f,
                                                    altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
         self.rtgd_thread.start()
+
         # bind ourself to the relevant weeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
@@ -533,7 +520,7 @@ class RealtimeGaugeData(StdService):
         # we send via the queue
         _package = {'type': 'loop',
                     'payload': event.packet}
-        self.rtgd_queue.put(_package)
+        self.rtgd_ctl_queue.put(_package)
         if weewx.debug == 2:
             logdbg("rtgd",
                    "queued loop packet (%s)" % _package['payload']['dateTime'])
@@ -547,7 +534,7 @@ class RealtimeGaugeData(StdService):
         # we send via the queue
         _package = {'type': 'archive',
                     'payload': event.record}
-        self.rtgd_queue.put(_package)
+        self.rtgd_ctl_queue.put(_package)
         if weewx.debug == 2:
             logdbg("rtgd",
                    "queued archive record (%s)" % _package['payload']['dateTime'])
@@ -561,7 +548,7 @@ class RealtimeGaugeData(StdService):
         if _minmax_baro:
             _package = {'type': 'stats',
                         'payload': _minmax_baro}
-            self.rtgd_queue.put(_package)
+            self.rtgd_ctl_queue.put(_package)
             if weewx.debug == 2:
                 logdbg("rtgd", "queued min/max barometer values")
             elif weewx.debug >= 3:
@@ -575,22 +562,40 @@ class RealtimeGaugeData(StdService):
         # via the queue
         _package = {'type': 'event',
                     'payload': weewx.END_ARCHIVE_PERIOD}
-        self.rtgd_queue.put(_package)
+        self.rtgd_ctl_queue.put(_package)
         logdbg2("rtgd", "queued weewx.END_ARCHIVE_PERIOD event")
 
     def shutDown(self):
-        """Shut down any threads."""
+        """Shut down any threads.
 
-        if hasattr(self, 'rtgd_queue') and hasattr(self, 'rtgd_thread'):
-            if self.rtgd_queue and self.rtgd_thread.isAlive():
-                # Put a None in the rtgd_queue to signal the thread to shutdown
-                self.rtgd_queue.put(None)
-                # Wait up to 20 seconds for the thread to exit:
-                self.rtgd_thread.join(20.0)
-                if self.rtgd_thread.isAlive():
-                    logerr("rtgd", "Unable to shut down %s thread" % self.rtgd_thread.name)
-                else:
-                    logdbg("rtgd", "Shut down %s thread." % self.rtgd_thread.name)
+        Would normally do all of a given threads actions in one go but since
+        we may have more than one thread and so that we don't have sequential
+        (potential) waits of up to 15 seconds we send each thread a shutdown
+        signal and then go and check that each has indeed shutdown.
+        """
+
+        if hasattr(self, 'rtgd_ctl_queue') and hasattr(self, 'rtgd_thread'):
+            if self.rtgd_ctl_queue and self.rtgd_thread.isAlive():
+                # Put a None in the rtgd_ctl_queue to signal the thread to shutdown
+                self.rtgd_ctl_queue.put(None)
+        if hasattr(self, 'wu_ctl_queue') and hasattr(self, 'wu_thread'):
+            if self.wu_ctl_queue and self.wu_thread.isAlive():
+                # Put a None in the wu_ctl_queue to signal the thread to shutdown
+                self.wu_ctl_queue.put(None)
+        if hasattr(self, 'rtgd_thread') and self.rtgd_thread.isAlive():
+            # Wait up to 15 seconds for the thread to exit:
+            self.rtgd_thread.join(15.0)
+            if self.rtgd_thread.isAlive():
+                logerr("rtgd", "Unable to shut down %s thread" % self.rtgd_thread.name)
+            else:
+                logdbg("rtgd", "Shut down %s thread." % self.rtgd_thread.name)
+        if hasattr(self, 'wu_thread') and self.wu_thread.isAlive():
+            # Wait up to 15 seconds for the thread to exit:
+            self.wu_thread.join(15.0)
+            if self.wu_thread.isAlive():
+                logerr("rtgd", "Unable to shut down %s thread" % self.wu_thread.name)
+            else:
+                logdbg("rtgd", "Shut down %s thread." % self.wu_thread.name)
 
     def get_minmax_obs(self, obs_type):
         """Obtain the alltime max/min values for an observation."""
@@ -618,13 +623,17 @@ class RealtimeGaugeData(StdService):
 class RealtimeGaugeDataThread(threading.Thread):
     """Thread that generates gauge-data.txt in near realtime."""
 
-    def __init__(self, queue, config_dict, manager_dict,
+    def __init__(self, control_queue, result_queue, config_dict, manager_dict,
                  latitude, longitude, altitude):
         # Initialize my superclass:
         threading.Thread.__init__(self)
 
+        # setup a few thread things
+        self.setName('RtgdThread')
         self.setDaemon(True)
-        self.rtgd_queue = queue
+
+        self.control_queue = control_queue
+        self.result_queue = result_queue
         self.config_dict = config_dict
         self.manager_dict = manager_dict
 
@@ -790,6 +799,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.min_barometer = None
         self.max_barometer = None
 
+        # initialise forecast text
+        self.forecast_text = None
+
         # get some station info
         self.latitude = latitude
         self.longitude = longitude
@@ -864,67 +876,94 @@ class RealtimeGaugeDataThread(threading.Thread):
         # now run a continuous loop, waiting for records to appear in the rtgd
         # queue then processing them.
         while True:
+            # inner loop to monitor the queues
             while True:
-                _package = self.rtgd_queue.get()
-                # a None record is our signal to exit
-                if _package is None:
-                    return
-                elif _package['type'] == 'archive':
-                    if weewx.debug == 2:
-                        logdbg("rtgdthread",
-                               "received archive record (%s)" % _package['payload']['dateTime'])
-                    elif weewx.debug >= 3:
-                        logdbg("rtgdthread",
-                               "received archive record: %s" % _package['payload'])
-                    self.new_archive_record(_package['payload'])
-                    self.rose = calc_windrose(_package['payload']['dateTime'],
-                                              self.db_manager,
-                                              self.wr_period,
-                                              self.wr_points)
-                    if weewx.debug == 2:
-                        logdbg("rtgdthread", "windrose data calculated")
-                    elif weewx.debug >= 3:
-                        logdbg("rtgdthread",
-                               "windrose data calculated: %s" % (self.rose,))
-                    continue
-                elif _package['type'] == 'event':
-                    if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
-                        logdbg2("rtgdthread",
-                                "received event - END_ARCHIVE_PERIOD")
-                        self.end_archive_period()
-                    continue
-                elif _package['type'] == 'stats':
-                    if weewx.debug == 2:
-                        logdbg("rtgdthread",
-                               "received stats package")
-                    elif weewx.debug >= 3:
-                        logdbg("rtgdthread",
-                               "received stats package: %s" % _package['payload'])
-                    self.process_stats(_package['payload'])
-                    continue
-                # if packets have backed up in the rtgd queue, trim it until
+                # If we have a result queue check to see if we have received 
+                # any forecast data. Use get_nowait() so we don't block the 
+                # rtgd control queue. Wrap in a try..except to catch the error 
+                # if there is nothing in the queue.
+                if self.result_queue:
+                    try:
+                        # use nowait() so we don't block
+                        _package = self.result_queue.get_nowait()
+                    except Queue.Empty:
+                        # nothing in the queue so continue
+                        pass
+                    else:
+                        # we did get something in the queue but was it a 'forecast' 
+                        # package
+                        if hasattr(_package, 'type') and _package['type'] == 'forecast':
+                            # we have forecast text so log and save it
+                            logdbg2("rtgdthread",
+                                    "received forecast text: %s" % _package['payload'])
+                            self.forecast_text = _package['payload']
+                # now deal with the control queue
+                try:
+                    _package = self.control_queue.get_nowait()
+                except Queue.Empty:
+                    # nothing in the queue so continue
+                    pass
+                else:
+                    # a None record is our signal to exit
+                    if _package is None:
+                        return
+                    elif _package['type'] == 'archive':
+                        if weewx.debug == 2:
+                            logdbg("rtgdthread",
+                                   "received archive record (%s)" % _package['payload']['dateTime'])
+                        elif weewx.debug >= 3:
+                            logdbg("rtgdthread",
+                                   "received archive record: %s" % _package['payload'])
+                        self.new_archive_record(_package['payload'])
+                        self.rose = calc_windrose(_package['payload']['dateTime'],
+                                                  self.db_manager,
+                                                  self.wr_period,
+                                                  self.wr_points)
+                        if weewx.debug == 2:
+                            logdbg("rtgdthread", "windrose data calculated")
+                        elif weewx.debug >= 3:
+                            logdbg("rtgdthread",
+                                   "windrose data calculated: %s" % (self.rose,))
+                        continue
+                    elif _package['type'] == 'event':
+                        if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
+                            logdbg2("rtgdthread",
+                                    "received event - END_ARCHIVE_PERIOD")
+                            self.end_archive_period()
+                        continue
+                    elif _package['type'] == 'stats':
+                        if weewx.debug == 2:
+                            logdbg("rtgdthread",
+                                   "received stats package")
+                        elif weewx.debug >= 3:
+                            logdbg("rtgdthread",
+                                   "received stats package: %s" % _package['payload'])
+                        self.process_stats(_package['payload'])
+                        continue
+                    elif _package['type'] == 'loop':
+                        # we now have a packet to process, wrap in a try..except so we can
+                        # catch any errors
+                        try:
+                            if weewx.debug == 2:
+                                logdbg("rtgdthread",
+                                       "received loop packet (%s)" % _package['payload']['dateTime'])
+                            elif weewx.debug >= 3:
+                                logdbg("rtgdthread",
+                                       "received loop packet: %s" % _package['payload'])
+                            self.process_packet(_package['payload'])
+                            continue
+                        except Exception, e:
+                            # Some unknown exception occurred. This is probably a serious
+                            # problem. Exit.
+                            logcrit("rtgdthread",
+                                    "Unexpected exception of type %s" % (type(e), ))
+                            weeutil.weeutil.log_traceback('*** ', syslog.LOG_DEBUG)
+                            logcrit("rtgdthread", "Thread exiting. Reason: %s" % (e, ))
+                            return
+                # if packets have backed up in the control queue, trim it until
                 # it's no bigger than the max allowed backlog
-                if self.rtgd_queue.qsize() <= 5:
-                    break
-
-            # we now have a packet to process, wrap in a try..except so we can
-            # catch any errors
-            try:
-                if weewx.debug == 2:
-                    logdbg("rtgdthread",
-                           "received loop packet (%s)" % _package['payload']['dateTime'])
-                elif weewx.debug >= 3:
-                    logdbg("rtgdthread",
-                           "received loop packet: %s" % _package['payload'])
-                self.process_packet(_package['payload'])
-            except Exception, e:
-                # Some unknown exception occurred. This is probably a serious
-                # problem. Exit.
-                logcrit("rtgdthread",
-                        "Unexpected exception of type %s" % (type(e), ))
-                weeutil.weeutil.log_traceback('*** ', syslog.LOG_DEBUG)
-                logcrit("rtgdthread", "Thread exiting. Reason: %s" % (e, ))
-                return
+                while self.control_queue.qsize() > 5:
+                    self.control_queue.get()
 
     def process_packet(self, packet):
         """Process incoming loop packets and generate gauge-data.txt.
@@ -1081,7 +1120,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         is used:
         - string in weewx.conf [RealtimeGaugeData]
         - string in a text file
-        - a field in a database
+        - WU API forecast text
         - Zambretti forecast
 
         If nothing is found then a zero length string is returned.
@@ -1094,6 +1133,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         elif self.scroller_file is not None:
             with open(self.scroller_file, 'r') as f:
                 _scroller = f.readline().strip()
+        # if nothing look for a WU forecast
+        elif self.forecast_text is not None:
+            _scroller = self.forecast_text
         # if nothing look for a Zambretti forecast
         elif self.forecast.is_installed():
             _scroller = self.forecast.get_zambretti_text()
@@ -2197,3 +2239,432 @@ def calc_windrose(now, db_manager, period, points):
                 rose[0] += _row[1]
     # now  round our results and return
     return [round(x, 1) for x in rose]
+
+    
+# ============================================================================
+#                              class WUThread
+# ============================================================================
+
+
+class WUThread(threading.Thread):
+    """Thread that obtains WU API forecast data and places it in a queue.
+
+    The WUThread class queries the WU API and places selected forecast data in
+    JSON format in a queue used by the data consumer. The WU API is called at a
+    user selectable frequency. The thread listens for a shutdown signal from
+    its parent.
+
+    WUThread constructor parameters:
+
+        control_queue:  A Queue object used by our parent to control (shutdown)
+                        this thread.
+        result_queue:   A Queue object used to pass forecast data to the
+                        destination
+        config_dict:    A weeWX config dictionary.
+        wu_config_dict: A config dictionary for the WUThread.
+        lat:            Station latitude in decimal degrees.
+        long:           Station longitude in decimal degrees.
+
+    WUThread methods:
+
+        run.               Control querying of the API and monitor the control
+                           queue.
+        query_wu.          Query the API and put selected forecast data in the
+                           result queue.
+        parse_WU_response. Parse a WU API response and return selected data.
+    """
+
+    def __init__(self, control_queue, result_queue, config_dict,
+                 wu_config_dict, lat, long):
+
+        # Initialize my superclass
+        threading.Thread.__init__(self)
+
+        # setup a few thread things
+        self.setName('RtgdWuThread')
+        self.setDaemon(True)
+
+        # save the queues we will use
+        self.control_queue = control_queue
+        self.result_queue = result_queue
+
+        # the WU API 'feature' to be used for the forecast data
+        self.feature = 'forecast'
+        # interval between API calls
+        self.interval = to_int(wu_config_dict.get('interval', 1800))
+        # max no of tries we will make in any one attempt to contact WU via API
+        self.max_WU_tries = to_int(wu_config_dict.get('max_WU_tries', 3))
+        # Get API call lockout period. This is the minimum period between API
+        # calls for the same feature. This prevents an error condition making
+        # multiple rapid API calls and thus breac the API usage conditions.
+        self.lockout_period = to_int(wu_config_dict.get('api_lockout_period', 60))
+        # initialise container for timestamp of last WU api call
+        self.last_call_ts = None
+        # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
+        # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
+        # try..except loop to catch exceptions (ie one or both don't exist.
+        try:
+            if wu_config_dict.get('api_key') is not None:
+                api_key = wu_config_dict.get('api_key')
+            elif config_dict['Forecast']['WU'].get('api_key', None) is not None:
+                api_key = config_dict['Forecast']['WU'].get('api_key')
+            else:
+                raise MissingApiKey("Cannot find valid Weather Underground API key")
+        except:
+            raise MissingApiKey("Cannot find Weather Underground API key")
+        # Get 'query' (ie the location) to be used for use in WU API calls.
+        # Refer weewx.conf for details.
+        self.query = wu_config_dict.get('location', (lat, long))
+        # get a WeatherUndergroundAPI object to handle the API calls
+        self.api = WeatherUndergroundAPI(api_key)
+        # get units to be used in forecast text
+        self.units = wu_config_dict.get('units', 'METRIC').upper()
+        
+        # log what we will do
+        loginf("engine", 
+               "RealTimeGaugeData will download forecast data from Weather Underground")
+
+    def run(self):
+        """Control the querying of the API and the shutdown of the thread.
+
+        Run a continuous loop querying the API, queuing the resulting forecast
+        data and checking for the shutdown signal. Since subsequent API queries
+        are triggered by an elapsed period of time rather than an external
+        event (eg recipt of archive record) it makes sense to sleep for a
+        period before checking if it is time to query. However, this limits the
+        responsiveness of the thread to the shutdown singal unless the sleep
+        period is very short (seconds). An alternative is to use the blocking
+        feature of Queue.get() to spend time blocking rather than sleeping. If
+        the blocking period is greater than the API lockout period then we can
+        avoid activating the API blockout period.
+        """
+
+        # since we are in a thread some additional try..except clauses will
+        # help give additional output in case of an error rather than having
+        # the thread die silenetly
+        try:
+            # Run a continuous loop, obtaining WU data as required and
+            # monitoring the control queue for the shutdown signal. Only break
+            # out if we receive the shutdown signal (None) from our parent.
+            while True:
+                # run an inner loop querying the API and checking for the
+                # shutdown signal
+                # first up query the API
+                _response = self.query_wu()
+                # if we have a non-None response then we have data from WU,
+                # parse the response, gather the required data and put it in
+                # the result queue
+                if _response is not None:
+                    # parse the WU response and extract the forecast text
+                    _data = self.parse_WU_response(_response)
+                    # if we have some data then place it in the result queue
+                    if _data is not None:
+                        # construct our data dict for the queue
+                        _package = {'type': 'forecast',
+                                    'payload': _data}
+                        self.result_queue.put(_package)
+                # now check to see if we have a shutdown signal
+                try:
+                    # Try to get data from the queue, block for up to 60
+                    # seconds. If nothing is there an empty queue exception
+                    # will be thrown after 60 seconds
+                    _package = self.control_queue.get(block=True, timeout=60)
+                except Queue.Empty:
+                    # nothing in the queue so continue
+                    pass
+                else:
+                    # somethign was in the queue, if it is the shutdown signal
+                    # then return otherwise continue
+                    if _package is None:
+                        # we have a shutdown signal so return to exit
+                        return
+        except Exception, e:
+            # Some unknown exception occurred. This is probably a serious
+            # problem. Exit with some notification.
+            logcrit("WUThread",
+                    "Unexpected exception of type %s" % (type(e), ))
+            weeutil.weeutil.log_traceback('WUThread: **** ')
+            logcrit("WUThread", "Thread exiting. Reason: %s" % (e, ))
+
+    def query_wu(self):
+        """If required query the WU API and return the response.
+
+        Checks to see if it is time to query the API, if so queries the API
+        and returns the raw response in JSON format. To prevent the user
+        exceeding their API call limit the query is only made if at least
+        self.lockout_period seconds have elapsed since the last call.
+
+        Inputs:
+            None.
+
+        Returns:
+            The raw WU API response in JSON format.
+        """
+
+        # get the current time
+        now = time.time()
+        logdbg2("WUThread",
+                "Last Weather Underground API call at %s" % self.last_call_ts)
+        # has the lockout period passed since the last call
+        if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
+            # If we haven't made an API call previously or if its been too long
+            # since the last call then make the call
+            if (self.last_call_ts is None) or ((now + 1 - self.interval) >= self.last_call_ts):
+                # Make the call, wrap in a try..except just in case
+                try:
+                    _response = self.api.data_request(features=self.feature,
+                                                      query=self.query,
+                                                      resp_format='json',
+                                                      max_tries=self.max_WU_tries)
+                    logdbg("WUThread",
+                           "Downloaded updated Weather Underground %s information" % self.feature)
+                except Exception, e:
+                    # Some unknown exception occurred. Log it and continue.
+                    loginf("WUThread",
+                           "Unexpected exception of type %s" % (type(e), ))
+                    weeutil.weeutil.log_traceback('WUThread: **** ')
+                    loginf("WUThread",
+                           "Unexpected exception of type %s" % (type(e), ))
+                    loginf("WUThread",
+                           "Weather Underground '%s' API query failed" % self.feature)
+                # if we got something back then reset our last call timestamp
+                if _response is not None:
+                    self.last_call_ts = now
+                return _response
+        else:
+            # API call limiter kicked in so say so
+            loginf("WUThread",
+                   "Tried to make an API call within %d sec of the previous call." % (self.lockout_period, ))
+            loginf("        ",
+                   "API call limit reached. API call skipped.")
+        return None
+
+    def parse_WU_response(self, response):
+        """ Validate/parse a WU response and return the required fields.
+
+        Take a WU API response, check for (WU defined) errors then extract and
+        return the forecast text and Metric forecast text fields for period 0.
+
+        Input:
+            response: A WU API response in JSON format.
+
+        Returns:
+            A dictionary containing the fields of interest from the WU API
+            response.
+        """
+
+        # deserialize the response
+        _response_json = json.loads(response)
+        # check for recognised format
+        if 'response' not in _response_json:
+            loginf("WUThread",
+                   "Unknown format in Weather Underground '%s'" % (feature, ))
+            return None
+        _response = _response_json['response']
+        # check for WU provided error else start pulling in the data we want
+        if 'error' in _response:
+            loginf("WUThread",
+                   "Error in Weather Underground '%s' response" % (feature, ))
+            return None
+        # we have forecast data so return the data we want
+        _fcast = _response_json['forecast']['txt_forecast']['forecastday']
+        # select which forecast we want
+        if self.units == 'METRIC':
+            return _fcast[0]['fcttext_metric']
+        else:
+            return _fcast[0]['fcttext']
+
+
+# ============================================================================
+#                        class WeatherUndergroundAPI
+# ============================================================================
+
+
+class WeatherUndergroundAPI(object):
+    """Query the Weather Underground API and return the API response.
+
+    The WU API is accessed by calling one or more features. These features can
+    be grouped into two groups, WunderMap layers and data features. This class
+    supports access to the API data features only.
+
+    WeatherUndergroundAPI constructor parameters:
+
+        api_key: WeatherUnderground API key to be used.
+
+    WeatherUndergroundAPI methods:
+
+        data_request. Submit a data feature request to the WeatherUnderground
+                      API and return the response.
+    """
+
+    BASE_URL = 'http://api.wunderground.com/api'
+
+    def __init__(self, api_key):
+        # initialise a WeatherUndergroundAPI object
+
+        # save the API key to be used
+        self.api_key = api_key
+
+    def data_request(self, features, query, settings=None,
+                     resp_format='json', max_tries=3):
+        """Make a data feature request via the API and return the results.
+
+        Construct an API call URL, make the call and return the response.
+
+        Parameters:
+            features:    One or more WU API data features. String or list/tuple
+                         of strings.
+            query:       The location for which the information is sought. Refer
+                         usage comments at start of this file. String.
+            settings:    Optional settings to be included in the API call
+                         eg lang:FR for French, pws:1 to use PWS for conditions.
+                         String or list/tuple of strings. Default is 'pws:1'
+            resp_format: The output format of the data returned by the WU API.
+                         String, either 'json' or 'xml' for JSON or XML
+                         respectively. Default is JSON.
+            max_tries:   The maximum number of attempts to be made to obtain a
+                         response from the WU API. Default is 3.
+
+        Returns:
+            The WU API response in JSON or XML format.
+        """
+
+        # there may be multiple features so if features is a list create a
+        # string delimiting the features with a solidus
+        if features is not None and hasattr(features, '__iter__'):
+            features_str = '/'.join(features)
+        else:
+            features_str = features
+
+        # Are there any settings parameters? If so construct a query string
+        if hasattr(settings, '__iter__'):
+            # we have more than one setting
+            settings_str = '/'.join(settings)
+        elif settings is not None:
+            # we have a single setting
+            settings_str = settings
+        else:
+            # we have no setting, use the default pws:1 to make life easier
+            # when assembling the URL to be used
+            settings_str = 'pws:1'
+
+        # construct the API call URL to be used
+        partial_url = '/'.join([self.BASE_URL,
+                                self.api_key,
+                                features_str,
+                                settings_str,
+                                'q',
+                                query])
+        url = '.'.join([partial_url, resp_format])
+        # if debug >=1 log the URL used but obfuscate the API key
+        if weewx.debug >= 1:
+            _obf_api_key = '*'*(len(self.api_key) - 4) + self.api_key[-4:]
+            _obf = '/'.join([self.BASE_URL,
+                             _obf_api_key,
+                             features_str,
+                             settings_str,
+                             'q',
+                             query])
+            _obf_url = '.'.join([_obf, resp_format])
+            logdbg("weatherundergroundapi",
+                   "Submitting API call using URL: %s" % (_obf_url, ))
+        # we will attempt the call max_tries times
+        for count in range(max_tries):
+            # attempt the call
+            try:
+                w = urllib2.urlopen(url)
+                _response = w.read()
+                w.close()
+                return _response
+            except (urllib2.URLError, socket.timeout), e:
+                logerr("weatherundergroundapi",
+                       "Failed to get '%s' on attempt %d" % (query, count+1))
+                logerr("weatherundergroundapi", "   **** %s" % e)
+        else:
+            logerr("weatherundergroundapi",
+                   "Failed to get Weather Underground '%s'" % (query, ))
+        return None
+
+
+# ============================================================================
+#                          class ZambrettiForecast
+# ============================================================================
+
+
+class ZambrettiForecast(object):
+    """Class to extract Zambretti forecast text.
+
+    Requires the weeWX forecast extension to be installed and configured to
+    provide the Zambretti forecast otherwise 'Forecast not available' will be
+    returned."""
+
+    DEFAULT_FORECAST_BINDING = 'forecast_binding'
+    DEFAULT_BINDING_DICT = {'database': 'forecast_sqlite',
+                            'manager': 'weewx.manager.Manager',
+                            'table_name': 'archive',
+                            'schema': 'user.forecast.schema'}
+
+    def __init__(self, config_dict):
+        """Initialise the ZambrettiForecast object."""
+
+        # flag as to whether the weeWX forecasting extension is installed
+        self.forecasting_installed = False
+        # set some forecast db access parameters
+        self.db_max_tries = 3
+        self.db_retry_wait = 3
+        # Get a db manager for the forecast database and import the Zambretti
+        # label lookup dict. If an exception is raised then we can assume the
+        # forecast extension is not installed.
+        try:
+            # create a db manager config dict
+            dbm_dict = weewx.manager.get_manager_dict(config_dict['DataBindings'],
+                                                      config_dict['Databases'],
+                                                      ZambrettiForecast.DEFAULT_FORECAST_BINDING,
+                                                      default_binding_dict=ZambrettiForecast.DEFAULT_BINDING_DICT)
+            # get a db manager for the forecast database
+            self.dbm = weewx.manager.open_manager(dbm_dict)
+            # import the Zambretti forecast text
+            from user.forecast import zambretti_label_dict
+            self.zambretti_label_dict = zambretti_label_dict
+            # if we made it this far the forecast extension is installed and we
+            # can do business
+            self.forecasting_installed = True
+        except (weewx.UnknownBinding, weedb.DatabaseError,
+                weewx.UnsupportedFeature, KeyError, ImportError):
+            # something went wrong, our forecasting_installed flag will not
+            # have been set so we can just continue on
+            pass
+
+    def is_installed(self):
+        """Is the forecasting extension installed."""
+
+        return self.forecasting_installed
+
+    def get_zambretti_text(self):
+        """Return the current Zambretti forecast text."""
+
+        # if the forecast extension is not installed then return an appropriate
+        # message
+        if not self.forecasting_installed:
+            return 'Forecast not available'
+
+        # SQL query to get the latest Zambretti forecast code
+        sql = "SELECT dateTime,zcode FROM %s WHERE method = 'Zambretti' ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
+        # try to execute the query
+        for count in range(self.db_max_tries):
+            try:
+                record = self.dbm.getSql(sql)
+                # if we get a non-None response then return the decoded
+                # forecast text
+                if record is not None:
+                    return self.zambretti_label_dict[record[1]]
+            except Exception, e:
+                logerr('rtgdthread: zambretti:', 'get zambretti failed (attempt %d of %d): %s' %
+                       ((count + 1), self.db_max_tries, e))
+                logdbg('rtgdthread: zambretti', 'waiting %d seconds before retry' %
+                       self.db_retry_wait)
+                time.sleep(self.db_retry_wait)
+        # if we made it here we have been unable to get a response from the
+        # forecast db so return a suitable message
+        return 'Forecast not available'
+        
