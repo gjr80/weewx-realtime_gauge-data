@@ -21,8 +21,7 @@
 #
 # Revision History
 #   4 September 2017    v0.3.0
-#       - added new feature to include Weather Underground forecast text as the
-#         scrolling message in the SteelSeries scroller.
+#       - added ability to include Weather Underground forecast text
 #   8 July 2017         v0.2.14
 #       - changed default decimal places for foot, inHg, km_per_hour and
 #         mile_per_hour
@@ -156,7 +155,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     remote_server_url = http://remote/address
     # timeout in seconds for remote URL posts. Optional, default is 2
     timeout = 1
-    # text returned from remote URL indicating success. Optional, default is no
+    # Text returned from remote URL indicating success. Optional, default is no
     # response text.
     response_text = success
 
@@ -169,7 +168,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # loop packet if min_interval seconds have NOT elapsed since the last
     # generation. If min_interval is 0 or omitted generation will occur on
     # every loop packet (as will be the case if min_interval < station loop
-    period). Optional, default is 0.
+    # period). Optional, default is 0.
     min_interval =
 
     # Number of compass points to include in WindRoseData, normally
@@ -183,13 +182,30 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Binding to use for appTemp data. Optional, default 'wx_binding'.
     apptemp_binding = wx_binding
 
+    # The SteelSeries Weather Gauges displays the content of the gauge-data.txt
+    # 'forecast' field in the scrolling text display. The RTGD service can
+    # populate the 'forecast' field in a number of ways. The RTGD service works
+    # through the following sources, in order, and the first options that
+    # provides valid data (ie non-None) is used to populate the 'forecast'
+    # field:
+    #
+    # 1. text at [RealtimeGaugeData] scroller_text option
+    # 2. file specified at [RealtimeGaugeData] scroller_file option
+    # 3. Weather Underground API sourced forecast text for location specified
+    #    at [RealtimeGaugeData] [[WU]]
+    # 4. Zambretti forecast if weeWX Forecast extension is installed
+    #
+    # If none of the above are set/installed or provide a non-None result the,
+    # forecast field is set to '' (empty string).
+
     # Text to display on the scroller. Must be enclosed in quotes if spaces
-    # included. Optional.
+    # included. Python strftime format codes may be embedded in the string to
+    # display the current time/date. Optional, omit to disable.
     scroller_text = 'some text'
 
     # File to use as source for the scroller text. File must be a text file,
     # first line only of file is read. Only used if scroller_text is blank or
-    # omitted. Optional.
+    # omitted. Optional, omit to disable.
     scroller_file = /var/tmp/scroller.txt
 
     # Update windrun value each loop period or just on each archive period.
@@ -245,7 +261,12 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
                                        'km_per_hour' or 'meter_per_second'
         group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
 
+    # Specify settings to be used to obtain WU forecast text to display in the
+    # 'forecast' field. Optional.
     [[WU]]
+        # Enable/disable WU forecast text
+        enable = true
+
         # WU API key to be used when calling the WU API
         api_key = xxxxxxxxxxxxxxxx
 
@@ -482,7 +503,7 @@ class RealtimeGaugeData(StdService):
 
         #
         wu_config_dict = rtgd_config_dict.get('WU', None)
-        if wu_config_dict is not None:
+        if wu_config_dict is not None and wu_config_dict.get('enable', False):
             self.wu_ctl_queue = Queue.Queue()
             self.result_queue = Queue.Queue()
             self.wu_thread = WUThread(self.wu_ctl_queue,
@@ -576,24 +597,28 @@ class RealtimeGaugeData(StdService):
 
         if hasattr(self, 'rtgd_ctl_queue') and hasattr(self, 'rtgd_thread'):
             if self.rtgd_ctl_queue and self.rtgd_thread.isAlive():
-                # Put a None in the rtgd_ctl_queue to signal the thread to shutdown
+                # Put a None in the rtgd_ctl_queue to signal the thread to
+                # shutdown
                 self.rtgd_ctl_queue.put(None)
         if hasattr(self, 'wu_ctl_queue') and hasattr(self, 'wu_thread'):
             if self.wu_ctl_queue and self.wu_thread.isAlive():
-                # Put a None in the wu_ctl_queue to signal the thread to shutdown
+                # Put a None in the wu_ctl_queue to signal the thread to
+                # shutdown
                 self.wu_ctl_queue.put(None)
         if hasattr(self, 'rtgd_thread') and self.rtgd_thread.isAlive():
             # Wait up to 15 seconds for the thread to exit:
             self.rtgd_thread.join(15.0)
             if self.rtgd_thread.isAlive():
-                logerr("rtgd", "Unable to shut down %s thread" % self.rtgd_thread.name)
+                logerr("rtgd",
+                       "Unable to shut down %s thread" % self.rtgd_thread.name)
             else:
                 logdbg("rtgd", "Shut down %s thread." % self.rtgd_thread.name)
         if hasattr(self, 'wu_thread') and self.wu_thread.isAlive():
             # Wait up to 15 seconds for the thread to exit:
             self.wu_thread.join(15.0)
             if self.wu_thread.isAlive():
-                logerr("rtgd", "Unable to shut down %s thread" % self.wu_thread.name)
+                logerr("rtgd",
+                       "Unable to shut down %s thread" % self.wu_thread.name)
             else:
                 logdbg("rtgd", "Shut down %s thread." % self.wu_thread.name)
 
@@ -840,7 +865,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                       self.apptemp_binding)
         # get a Zambretti forecast objects
         self.forecast = ZambrettiForecast(self.config_dict)
-        logdbg("rtgdthread", "Zambretti is installed: %s" % self.forecast.is_installed())
+        logdbg("rtgdthread",
+               "Zambretti is installed: %s" % self.forecast.is_installed())
         # initialise our day stats
         self.day_stats = self.db_manager._get_day_summary(time.time())
         # initialise our day stats from our appTemp source
@@ -890,8 +916,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                         # nothing in the queue so continue
                         pass
                     else:
-                        # we did get something in the queue but was it a 'forecast'
-                        # package
+                        # we did get something in the queue but was it a
+                        # 'forecast' package
                         if isinstance(_package, dict):
                             if 'type' in _package and _package['type'] == 'forecast':
                                 # we have forecast text so log and save it
@@ -942,8 +968,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                         self.process_stats(_package['payload'])
                         continue
                     elif _package['type'] == 'loop':
-                        # we now have a packet to process, wrap in a try..except so we can
-                        # catch any errors
+                        # we now have a packet to process, wrap in a
+                        # try..except so we can catch any errors
                         try:
                             if weewx.debug == 2:
                                 logdbg("rtgdthread",
@@ -954,12 +980,14 @@ class RealtimeGaugeDataThread(threading.Thread):
                             self.process_packet(_package['payload'])
                             continue
                         except Exception, e:
-                            # Some unknown exception occurred. This is probably a serious
-                            # problem. Exit.
+                            # Some unknown exception occurred. This is probably
+                            # a serious problem. Exit.
                             logcrit("rtgdthread",
                                     "Unexpected exception of type %s" % (type(e), ))
-                            weeutil.weeutil.log_traceback('*** ', syslog.LOG_DEBUG)
-                            logcrit("rtgdthread", "Thread exiting. Reason: %s" % (e, ))
+                            weeutil.weeutil.log_traceback('*** ',
+                                                          syslog.LOG_DEBUG)
+                            logcrit("rtgdthread",
+                                    "Thread exiting. Reason: %s" % (e, ))
                             return
                 # if packets have backed up in the control queue, trim it until
                 # it's no bigger than the max allowed backlog
@@ -1083,7 +1111,9 @@ class RealtimeGaugeDataThread(threading.Thread):
             # Python 2.5 and earlier do not have a "timeout" parameter.
             # Including one could cause a TypeError exception. Be prepared
             # to catch it.
-            _response = urllib2.urlopen(request, data=payload, timeout=self.timeout)
+            _response = urllib2.urlopen(request,
+                                        data=payload,
+                                        timeout=self.timeout)
         except TypeError:
             # Must be Python 2.5 or early. Use a simple, unadorned request
             _response = urllib2.urlopen(request, data=payload)
@@ -2298,7 +2328,8 @@ class WUThread(threading.Thread):
         # Get API call lockout period. This is the minimum period between API
         # calls for the same feature. This prevents an error condition making
         # multiple rapid API calls and thus breac the API usage conditions.
-        self.lockout_period = to_int(wu_config_dict.get('api_lockout_period', 60))
+        self.lockout_period = to_int(wu_config_dict.get('api_lockout_period',
+                                                        60))
         # initialise container for timestamp of last WU api call
         self.last_call_ts = None
         # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
@@ -2515,11 +2546,12 @@ class WeatherUndergroundAPI(object):
         Parameters:
             features:    One or more WU API data features. String or list/tuple
                          of strings.
-            query:       The location for which the information is sought. Refer
-                         usage comments at start of this file. String.
+            query:       The location for which the information is sought.
+                         Refer usage comments at start of this file. String.
             settings:    Optional settings to be included in the API call
-                         eg lang:FR for French, pws:1 to use PWS for conditions.
-                         String or list/tuple of strings. Default is 'pws:1'
+                         eg lang:FR for French, pws:1 to use PWS for
+                         conditions. String or list/tuple of strings. Default
+                         is 'pws:1'
             resp_format: The output format of the data returned by the WU API.
                          String, either 'json' or 'xml' for JSON or XML
                          respectively. Default is JSON.
