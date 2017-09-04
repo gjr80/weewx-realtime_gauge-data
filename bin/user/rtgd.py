@@ -371,7 +371,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int
 
 # version number of this script
-RTGD_VERSION = '0.2.14'
+RTGD_VERSION = '0.3.0'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -2271,7 +2271,7 @@ class WUThread(threading.Thread):
                            queue.
         query_wu.          Query the API and put selected forecast data in the
                            result queue.
-        parse_WU_response. Parse a WU API response and return selected data.
+        parse_wu_response. Parse a WU API response and return selected data.
     """
 
     def __init__(self, control_queue, result_queue, config_dict,
@@ -2341,7 +2341,7 @@ class WUThread(threading.Thread):
 
         # since we are in a thread some additional try..except clauses will
         # help give additional output in case of an error rather than having
-        # the thread die silenetly
+        # the thread die silently
         try:
             # Run a continuous loop, obtaining WU data as required and
             # monitoring the control queue for the shutdown signal. Only break
@@ -2356,7 +2356,7 @@ class WUThread(threading.Thread):
                 # the result queue
                 if _response is not None:
                     # parse the WU response and extract the forecast text
-                    _data = self.parse_WU_response(_response)
+                    _data = self.parse_wu_response(_response)
                     # if we have some data then place it in the result queue
                     if _data is not None:
                         # construct our data dict for the queue
@@ -2439,7 +2439,7 @@ class WUThread(threading.Thread):
                    "API call limit reached. API call skipped.")
         return None
 
-    def parse_WU_response(self, response):
+    def parse_wu_response(self, response):
         """ Validate/parse a WU response and return the required fields.
 
         Take a WU API response, check for (WU defined) errors then extract and
@@ -2458,13 +2458,13 @@ class WUThread(threading.Thread):
         # check for recognised format
         if 'response' not in _response_json:
             loginf("WUThread",
-                   "Unknown format in Weather Underground '%s'" % (feature, ))
+                   "Unknown format in Weather Underground '%s'" % (self.feature, ))
             return None
         _response = _response_json['response']
         # check for WU provided error else start pulling in the data we want
         if 'error' in _response:
             loginf("WUThread",
-                   "Error in Weather Underground '%s' response" % (feature, ))
+                   "Error in Weather Underground '%s' response" % (self.feature, ))
             return None
         # we have forecast data so return the data we want
         _fcast = _response_json['forecast']['txt_forecast']['forecastday']
