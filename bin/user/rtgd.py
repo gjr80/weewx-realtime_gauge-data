@@ -496,7 +496,7 @@ class RealtimeGaugeData(StdService):
         else:
             self.wu_thread = None
             self.result_queue = none
-        
+
         # get an instance of class RealtimeGaugeDataThread and start the
         # thread running
         self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_ctl_queue,
@@ -878,9 +878,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         while True:
             # inner loop to monitor the queues
             while True:
-                # If we have a result queue check to see if we have received 
-                # any forecast data. Use get_nowait() so we don't block the 
-                # rtgd control queue. Wrap in a try..except to catch the error 
+                # If we have a result queue check to see if we have received
+                # any forecast data. Use get_nowait() so we don't block the
+                # rtgd control queue. Wrap in a try..except to catch the error
                 # if there is nothing in the queue.
                 if self.result_queue:
                     try:
@@ -890,13 +890,14 @@ class RealtimeGaugeDataThread(threading.Thread):
                         # nothing in the queue so continue
                         pass
                     else:
-                        # we did get something in the queue but was it a 'forecast' 
+                        # we did get something in the queue but was it a 'forecast'
                         # package
-                        if hasattr(_package, 'type') and _package['type'] == 'forecast':
-                            # we have forecast text so log and save it
-                            logdbg2("rtgdthread",
-                                    "received forecast text: %s" % _package['payload'])
-                            self.forecast_text = _package['payload']
+                        if isinstance(_package, dict):
+                            if 'type' in _package and _package['type'] == 'forecast':
+                                # we have forecast text so log and save it
+                                logdbg2("rtgdthread",
+                                        "received forecast text: %s" % _package['payload'])
+                                self.forecast_text = _package['payload']
                 # now deal with the control queue
                 try:
                     _package = self.control_queue.get_nowait()
@@ -2240,7 +2241,7 @@ def calc_windrose(now, db_manager, period, points):
     # now  round our results and return
     return [round(x, 1) for x in rose]
 
-    
+
 # ============================================================================
 #                              class WUThread
 # ============================================================================
@@ -2319,9 +2320,9 @@ class WUThread(threading.Thread):
         self.api = WeatherUndergroundAPI(api_key)
         # get units to be used in forecast text
         self.units = wu_config_dict.get('units', 'METRIC').upper()
-        
+
         # log what we will do
-        loginf("engine", 
+        loginf("engine",
                "RealTimeGaugeData will download forecast data from Weather Underground")
 
     def run(self):
@@ -2667,4 +2668,3 @@ class ZambrettiForecast(object):
         # if we made it here we have been unable to get a response from the
         # forecast db so return a suitable message
         return 'Forecast not available'
-        
