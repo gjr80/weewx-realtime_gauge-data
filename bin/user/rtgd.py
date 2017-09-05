@@ -389,7 +389,7 @@ import weewx.units
 import weewx.wxformulas
 from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
-from weeutil.weeutil import to_bool, to_int
+from weeutil.weeutil import to_bool, to_int, startOfDay
 
 # version number of this script
 RTGD_VERSION = '0.3.0'
@@ -503,7 +503,7 @@ class RealtimeGaugeData(StdService):
 
         #
         wu_config_dict = rtgd_config_dict.get('WU', None)
-        if wu_config_dict is not None and wu_config_dict.get('enable', False):
+        if wu_config_dict is not None and to_bool(wu_config_dict.get('enable', False)):
             self.wu_ctl_queue = Queue.Queue()
             self.result_queue = Queue.Queue()
             self.wu_thread = WUThread(self.wu_ctl_queue,
@@ -516,7 +516,7 @@ class RealtimeGaugeData(StdService):
             self.wu_thread.start()
         else:
             self.wu_thread = None
-            self.result_queue = none
+            self.result_queue = None
 
         # get an instance of class RealtimeGaugeDataThread and start the
         # thread running
@@ -802,7 +802,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # Are we updating windrun using archive data only or archive and loop
         # data?
         self.windrun_loop = to_bool(rtgd_config_dict.get('windrun_loop',
-                                                         'False'))
+                                                         False))
 
         # weeWX does not normally archive appTemp so day stats are not usually
         # available; however, if the user does have appTemp in a database then
@@ -1275,7 +1275,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
         # humTL - today's low relative humidity
-        humTL = weeutil.weeutil.min_with_none([self.buffer.humL_loop[0], self.day_stats['outHumidity'].min])
+        humTL = weeutil.weeutil.min_with_none([self.buffer.humL_loop[0], 
+                                               self.day_stats['outHumidity'].min])
         humTL = humTL if humTL is not None else hum
         data['humTL'] = self.hum_format % humTL
         # humTH - today's high relative humidity
@@ -1671,8 +1672,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             wind_sum_vt = ValueTuple(self.day_stats['wind'].sum,
                                      self.p_wind_type,
                                      self.p_wind_group)
-            windrun_day_average = (last_ts - weeutil.weeutil.startOfDay(ts))/3600.0 * convert(wind_sum_vt,
-                                                                                              self.wind_group).value/self.day_stats['wind'].count
+            windrun_day_average = (last_ts - startOfDay(ts))/3600.0 * convert(wind_sum_vt,
+                                                                              self.wind_group).value/self.day_stats['wind'].count
         except (ValueError, TypeError, ZeroDivisionError):
             windrun_day_average = 0.0
         if self.windrun_loop:   # is loop/realtime estimate
