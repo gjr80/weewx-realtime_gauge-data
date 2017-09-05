@@ -110,7 +110,7 @@ class RtgdInstaller(ExtensionInstaller):
                         'group_rain': 'mm',
                         'group_speed': 'km_per_hour',
                         'group_temperature': 'degree_C'
-                    }
+                    },
                     'WU': {
                         'enable': 'false',
                         'api_key': 'xxxxxxxxxxxxxxxx',
