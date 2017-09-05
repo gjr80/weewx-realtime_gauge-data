@@ -1,3 +1,5 @@
+v0.3.0
+*   added ability to include Weather Underground forecast text
 v0.2.14
 *   changed default decimal places for foot, inHg, km_per_hour and
     mile_per_hour

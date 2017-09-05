@@ -11,11 +11,13 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.2.14                                       Date: 8 July 2017
+# Version: 0.3.0                                        Date: 4 September 2017
 #
 # Revision History
+#   4 September 2017    v0.3.0
+#       - added [[WU]] config stanza to support WU forecast text
 #   8 July 2017         v0.2.14
-#       - changed default decimal places for foot, inHg, km_per_hour and 
+#       - changed default decimal places for foot, inHg, km_per_hour and
 #         mile_per_hour
 #   6 May 2017          v0.2.13
 #       - bumped version only
@@ -55,7 +57,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.2.14"
+RTGD_VERSION = "0.3.0"
 
 
 def loader():
@@ -108,6 +110,11 @@ class RtgdInstaller(ExtensionInstaller):
                         'group_rain': 'mm',
                         'group_speed': 'km_per_hour',
                         'group_temperature': 'degree_C'
+                    }
+                    'WU': {
+                        'enable': 'false',
+                        'api_key': 'xxxxxxxxxxxxxxxx',
+                        'location': 'enter location here'
                     }
                 }
             },
