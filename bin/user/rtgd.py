@@ -2212,7 +2212,7 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
     if then_record is None:
         return None
     else:
-        if obs_type not in then_record:
+        if obs_type not in then_record or then_record[obs_type] is None:
             return None
         else:
             then_vt = weewx.units.as_value_tuple(then_record, obs_type)
