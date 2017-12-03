@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.3.0                                        Date: 4 September 2017
+# Version: 0.3.1                                        Date: 3 December 2017
 #
 # Revision History
+#   3 December 2017     v0.3.1
+#       - bumped version only
 #   4 September 2017    v0.3.0
 #       - added [[WU]] config stanza to support WU forecast text
 #   8 July 2017         v0.2.14
@@ -57,7 +59,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.3.0"
+RTGD_VERSION = "0.3.1"
 
 
 def loader():

@@ -17,9 +17,15 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.0                                      Date: 4 September 2017
+# Version: 0.3.1                                      Date: 3 December 2017
 #
 # Revision History
+#   3 December 2017     v0.3.1
+#       - added ignore_lost_contact config option to ignore the sensor contact
+#         check result
+#       - refactored lost contact flag check code, now uses a dedictaed method 
+#         to determine whether sensor contact has been lost
+#       - changed a syslog entry to indicate 'rtgd' as the source not 'engine'
 #   4 September 2017    v0.3.0
 #       - added ability to include Weather Underground forecast text
 #   8 July 2017         v0.2.14
@@ -216,6 +222,12 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # caches packet data. max_cache_age is the maximum age  in seconds for
     # which cached data is retained. Optional, default is 600 seconds.
     max_cache_age = 600
+
+    # It is possible to ignore the sensor contact check result for the station
+    # and always set the gauge-data.txt SensorContactLost field to 0 (sensor
+    # contact not lost). This option should be used with care as it may mask a
+    # legitimate sensor lost contact state. Optional, default is False.
+    ignore_lost_contact = False
 
     # Parameters used in/required by rtgd calculations
     [[Calculate]]
@@ -815,7 +827,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         # create a RtgdBuffer object to hold our loop 'stats'
         self.buffer = RtgdBuffer()
 
-        # Set our lost contact flag. Assume we start off with contact
+        # Lost contact
+        # do we ignore the lost contact 'calculation'
+        self.ignore_lcontact = to_bool(rtgd_config_dict.get('ignore_lost_contact',
+                                                            False))
+        # set the lost contact flag, assume we start off with contact
         self.lost_contact_flag = False
 
         # initialise some properties used to hold archive period wind data
@@ -836,6 +852,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
 
+        # notify the user of a couple of things that we will do
+        # frequency of generation
         if self.min_interval is None:
             _msg = "RealTimeGaugeData will generate gauge-data.txt. "\
                        "min_interval is None"
@@ -844,7 +862,10 @@ class RealtimeGaugeDataThread(threading.Thread):
                        "min_interval is 1 second"
         else:
             _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is %s seconds" % self.min_interval
-        loginf("engine", _msg)
+        loginf("rtgd", _msg)
+        # lost contact
+        if self.ignore_lcontact:
+            loginf("rtgd", "RealTimeGaugeData will ignore sensor contact state")
 
     def run(self):
         """Collect packets from the rtgd queue and manage their processing.
@@ -1022,8 +1043,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                     logdbg("rtgdthread",
                            "created cached loop packet: %s" % (cached_packet,))
                 # set our lost contact flag if applicable
-                if self.station_type in LOOP_STATIONS:
-                    self.lost_contact_flag = cached_packet[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
+                self.lost_contact_flag = self.get_lost_contact(cached_packet, 'loop')
                 # get a data dict from which to construct our file
                 data = self.calculate(cached_packet)
                 # write to our file
@@ -1275,7 +1295,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
         # humTL - today's low relative humidity
-        humTL = weeutil.weeutil.min_with_none([self.buffer.humL_loop[0], 
+        humTL = weeutil.weeutil.min_with_none([self.buffer.humL_loop[0],
                                                self.day_stats['outHumidity'].min])
         humTL = humTL if humTL is not None else hum
         data['humTL'] = self.hum_format % humTL
@@ -1763,8 +1783,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         """Control processing when new a archive record is presented."""
 
         # set our lost contact flag if applicable
-        if self.station_type in ARCHIVE_STATIONS:
-            self.lost_contact_flag = record[STATION_LOST_CONTACT[self.station_type]['field']] == STATION_LOST_CONTACT[self.station_type]['value']
+        self.lost_contact_flag = self.get_lost_contact(record, 'archive')
         # save the windSpeed value to use as our archive period average
         if 'windSpeed' in record:
             self.windSpeedAvg_vt = weewx.units.as_value_tuple(record, 'windSpeed')
@@ -1785,6 +1804,24 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # Reset our loop stats.
         self.buffer.reset_loop_stats()
+
+    def get_lost_contact(self, rec, type):
+        """Determine is station has lost contact with sensors."""
+
+        # default to lost contact = False
+        result = False
+        # if we are not ignoring the lost contact test do the check
+        if not self.ignore_lcontact:
+            if ((type == 'loop' and self.station_type in LOOP_STATIONS) or
+                    (type == 'archive' and self.station_type in ARCHIVE_STATIONS)):
+                _v = STATION_LOST_CONTACT[self.station_type]['value']
+                try:
+                    result = rec[STATION_LOST_CONTACT[self.station_type]['field']] == _v
+                except KeyError:
+                    logdbg("rtgd",
+                           "KeyError: Could not determine sensor contact state")
+                    result = True
+        return result
 
 
 # ============================================================================
@@ -2212,7 +2249,7 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
     if then_record is None:
         return None
     else:
-        if obs_type not in then_record or then_record[obs_type] is None:
+        if obs_type not in then_record:
             return None
         else:
             then_vt = weewx.units.as_value_tuple(then_record, obs_type)

@@ -1,3 +1,9 @@
+v0.3.1
+*   added ignore_lost_contact config option to ignore the sensor contact
+    check result
+*   refactored lost contact flag check code, now uses a dedictaed method to
+    determine whether sensor contact has been lost
+*   changed a syslog entry to indicate 'rtgd' as the source not 'engine'
 v0.3.0
 *   added ability to include Weather Underground forecast text
 v0.2.14
