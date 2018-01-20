@@ -1,3 +1,5 @@
+v0.3.2
+*   modified rtdgthread queue management to fix 100% CPU usage issue
 v0.3.1
 *   added ignore_lost_contact config option to ignore the sensor contact
     check result

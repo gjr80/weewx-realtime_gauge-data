@@ -11,9 +11,11 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.3.1                                        Date: 3 December 2017
+# Version: 0.3.2                                        Date: 20 January 2018
 #
 # Revision History
+#   20 January 2018     v0.3.2
+#       - bumped version only
 #   3 December 2017     v0.3.1
 #       - bumped version only
 #   4 September 2017    v0.3.0
@@ -59,7 +61,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.3.1"
+RTGD_VERSION = "0.3.2"
 
 
 def loader():

@@ -17,13 +17,15 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.1                                      Date: 3 December 2017
+# Version: 0.3.2                                      Date: 20 January 2018
 #
 # Revision History
+#   20 January 2018     v0.3.2
+#       - modified rtgdthread queue management to fix 100% CPU usage issue
 #   3 December 2017     v0.3.1
 #       - added ignore_lost_contact config option to ignore the sensor contact
 #         check result
-#       - refactored lost contact flag check code, now uses a dedictaed method 
+#       - refactored lost contact flag check code, now uses a dedicated method
 #         to determine whether sensor contact has been lost
 #       - changed a syslog entry to indicate 'rtgd' as the source not 'engine'
 #   4 September 2017    v0.3.0
@@ -63,7 +65,7 @@
 #         'wedge' would occasionally temporarily disappear from wind speed
 #         gauge
 #   28 February 2017    v0.2.8
-#       - Reworked day max/min calculations to better handle missing historical
+#       - reworked day max/min calculations to better handle missing historical
 #         data. If historical max/min data is missing day max/min will default
 #         to the current value for the obs concerned.
 #   26 February 2017    v0.2.7
@@ -947,7 +949,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 self.forecast_text = _package['payload']
                 # now deal with the control queue
                 try:
-                    _package = self.control_queue.get_nowait()
+                    # block for one second waiting for package, if nothing
+                    # received throw Queue.Empty
+                    _package = self.control_queue.get(True, 1.0)
                 except Queue.Empty:
                     # nothing in the queue so continue
                     pass
