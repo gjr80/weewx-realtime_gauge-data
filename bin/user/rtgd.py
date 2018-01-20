@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.2                                      Date: 20 January 2018
+# Version: 0.3.3                                      Date: ?? January 2018
 #
 # Revision History
+#   ?? January 2018     v0.3.3
+#       - implemented atomic write when writing gauge-data.txt to file
 #   20 January 2018     v0.3.2
 #       - modified rtgdthread queue management to fix 100% CPU usage issue
 #   3 December 2017     v0.3.1
@@ -388,6 +390,7 @@ import errno
 import httplib
 import json
 import math
+import os
 import os.path
 import socket
 import syslog
@@ -692,6 +695,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.rtgd_path_file = os.path.join(self.rtgd_path,
                                            rtgd_config_dict.get('rtgd_file_name',
                                                                 'gauge-data.txt'))
+        self.rtgd_path_file_tmp = self.rtgd_path_file + '.tmp'
 
         # get the remote server URL if it exists, if it doesn't set it to None
         self.remote_server_url = rtgd_config_dict.get('remote_server_url', None)
@@ -1148,8 +1152,9 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         Takes dictionary of data elements, converts them to JSON format and
         writes them to file. JSON output is sorted by key and any non-critical
-        whitespace removed before being written to file. Destination directory
-        is created if it does not exist.
+        whitespace removed before being written to file. An atomic write to
+        file is used to lessen chance of rtgd/web server file access conflict.
+        Destination directory is created if it does not exist.
 
         Inputs:
             data: dictionary of gauge-data.txt data elements
@@ -1163,9 +1168,11 @@ class RealtimeGaugeDataThread(threading.Thread):
             # raise if the error is anything other than the dir already exists
             if error.errno != errno.EEXIST:
                 raise
-        # now write to file
-        with open(self.rtgd_path_file, 'w') as f:
+        # now write to temporary file
+        with open(self.rtgd_path_file_tmp, 'w') as f:
             json.dump(data, f, separators=(',', ':'), sort_keys=True)
+        # and copy the temporary file to our destination
+        os.rename(self.rtgd_path_file_tmp, self.rtgd_path_file)
 
     def get_scroller_text(self):
         """Obtain the text string to be used in the scroller.
