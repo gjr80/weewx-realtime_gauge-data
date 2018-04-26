@@ -1,3 +1,5 @@
+v0.3.4
+*   added support for optional fields mrfall and yrfall
 v0.3.3
 *   implemented atomic write when writing gauge-data.txt to file
 v0.3.2
