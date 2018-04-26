@@ -17,9 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.3                                      Date: 26 April 2018
+# Version: 0.3.4                                      Date: 26 April 2018
 #
 # Revision History
+#   26 April 2018       v0.3.4
+#       - Added support for optional fields mrfall and yrfall that provide 
+#         month and year to date rainfall respectively. Optional fields are 
+#         calculated/added to output if config options mtd_rain and/or ytd_rain 
+#         are set True.
 #   26 April 2018       v0.3.3
 #       - implemented atomic write when writing gauge-data.txt to file
 #   20 January 2018     v0.3.2
@@ -409,7 +414,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
 # version number of this script
-RTGD_VERSION = '0.3.3'
+RTGD_VERSION = '0.3.4'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -546,6 +551,11 @@ class RealtimeGaugeData(StdService):
                                                    altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
         self.rtgd_thread.start()
 
+        # are we providing month and/or year to date rain, default is no we are 
+        # not
+        self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
+        self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
+        
         # bind ourself to the relevant weeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
@@ -592,7 +602,39 @@ class RealtimeGaugeData(StdService):
             elif weewx.debug >= 3:
                 logdbg("rtgd",
                        "queued min/max barometer values: %s" % _package['payload'])
-
+        # if required get updated month to date rainfall and put in the queue
+        if self.mtd_rain:
+            _tspan = weeutil.weeutil.archiveMonthSpan(event.record['dateTime']) 
+            _rain = self.get_rain(_tspan)
+            # if we have some data then package it in a dict since this is not the
+            # only data we send via the queue
+            if _rain:
+                _payload = {'month_rain': _rain}
+                _package = {'type': 'stats',
+                            'payload': _payload}
+                self.rtgd_ctl_queue.put(_package)
+                if weewx.debug == 2:
+                    logdbg("rtgd", "queued month to date rain")
+                elif weewx.debug >= 3:
+                    logdbg("rtgd",
+                           "queued month to date rain: %s" % _package['payload'])
+        # if required get updated year to date rainfall and put in the queue
+        if self.ytd_rain:
+            _tspan = weeutil.weeutil.archiveYearSpan(event.record['dateTime']) 
+            _rain = self.get_rain(_tspan)
+            # if we have some data then package it in a dict since this is not the
+            # only data we send via the queue
+            if _rain:
+                _payload = {'year_rain': _rain}
+                _package = {'type': 'stats',
+                            'payload': _payload}
+                self.rtgd_ctl_queue.put(_package)
+                if weewx.debug == 2:
+                    logdbg("rtgd", "queued year to date rain")
+                elif weewx.debug >= 3:
+                    logdbg("rtgd",
+                           "queued year to date rain: %s" % _package['payload'])
+    
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
 
@@ -656,6 +698,15 @@ class RealtimeGaugeData(StdService):
             return {'min_%s' % obs_type: _row[0],
                     'max_%s' % obs_type: _row[1]}
 
+    def get_rain(self, tspan):
+        """Calculate rainfall over a given timespan."""
+
+        _result = {}
+        _rain_vt = self.db_manager.getAggregate(tspan, 'rain', 'sum')
+        if _rain_vt:
+            return _rain_vt
+        else:
+            return None
 
 # ============================================================================
 #                       class RealtimeGaugeDataThread
@@ -857,6 +908,17 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
+
+        # are we providing month and/or year to date rain, default is no we are 
+        # not
+        self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
+        self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
+        # initialise some properties if we are providing month and/or year to 
+        # date rain
+        if self.mtd_rain:
+            self.month_rain = None
+        if self.ytd_rain:
+            self.year_rain = None
 
         # notify the user of a couple of things that we will do
         # frequency of generation
@@ -1788,6 +1850,32 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['build'] = ''
         # ver - gauge-data.txt version number
         data['ver'] = self.version
+        # month to date rain, only calculate if we have been asked
+        if self.mtd_rain:
+            if self.month_rain is not None:
+                rainM = convert(self.month_rain, self.rain_group).value
+                rainB_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
+                rainB = convert(rainB_vt, self.rain_group).value 
+                if rainM is not None and rainB is not None:
+                    rainM = rainM + rainB
+                else:
+                    rainM = 0.0
+            else:
+                rainM = 0.0
+            data['mrfall'] = self.rain_format % rainM
+        # year to date rain, only calculate if we have been asked
+        if self.ytd_rain:
+            if self.year_rain is not None:
+                rainY = convert(self.year_rain, self.rain_group).value
+                rainB_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
+                rainB = convert(rainB_vt, self.rain_group).value 
+                if rainY is not None and rainB is not None:
+                    rainY = rainY + rainB
+                else:
+                    rainY = 0.0
+            else:
+                rainY = 0.0
+            data['yrfall'] = self.rain_format % rainY
         return data
 
     def new_archive_record(self, record):
