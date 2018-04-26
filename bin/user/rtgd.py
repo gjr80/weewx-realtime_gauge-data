@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.3                                      Date: ?? January 2018
+# Version: 0.3.3                                      Date: 26 April 2018
 #
 # Revision History
-#   ?? January 2018     v0.3.3
+#   26 April 2018       v0.3.3
 #       - implemented atomic write when writing gauge-data.txt to file
 #   20 January 2018     v0.3.2
 #       - modified rtgdthread queue management to fix 100% CPU usage issue
@@ -409,7 +409,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
 # version number of this script
-RTGD_VERSION = '0.3.0'
+RTGD_VERSION = '0.3.3'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 

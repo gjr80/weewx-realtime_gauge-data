@@ -1,3 +1,5 @@
+v0.3.3
+*   implemented atomic write when writing gauge-data.txt to file
 v0.3.2
 *   modified rtdgthread queue management to fix 100% CPU usage issue
 v0.3.1
