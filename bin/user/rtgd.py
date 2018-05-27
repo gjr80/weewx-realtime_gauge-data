@@ -468,18 +468,20 @@ def logcrit(id, msg):
 
 
 def logdbg(id, msg):
-    logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+    # logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+    loginf(id, msg)
 
 
 def logdbg2(id, msg):
-    if weewx.debug >= 2:
-        logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+    # if weewx.debug >= 2:
+    #    logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+    loginf(id, msg)
 
 
 def logdbg3(id, msg):
-    if weewx.debug >= 3:
-        logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
-
+    # if weewx.debug >= 3:
+    #     logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+    loginf(id, msg)
 
 def loginf(id, msg):
     logmsg(syslog.LOG_INFO, '%s: %s' % (id, msg))
@@ -540,6 +542,21 @@ class RealtimeGaugeData(StdService):
             self.wu_thread = None
             self.result_queue = None
 
+        darksky_config_dict = rtgd_config_dict.get('Darksky', None)
+        if darksky_config_dict is not None and to_bool(darksky_config_dict.get('enable', False)):
+            self.darksky_ctl_queue = Queue.Queue()
+            self.result_queue = Queue.Queue()
+            self.darksky_thread = DarkskyThread(self.darksky_ctl_queue,
+                                                self.result_queue,
+                                                darksky_config_dict,
+                                                lat=engine.stn_info.latitude_f,
+                                                long=engine.stn_info.longitude_f,
+                                               )
+            self.darksky_thread.start()
+        else:
+            self.darksky_thread = None
+            self.result_queue = None
+        
         # get an instance of class RealtimeGaugeDataThread and start the
         # thread running
         self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_ctl_queue,
@@ -664,6 +681,11 @@ class RealtimeGaugeData(StdService):
                 # Put a None in the wu_ctl_queue to signal the thread to
                 # shutdown
                 self.wu_ctl_queue.put(None)
+        if hasattr(self, 'darksky_ctl_queue') and hasattr(self, 'darksky_thread'):
+            if self.darksky_ctl_queue and self.darksky_thread.isAlive():
+                # Put a None in the darksky_ctl_queue to signal the thread to
+                # shutdown
+                self.darksky_ctl_queue.put(None)
         if hasattr(self, 'rtgd_thread') and self.rtgd_thread.isAlive():
             # Wait up to 15 seconds for the thread to exit:
             self.rtgd_thread.join(15.0)
@@ -680,6 +702,14 @@ class RealtimeGaugeData(StdService):
                        "Unable to shut down %s thread" % self.wu_thread.name)
             else:
                 logdbg("rtgd", "Shut down %s thread." % self.wu_thread.name)
+        if hasattr(self, 'darksky_thread') and self.darksky_thread.isAlive():
+            # Wait up to 15 seconds for the thread to exit:
+            self.darksky_thread.join(15.0)
+            if self.darksky_thread.isAlive():
+                logerr("rtgd",
+                       "Unable to shut down %s thread" % self.darksky_thread.name)
+            else:
+                logdbg("rtgd", "Shut down %s thread." % self.darksky_thread.name)
 
     def get_minmax_obs(self, obs_type):
         """Obtain the alltime max/min values for an observation."""
@@ -2837,3 +2867,492 @@ class ZambrettiForecast(object):
         # if we made it here we have been unable to get a response from the
         # forecast db so return a suitable message
         return 'Forecast not available'
+
+
+# ============================================================================
+#                           class DarkskyThread
+# ============================================================================
+
+
+class DarkskyThread(threading.Thread):
+    """Thread that obtains Darksky forecast data and places it in a queue.
+
+    The DarkskyThread class queries the Darksky API and places selected 
+    forecast data in JSON format in a queue used by the data consumer. The 
+    Darksky API is called at a user selectable frequency. The thread listens 
+    for a shutdown signal from its parent.
+
+    DarkskyThread constructor parameters:
+
+        control_queue:       A Queue object used by our parent to control 
+                             (shutdown) this thread.
+        result_queue:        A Queue object used to pass forecast data to the
+                             destination
+        darksky_config_dict: A config dictionary for the DarkskyThread.
+        lat:                 Station latitude in decimal degrees.
+        long:                Station longitude in decimal degrees.
+
+    DarkskyThread methods:
+
+        run.            Control querying of the API and monitor the control
+                        queue.
+        query_darksky.  Query the API and put selected forecast data in the
+                        result queue.
+        parse_response. Parse a Darksky API response and return selected data.
+    """
+
+    VALID_UNITS = ['auto', 'ca', 'uk2', 'us', 'si']
+
+    VALID_LANGUAGES = {
+        'Arabic': 'ar',
+        'Azerbaijani': 'az',
+        'Belarusian': 'be',
+        'Bulgarian': 'bg',
+        'Bosnian': 'bs',
+        'Catalan': 'ca',
+        'Czech': 'cs',
+        'Danish': 'da',
+        'German': 'de',
+        'Greek': 'el',
+        'English': 'en',
+        'Spanish': 'es',
+        'Estonian': 'et',
+        'Finnish': 'fi',
+        'French': 'fr',
+        'Croatian': 'hr',
+        'Hungarian': 'hu',
+        'Indonesian': 'id',
+        'Icelandic': 'is',
+        'Italian': 'it',
+        'Japanese': 'ja',
+        'Georgian': 'ka',
+        'Korean': 'ko',
+        'Cornish': 'kw',
+        'Norwegian Bokmal': 'nb',
+        'Dutch': 'nl',
+        'Polish': 'pl',
+        'Portuguese': 'pt',
+        'Romanian': 'ro',
+        'Russian': 'ru',
+        'Slovak': 'sk',
+        'Slovenian': 'sl',
+        'Serbian': 'sr',
+        'Swedish': 'sv',
+        'Tetum': 'tet',
+        'Turkish': 'tr',
+        'Ukrainian': 'uk',
+        'Igpay Atinlay': 'x-pig-latin',
+        'simplified Chinese': 'zh',
+        'traditional Chinese': 'zh-tw'}
+
+    VALID_SOURCES = ['currently', 'minutely', 'hourly', 'daily']
+    DEFAULT_SOURCE = 'hourly'
+
+    
+    def __init__(self, control_queue, result_queue, darksky_config_dict, 
+                 lat, long):
+
+        # Initialize my superclass
+        threading.Thread.__init__(self)
+
+        # setup a few thread things
+        self.setName('RtgdDarkskyThread')
+        self.setDaemon(True)
+
+        # save the queues we will use
+        self.control_queue = control_queue
+        self.result_queue = result_queue
+
+        # Darksky uses lat, long to 'locate' the forecast. Check if lat and 
+        # long are specified in the darksky_config_dict, if not use station lat
+        # and long.
+        lat = darksky_config_dict.get("latitude", lat)
+        long = darksky_config_dict.get("longitude", long)
+        # interval between API calls
+        self.interval = to_int(darksky_config_dict.get('interval', 1800))
+        # max no of tries we will make in any one attempt to contact the API
+        self.max_tries = to_int(darksky_config_dict.get('max_tries', 3))
+        # Get API call lockout period. This is the minimum period between API
+        # calls for the same feature. This prevents an error condition making
+        # multiple rapid API calls and thus breac the API usage conditions.
+        self.lockout_period = to_int(darksky_config_dict.get('api_lockout_period',
+                                                             60))
+        # initialise container for timestamp of last API call
+        self.last_call_ts = None
+        # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
+        # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
+        # try..except loop to catch exceptions (ie one or both don't exist.
+        key = darksky_config_dict.get('key', None)
+        if key is None:
+            raise MissingApiKey("Cannot find valid Darksky key")
+        # get a DarkskyForecastAPI object to handle the API calls
+        self.api = DarkskyForecastAPI(key, lat, long)
+        # get units to be used in forecast text
+        _units = darksky_config_dict.get('units', 'ca').lower()
+        # validate units
+        self.units = _units if _units in self.VALID_UNITS else 'ca'
+        self.exclude = darksky_config_dict.get('exclude')
+        self.extend = darksky_config_dict.get('extend')
+        _language = darksky_config_dict.get('language', 'en').lower()
+        # validate language
+        self.language = _language if _language in self.VALID_LANGUAGES.keys() else 'en'
+        _source = darksky_config_dict.get('source', 'hourly').lower()
+        # validate source
+        self.source = _source if _source in self.VALID_SOURCES else 'hourly'
+
+        # log what we will do
+        loginf("engine",
+               "RealTimeGaugeData will download forecast data from Darksky")
+
+    def run(self):
+        """Control the querying of the API and the shutdown of the thread.
+
+        Run a continuous loop querying the API, queuing the resulting forecast
+        data and checking for the shutdown signal. Since subsequent API queries
+        are triggered by an elapsed period of time rather than an external
+        event (eg receipt of archive record) it makes sense to sleep for a
+        period before checking if it is time to query. However, this limits the
+        responsiveness of the thread to the shutdown singal unless the sleep
+        period is very short (seconds). An alternative is to use the blocking
+        feature of Queue.get() to spend time blocking rather than sleeping. If
+        the blocking period is greater than the API lockout period then we can
+        avoid activating the API blockout period.
+        """
+
+        # since we are in a thread some additional try..except clauses will
+        # help give additional output in case of an error rather than having
+        # the thread die silently
+        try:
+            # Run a continuous loop, obtaining API data as required and
+            # monitoring the control queue for the shutdown signal. Only break
+            # out if we receive the shutdown signal (None) from our parent.
+            while True:
+                # run an inner loop querying the API and checking for the
+                # shutdown signal
+                # first up query the API
+                _response = self.query_darksky()
+                # if we have a non-None response then we have data from Darksky,
+                # parse the response, gather the required data and put it in
+                # the result queue
+                if _response is not None:
+                    # parse the API response and extract the forecast text
+                    _data = self.parse_response(_response, source=self.source)
+                    # if we have some data then place it in the result queue
+                    if _data is not None:
+                        # construct our data dict for the queue
+                        _package = {'type': 'forecast',
+                                    'payload': _data}
+                        self.result_queue.put(_package)
+                # now check to see if we have a shutdown signal
+                try:
+                    # Try to get data from the queue, block for up to 60
+                    # seconds. If nothing is there an empty queue exception
+                    # will be thrown after 60 seconds
+                    _package = self.control_queue.get(block=True, timeout=60)
+                except Queue.Empty:
+                    # nothing in the queue so continue
+                    pass
+                else:
+                    # something was in the queue, if it is the shutdown signal
+                    # then return otherwise continue
+                    if _package is None:
+                        # we have a shutdown signal so return to exit
+                        return
+        except Exception, e:
+            # Some unknown exception occurred. This is probably a serious
+            # problem. Exit with some notification.
+            logcrit("darkskythread",
+                    "Unexpected exception of type %s" % (type(e), ))
+            weeutil.weeutil.log_traceback('darkskythread: **** ')
+            logcrit("darkskythread", "Thread exiting. Reason: %s" % (e, ))
+
+    def query_darksky(self):
+        """If required query the Darksky API and return the JSON response.
+
+        Checks to see if it is time to query the API, if so queries the API
+        and returns the raw response in JSON format. To prevent the user
+        exceeding their API call limit the query is only made if at least
+        self.lockout_period seconds have elapsed since the last call.
+
+        Inputs:
+            None.
+
+        Returns:
+            The Darksky API response in JSON format or None if no/invalid 
+            response was obtained.
+        """
+
+        # get the current time
+        now = time.time()
+        logdbg2("darkskythread",
+                "Last Darksky API call at %s" % self.last_call_ts)
+        # has the lockout period passed since the last call
+        if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
+            # If we haven't made an API call previously or if its been too long
+            # since the last call then make the call
+            if (self.last_call_ts is None) or ((now + 1 - self.interval) >= self.last_call_ts):
+                # Make the call, wrap in a try..except just in case
+                try:
+                    _response = self.api.get_data(exclude=self.exclude,
+                                                  extend=self.extend, 
+                                                  language=self.language, 
+                                                  units=self.units,
+                                                  max_tries=self.max_tries)
+                    logdbg("darkskythread",
+                           "Downloaded updated Darksky forecast")
+                except Exception, e:
+                    # Some unknown exception occurred. Log it and continue.
+                    loginf("darkskythread",
+                           "Unexpected exception of type %s" % (type(e), ))
+                    weeutil.weeutil.log_traceback('darkskythread: **** ')
+                    loginf("darkskythread",
+                           "Unexpected exception of type %s" % (type(e), ))
+                    loginf("darkskythread", "Darksky forecast API query failed")
+                # if we got something back then reset our last call timestamp
+                if _response is not None:
+                    self.last_call_ts = now
+                return _response
+        else:
+            # API call limiter kicked in so say so
+            loginf("darkskythread",
+                   "Tried to make an API call within %d sec of the previous call." % (self.lockout_period, ))
+            loginf("        ",
+                   "API call limit reached. API call skipped.")
+        return None
+
+    def parse_response(self, response, source):
+        """Parse a Darksky forecast response.
+
+        Take a Darksky forecast response, check for (Darksky defined) errors 
+        then extract and return the required summary text.
+
+        Input:
+            response: A Darksky forecast API response in JSON format.
+
+        Returns:
+            Summary text or None.
+        """
+
+        # There is not too much validation of the data we can do other than 
+        # looking at the 'flags' object
+        if 'flags' in response:
+            if 'darksky-unavailable' in response['flags']:
+                loginf("darkskythread",
+                       "Darksky data for this location temporarily unavailable")
+                return None
+        else:
+            logdbg("darkskythread", "No flag object in API response.")
+
+        # get the summary data to be used
+        # is our source available, can't assume it is
+        if source in response:
+            # we have our source, but is the summary there
+            if 'summary' in response[source]:
+                # we have a summary field
+                summary = response[source]['summary'].encode('ascii', 'ignore')
+############Debug code
+                loginf("darkskythread", "summary=%s" % (summary, ))
+#############
+                return summary
+            else:
+                # we have no sumamry field, so log it and return None
+                logdbg("darkskythread",
+                       "Summary data not available for '%s' forecast" % (source, ))
+                return None
+        else:
+            # our source is not available, so try the default
+            if self.DEFAULT_SOURCE in response:
+                # our default source is available but does it have a summary
+                if 'summary' in response[self.DEFAULT_SOURCE]:
+                    # we have a summary field
+                    summary = response[self.DEFAULT_SOURCE]['summary'].encode('ascii', 
+                                                                              'ignore')
+############Debug code
+                    loginf("darkskythread", "summary=%s" % (summary, ))
+#############
+                    # log the fact we are using the default instead of our 
+                    # config option then return the summary field
+                    logdbg("darkskythread",
+                           "Using default source '%s' for forecast" % (self.DEFAULT_SOURCE, ))
+                    return summary
+                # if we made it here we have our defalt source but it has no 
+                # summary field, log it and return None
+                return None
+            else:
+                # our default is not available so try our other possible sources
+                # in order, some we will ahve already tried
+                for _source in self.VALID_SOURCES:
+                    if _source in response:
+                        # we have an available source, but does it have a a 
+                        # summary field
+                        if 'summary' in response[_source]:
+                            # we have a summary field
+                            summary = response[_source]['summary'].encode('ascii', 
+                                                                          'ignore')
+############Debug code
+                            loginf("darkskythread", "summary=%s" % (summary, ))
+#############
+                            # log the field we used then return the summary
+                            logdbg("darkskythread",
+                                   "Using default source '%s' for forecast" % (_source, ))
+                            return summary
+                # If we made it here then we have no source and hence no 
+                # available summary. Log it and return None.
+                logdbg("darkskythread", "No forecast summary data available")
+                return None
+
+
+# ============================================================================
+#                         class DarkskyForecastAPI
+# ============================================================================
+
+
+class DarkskyForecastAPI(object):
+    """Query the Darksky API and return the API response.
+
+    DarkskyForecastAPI constructor parameters:
+
+        darksky_config_dict: Dictionary containing the following keys:
+            key:       Darksky secret key to be used
+            latitude:  Latitude of the location concerned 
+            longitude: Longitude of the location concerned 
+
+    DarkskyForecastAPI methods:
+
+        get_data. Submit a data request to the Darksky API and return the 
+                  response.
+
+        _build_optional: Build a string containing the optional parameters to 
+                         submitted as part of the API request URL.
+        
+        _hit_api: Submit the API request and capture the response.
+
+        obfuscated_key: Property to return an obfuscated secret key.
+    """
+
+    BASE_URL = 'https://api.darksky.net/forecast'
+
+    def __init__(self, key, lat, long):
+        # initialise a DarkskyForecastAPI object
+
+        # save the secret key to be used
+        self.key = key
+        self.latitude = lat
+        self.longitude = long
+
+    def get_data(self, exclude=None, extend=None, language='en', units='auto', 
+                 max_tries=3):
+        """Make a data request via the API and return the response.
+
+        Construct an API call URL, make the call and return the response.
+
+        Parameters:
+            exclude:   List of any data blocks to exclude from the API response. 
+                       Refer to the optional parameter 'exclude' at 
+                       https://darksky.net/dev/docs. Setting to None will omit 
+                       the parameter. None or list of strings, default is None.
+            extend:    Whether to extend the hour by hour data. Refer to the 
+                       optional parameter 'extend' at https://darksky.net/dev/docs.
+                       Setting to None will omit the parameter. None or 'hourly', 
+                       default is None.
+            language:  The language to be used in any response text. Refer to 
+                       the optional parameter 'language' at 
+                       https://darksky.net/dev/docs. String, default is 'en'.
+            units:     The units to be used in the response. Refer to the 
+                       optional parameter 'units' at https://darksky.net/dev/docs.
+                       String, default is 'auto'.
+            max_tries: The maximum number of attempts to be made to obtain a
+                       response from the API. Number, default is 3.
+
+        Returns:
+            The Darksky API response in JSON format.
+        """
+
+        # start constructing the API call URL to be used
+        url = '/'.join([self.BASE_URL,
+                        self.key,
+                        '%s,%s' % (self.latitude, self.longitude)])
+        
+        # now build the optional paramaters string
+        optional_string = self._build_optional(exclude=exclude, extend=extend, 
+                                               language=language, units=units)
+        # if it has any content then add it to the URL
+        if len(optional_string) > 0:
+            url = '?'.join([url, optional_string])
+
+################ Debug code
+        _obfuscated_url = '/'.join([self.BASE_URL,
+                                    self.obfuscated_key,
+                                    '%s,%s' % (self.latitude, self.longitude)])
+        _obfuscated_url = '?'.join([_obfuscated_url, optional_string])
+        logdbg("darkskyapi",
+               "Submitting API call using URL: %s" % (_obfuscated_url, ))
+################
+
+        # if debug >=1 log the URL used but obfuscate the key
+        if weewx.debug >= 1:
+            _obfuscated_url = '/'.join([self.BASE_URL,
+                                        self.obfuscated_key,
+                                        '%s,%s' % (self.latitude, self.longitude)])
+            _obfuscated_url = '?'.join([_obfuscated_url, optional_string])
+            logdbg("darkskyapi",
+                   "Submitting API call using URL: %s" % (_obfuscated_url, ))
+
+        # make the API call
+        _response = self._hit_api(url, max_tries)
+        # if we have a response we need to deserialise it
+        if _response is not None:
+            # we have a response so deserialise our JSON response
+            json_response = json.loads(_response)
+        # return the response
+        return json_response
+        
+    def _build_optional(self, exclude=None, extend=None, language='en', units='auto'):
+        """Build the optional parameters string."""
+
+        # initialise a list of non-None optional parameters and their values
+        opt_params_list = []
+        # exclude
+        if exclude is not None and hasattr(exclude, '__iter__'):
+            opt_params_list.append('exclude=%s' % ','.join(exclude))
+        # extend
+        if extend is not None:
+            opt_params_list.append('extend=%s' % extend)
+        # language
+        if language is not None:
+            opt_params_list.append('lang=%s' % language)
+        # units
+        if units is not None:
+            opt_params_list.append('units=%s' % units)
+        # now if we have any parameters concatenate them separating each with 
+        # an ampersand
+        opt_params = "&".join(opt_params_list)
+        # return the resulting string
+        return opt_params
+
+    def _hit_api(self, url, max_tries=3):
+        """Make the API call and return the result."""
+
+        # we will attempt the call max_tries times
+        for count in range(max_tries):
+            # attempt the call
+            try:
+                w = urllib2.urlopen(url)
+                response = w.read()
+                w.close()
+                return response
+            except (urllib2.URLError, socket.timeout), e:
+                logerr("darkskyapi",
+                       "Failed to get API response on attempt %d" % (count+1, ))
+                logerr("darkskyapi", "   **** %s" % e)
+        else:
+            logerr("darkskyapi", "Failed to get API response")
+        return None
+
+    @property
+    def obfuscated_key(self):
+        """Produce and obfuscated copy of the key."""
+
+        # replace all characters in the key with an asterisk except for the 
+        # last 4
+        return '*'*(len(self.key) - 4) + self.key[-4:]
