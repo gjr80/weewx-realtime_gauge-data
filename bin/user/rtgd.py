@@ -17,15 +17,15 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.5                                      Date: ?? Jun 2018
+# Version: 0.3.5                                      Date: 4 June 2018
 #
 # Revision History
-#   ?? Jun 2018         v0.3.5
+#   4 June 2018         v0.3.5
 #       - added support for Darksky forecast API
 #       - refactored code for obtaining scroller text
 #       - each scoller text source now uses its own 2nd level (ie [[ ]]) config 
 #         with the scroller source specified under [RealtimeGaugeData]
-#   26 April 2018       v0.3.4
+#   26 April 2018       v0.3.4 (not released)
 #       - Added support for optional fields mrfall and yrfall that provide 
 #         month and year to date rainfall respectively. Optional fields are 
 #         calculated/added to output if config options mtd_rain and/or ytd_rain 
@@ -173,8 +173,10 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Remote URL to which the gauge-data.txt data will be posted via HTTP POST.
     # Optional, omit to disable HTTP POST.
     remote_server_url = http://remote/address
+
     # timeout in seconds for remote URL posts. Optional, default is 2
     timeout = 1
+
     # Text returned from remote URL indicating success. Optional, default is no
     # response text.
     response_text = success
@@ -288,71 +290,123 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
                                        'km_per_hour' or 'meter_per_second'
         group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
 
-        # The forecast text can be presented using either US imperial or Metric
-        # units. Optional string 'US' or 'Metric', default is 'Metric'
-        units =
-
 4.  If the scoller_source config option has been set add a second level config 
 stanza for the specified source. Config stanzas for each of the supported 
 sources are:
 
     -   user specified text:
 
-    # Specify settings to be used for user specified text source
-    [[Text]]
-        # user specified text to populate the 'forecast' field
-        text = enter text here
+        # Specify settings to be used for user specified text source
+        [[Text]]
+            # user specified text to populate the 'forecast' field
+            text = enter text here
 
     -   first line of text file:
 
-    # Specify settings to be used for first line of text file source
-    [[File]]
-        # Path and file name of file to use as source for the 'forecast' field. 
-        # Must be a text file, first line only of file is read.
-        file = path/to/file/file_name
+        # Specify settings to be used for first line of text file source
+        [[File]]
+            # Path and file name of file to use as source for the 'forecast' 
+            # field. Must be a text file, first line only of file is read.
+            file = path/to/file/file_name
 
-        # Interval (in seconds) between between file reads. Default is 1800.
-        interval = 1800
+            # Interval (in seconds) between between file reads. Default is 1800.
+            interval = 1800
 
-    -   Weather underground forecast
+    -   Weather Underground forecast
     
-    # Specify settings to be used for Weather Underground forecast source
-    [[WeatherUnderground]
-        # WU API key to be used when calling the WU API
-        api_key = xxxxxxxxxxxxxxxx
+        # Specify settings to be used for Weather Underground forecast source
+        [[WU]]
+            # WU API key to be used when calling the WU API
+            api_key = xxxxxxxxxxxxxxxx
 
-        # Interval (in seconds) between forecast downloads. Default
-        # is 1800.
-        interval = 1800
+            # Interval (in seconds) between forecast downloads. Default
+            # is 1800.
+            interval = 1800
 
-        # Minimum period (in seconds) between  API calls. This prevents
-        # conditions where a misbehaving program could call the WU API
-        # repeatedly thus violating the API usage conditions.
-        # Default is 60.
-        api_lockout_period = 60
+            # Minimum period (in seconds) between  API calls. This prevents
+            # conditions where a misbehaving program could call the WU API
+            # repeatedly thus violating the API usage conditions.
+            # Default is 60.
+            api_lockout_period = 60
 
-        # Maximum number attempts to obtain an API response. Default is 3.
-        max_tries = 3
+            # Maximum number attempts to obtain an API response. Default is 3.
+            max_tries = 3
 
-        # The location for the forecast and current conditions can be one
-        # of the following:
-        #   CA/San_Francisco     - US state/city
-        #   60290                - US zip code
-        #   Australia/Sydney     - Country/City
-        #   37.8,-122.4          - latitude,longitude
-        #   KJFK                 - airport code
-        #   pws:KCASANFR70       - PWS id
-        #   autoip               - AutoIP address location
-        #   autoip.json?geo_ip=38.102.136.138 - specific IP address
-        #                                       location
-        # If no location is specified, station latitude and longitude are
-        # used
-        location = enter location here
+            # The location for the forecast and current conditions can be one
+            # of the following:
+            #   CA/San_Francisco     - US state/city
+            #   60290                - US zip code
+            #   Australia/Sydney     - Country/City
+            #   37.8,-122.4          - latitude,longitude
+            #   KJFK                 - airport code
+            #   pws:KCASANFR70       - PWS id
+            #   autoip               - AutoIP address location
+            #   autoip.json?geo_ip=38.102.136.138 - specific IP address
+            #                                       location
+            # If no location is specified, station latitude and longitude are
+            # used
+            location = enter location here
 
+    -   Darksky forecast
 
+        # Specify settings to be used for Darksky forecast source
+        [[Darksky]]
+            # Key used to access Darksky API. String. Mandatory.
+            key = xxxxxxxxxxxxxxxx
 
+            # Latitude to use for forecast. Decimal degrees, negative for 
+            # southern hemishpere. Optional. Default is station latitude.
+            latitude = yy.yyyyy
 
+            # Longitude to use for forecast. Decimal degrees, negative for 
+            # western hemishpere. Optional. Default is station longitude.
+            longitude = zz.zzzz
 
+            # Darksky forecast text to use. String either minutely, hourly or 
+            # daily. Optional. Default is hourly. Refer Darksky API 
+            # documentation at 
+            # https://darksky.net/dev/docs#forecast-request
+            source = minutely|hourly|daily
+
+            # Language to use. String. Optional. Default is English. Available 
+            # language codes are listed in the Darksky API documetnation at 
+            # https://darksky.net/dev/docs#forecast-request
+            language = en
+
+            # Units to use in forecast text. String either auto, us, si, ca or
+            # uk2. Optional. Default is auto. Available units codes are 
+            # explained in the Darksky API documetnation at 
+            # https://darksky.net/dev/docs#forecast-request
+            units = auto|us|si|ca|uk2
+
+            # Interval (in seconds) between forecast downloads. Optional. 
+            # Default is 1800.
+            interval = 1800
+
+            # Maximum number attempts to obtain an API response. Optional. 
+            # Default is 3.
+            max_tries = 3
+
+    -   Zambretti forecast
+
+        # Specify settings to be used for Zambretti forecast source
+        [[Zambretti]]
+            # Interval (in seconds) between forecast updates. Optional. 
+            # Default is 1800.
+            # Note. In order to use the Zambretti forecast source the weeWX 
+            # forecast extension must be installled and the Zambretti forecast 
+            # enabled. RTGD reads the current Zambretti forecast every interval 
+            # seconds. The forecast extension controls how often the Zambretti 
+            # forecast is updated.
+            interval = 1800
+        
+            # Maximum number attempts to obtain the forecast. Optional. Default
+            # is 3.
+            max_tries = 3
+
+            # Time to wait (in seconds) between attempts to read the forecast. 
+            # Optional. Default is 3.
+            retry_wait = 3
 
 5.  Add the RealtimeGaugeData service to the list of report services under
 [Engines] [[WxEngine]] in weewx.conf:
@@ -585,7 +639,13 @@ class RealtimeGaugeData(StdService):
         # permit any variant of 'wu' as shorthand for Weather Underground
         _source = 'weatherunderground' if _source == 'wu' else _source
         # if we made it this far we have all we need to create an object
-        source_class = SCROLLER_SOURCES[_source]
+        source_class = SCROLLER_SOURCES.get(_source)
+        if source_class is None:
+            # We have an invalid source specified. Log this and use the default
+            # class Source which will provide a zero length string for the 
+            # scroller text.
+            loginf("rtgd", "Unknown source specified for scroller_text")
+            source_class = Source
         # create queues for passing data and controlling our source object
         self.source_ctl_queue = Queue.Queue()
         self.result_queue = Queue.Queue()
@@ -2518,6 +2578,46 @@ class ThreadedSource(threading.Thread):
 
 
 # ============================================================================
+#                             class Source
+# ============================================================================
+
+
+class Source(object):
+    """base class for a non-threaded scroller text source."""
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+        
+        # since we are not running in a thread we only need keep track of the 
+        # result queue
+        self.result_queue = result_queue
+
+    def start(self):
+        """Our entry point.
+        
+        Unlike most other source class Source does not run in a thread but 
+        rather is a simple non-threaded class that provides a result once and 
+        then does nothing else. The start() method has been defined as the 
+        entry point so we can be 'started' just like a threading.Thread object.
+        """
+
+        # get the scroller text string
+        _text = self.get_data()
+        # construct our data dict for the queue
+        _package = {'type': 'forecast',
+                    'payload': _text}
+        # now add it to the queue
+        self.result_queue.put(_package)
+
+    def get_data(self):
+        """Get scroller user specified scroller text string.
+        
+        This method must be defined for each child class.
+        """
+
+        return ''
+
+
+# ============================================================================
 #                              class WUSource
 # ============================================================================
 
@@ -3381,56 +3481,6 @@ class DarkskyForecastAPI(object):
 
 
 # ============================================================================
-#                             class TextSource
-# ============================================================================
-
-
-class TextSource(object):
-    """Class to return user specified text string."""
-
-    def __init__(self, control_queue, result_queue, engine, config_dict):
-        # since we are not running in a thread we only need keep track of a 
-        # couple of our init parameters
-        
-        # our config dict
-        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
-        self.text_config_dict = _rtgd_config_dict.get("Text")
-        # the queue to use for our results
-        self.result_queue = result_queue
-
-        # log what we will do
-        loginf("rtgd",
-               "RealTimeGaugeData scroller text will use a fixed string")
-
-    def start(self):
-        """Our entry point.
-        
-        Unlike most other source class textSource does not run in a thread but 
-        rather is a simple non-threaded class that provides a result once and 
-        then does nothing else. The start() method has been defined as the 
-        entry point so we can be 'started' just like a threading.Thread object.
-        """
-
-        # get the scroller text string
-        _text = self.get_data()
-        # construct our data dict for the queue
-        _package = {'type': 'forecast',
-                    'payload': _text}
-        # now add it to the queue
-        self.result_queue.put(_package)
-
-    def get_data(self):
-        """Get scroller user specified scroller text string.
-
-        If nothing is found then a zero length string is returned.
-        """
-
-        # get scroller text from weewx.conf [RealtimeGaugeData]
-        _text = self.text_config_dict.get('text', '')
-        return _text
-
-
-# ============================================================================
 #                             class FileSource
 # ============================================================================
 
@@ -3520,6 +3570,41 @@ class FileSource(ThreadedSource):
             # and finally return the read data 
             return _data
         return None
+
+
+# ============================================================================
+#                             class TextSource
+# ============================================================================
+
+
+class TextSource(Source):
+    """Class to return user specified text string."""
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+        
+        # Initialize my base class
+        super(TextSource, self).__init__(control_queue, result_queue, engine, 
+                                         config_dict)
+        
+        # since we are not running in a thread we only need keep track of our
+        # config dict
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        self.text_config_dict = _rtgd_config_dict.get("Text")
+
+        # log what we will do
+        loginf("rtgd",
+               "RealTimeGaugeData scroller text will use a fixed string")
+
+    def get_data(self):
+        """Get scroller user specified scroller text string.
+
+        If nothing is found then a zero length string is returned.
+        """
+
+        # get scroller text from weewx.conf [RealtimeGaugeData]
+        _text = self.text_config_dict.get('text', '')
+        return _text
+
 
 # available scroller text source classes
 SCROLLER_SOURCES = {'text': TextSource,
