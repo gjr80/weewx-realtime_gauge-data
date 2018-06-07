@@ -1892,6 +1892,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
         _text = self.scroller_text if self.scroller_text is not None else ''
+
+##### debug code
+        loginf("rtgd", "scroller_text=%s" % (self.scroller_text,))
+##### debug code
+
         data['forecast'] = time.strftime(_text, time.localtime(ts))
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
@@ -2565,7 +2570,7 @@ class ThreadedSource(threading.Thread):
         This method must be defined for each child class.
         """
 
-        pass
+        return None
         
     def parse_response(self, response):
         """Parse the source response and return the required data.
@@ -2658,7 +2663,8 @@ class WUSource(ThreadedSource):
         self.setName('RtgdWuThread')
 
         # get the WU config dict
-        wu_config_dict = config_dict.get("WU")
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        wu_config_dict = _rtgd_config_dict.get("WU", dict())
         
         # the WU API 'feature' to be used for the forecast data
         self.feature = 'forecast'
@@ -2690,7 +2696,7 @@ class WUSource(ThreadedSource):
         # get lat and long
         lat = wu_config_dict.get("latitude", engine.stn_info.latitude_f)
         long = wu_config_dict.get("longitude", engine.stn_info.longitude_f)
-        self.query = wu_config_dict.get('location', (lat, long))
+        self.query = wu_config_dict.get('location', "%s,%s" % (lat, long))
         # get a WeatherUndergroundAPI object to handle the API calls
         self.api = WeatherUndergroundAPI(api_key)
         # get units to be used in forecast text
@@ -2753,7 +2759,7 @@ class WUSource(ThreadedSource):
                    "WU API call limit reached. API call skipped.")
         return None
 
-    def parse_response(self):
+    def parse_response(self, response):
         """ Validate/parse a WU response and return the required fields.
 
         Take a WU API response, check for (WU defined) errors then extract and
@@ -2768,7 +2774,7 @@ class WUSource(ThreadedSource):
         """
 
         # deserialize the response
-        _response_json = json.loads(self.response)
+        _response_json = json.loads(response)
         # check for recognised format
         if 'response' not in _response_json:
             loginf("rtgd",
@@ -3162,7 +3168,8 @@ class DarkskySource(ThreadedSource):
         self.setName('RtgdDarkskyThread')
 
         # get the darksky config dict
-        darksky_config_dict = config_dict.get("Darksky")
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        darksky_config_dict = _rtgd_config_dict.get("Darksky", dict())
 
         # Darksky uses lat, long to 'locate' the forecast. Check if lat and 
         # long are specified in the darksky_config_dict, if not use station lat
@@ -3514,14 +3521,13 @@ class FileSource(ThreadedSource):
 
         # get the File config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
-        file_config_dict = _rtgd_config_dict.get("File")
+        file_config_dict = _rtgd_config_dict.get("File", dict())
         
         # interval between file reads
         self.interval = to_int(file_config_dict.get('interval', 1800))
-
         # get source file, check it refers to a file
-        self.scroller_file = file_config_dict.get('file', None)
-        if self.scroller_file is not None and not os.path.isfile(self.scroller_file):
+        self.scroller_file = file_config_dict.get('file')
+        if self.scroller_file is None or not os.path.isfile(self.scroller_file):
             logdbg("rtgd", "File source not specified or not a valid path/file")
             self.scroller_file = None
 
@@ -3529,8 +3535,9 @@ class FileSource(ThreadedSource):
         self.last_read_ts = None
         
         # log what we will do
-        loginf("rtgd",
-               "RealTimeGaugeData scroller text will use text from file '%s'" % self.scroller_file)
+        if self.scroller_file is not None:
+            loginf("rtgd",
+                   "RealTimeGaugeData scroller text will use text from file '%s'" % self.scroller_file)
     
     def get_response(self):
         """Get a single line of text from a file.
@@ -3589,7 +3596,7 @@ class TextSource(Source):
         # since we are not running in a thread we only need keep track of our
         # config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
-        self.text_config_dict = _rtgd_config_dict.get("Text")
+        self.text_config_dict = _rtgd_config_dict.get("Text", dict())
 
         # log what we will do
         loginf("rtgd",
@@ -3602,7 +3609,7 @@ class TextSource(Source):
         """
 
         # get scroller text from weewx.conf [RealtimeGaugeData]
-        _text = self.text_config_dict.get('text', '')
+        _text = self.text_config_dict.get('text')
         return _text
 
 
