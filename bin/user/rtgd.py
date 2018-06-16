@@ -2,7 +2,7 @@
 #
 # A weeWX service to generate a loop based gauge-data.txt.
 #
-# Copyright (C) 2017 Gary Roderick                  gjroderick<at>gmail.com
+# Copyright (C) 2017-2018 Gary Roderick             gjroderick<at>gmail.com
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free
@@ -224,7 +224,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # 4. Darksky - to use a Darksky forecast
     # 5. Zambretti - to use a Zambretti forecast
     # 
-    # The scoller_source config option is case insensitive. A corresponding 
+    # The scroller_source config option is case insensitive. A corresponding
     # second level config section (ie [[ ]]) is required for the source to be 
     # used. Refer to step 4 below for details. If the scroller_source config 
     # option is omitted or left blank the 'forecast' filed will be blank and no 
@@ -627,7 +627,7 @@ class RealtimeGaugeData(StdService):
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
         
-        # bind ourself to the relevant weeWX events
+        # bind our self to the relevant weeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
         self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
@@ -2739,7 +2739,9 @@ class WUSource(ThreadedSource):
                     logdbg("rtgd",
                            "Downloaded updated Weather Underground %s information" % self.feature)
                 except Exception, e:
-                    # Some unknown exception occurred. Log it and continue.
+                    # Some unknown exception occurred. Set _response to None,
+                    # log it and continue.
+                    _response = None
                     loginf("rtgd",
                            "Unexpected exception of type %s" % (type(e), ))
                     weeutil.weeutil.log_traceback('WUThread: **** ')
@@ -2946,6 +2948,8 @@ class ZambrettiSource(ThreadedSource):
         # get the Zambretti config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
         self.zambretti_config_dict = _rtgd_config_dict.get("Zambretti")
+
+        self.zambretti = None
 
         # log what we will do
         loginf("rtgd",
@@ -3157,7 +3161,6 @@ class DarkskySource(ThreadedSource):
     VALID_SOURCES = ['currently', 'minutely', 'hourly', 'daily']
     DEFAULT_SOURCE = 'hourly'
 
-    
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my base class:
@@ -3248,7 +3251,9 @@ class DarkskySource(ThreadedSource):
                     logdbg("rtgd",
                            "Downloaded updated Darksky forecast")
                 except Exception, e:
-                    # Some unknown exception occurred. Log it and continue.
+                    # Some unknown exception occurred. Set _response to None,
+                    # log it and continue.
+                    _response = None
                     loginf("rtgd",
                            "Unexpected exception of type %s" % (type(e), ))
                     weeutil.weeutil.log_traceback('rtgd: **** ')
@@ -3299,7 +3304,7 @@ class DarkskySource(ThreadedSource):
                 summary = response[self.source]['summary'].encode('ascii', 'ignore')
                 return summary
             else:
-                # we have no sumamry field, so log it and return None
+                # we have no summary field, so log it and return None
                 logdbg("rtgd",
                        "Summary data not available for '%s' forecast" % (self.source, ))
                 return None
@@ -3321,7 +3326,7 @@ class DarkskySource(ThreadedSource):
                 return None
             else:
                 # our default is not available so try our other possible sources
-                # in order, some we will ahve already tried
+                # in order, some we will have already tried
                 for _source in self.VALID_SOURCES:
                     if _source in response:
                         # we have an available source, but does it have a a 
@@ -3411,7 +3416,7 @@ class DarkskyForecastAPI(object):
                         self.key,
                         '%s,%s' % (self.latitude, self.longitude)])
         
-        # now build the optional paramaters string
+        # now build the optional parameters string
         optional_string = self._build_optional(exclude=exclude, extend=extend, 
                                                language=language, units=units)
         # if it has any content then add it to the URL
@@ -3430,13 +3435,12 @@ class DarkskyForecastAPI(object):
         # make the API call
         _response = self._hit_api(url, max_tries)
         # if we have a response we need to deserialise it
-        if _response is not None:
-            # we have a response so deserialise our JSON response
-            json_response = json.loads(_response)
+        json_response = json.loads(_response) if _response is not None else None
         # return the response
         return json_response
         
-    def _build_optional(self, exclude=None, extend=None, language='en', units='auto'):
+    @staticmethod
+    def _build_optional(exclude=None, extend=None, language='en', units='auto'):
         """Build the optional parameters string."""
 
         # initialise a list of non-None optional parameters and their values
@@ -3459,7 +3463,8 @@ class DarkskyForecastAPI(object):
         # return the resulting string
         return opt_params
 
-    def _hit_api(self, url, max_tries=3):
+    @staticmethod
+    def _hit_api(url, max_tries=3):
         """Make the API call and return the result."""
 
         # we will attempt the call max_tries times
@@ -3564,12 +3569,14 @@ class FileSource(ThreadedSource):
                         _data = f.readline().strip()
                 logdbg("rtgd", "File read")
             except Exception, e:
-                # Some unknown exception occurred. Log it and continue.
+                # Some unknown exception occurred. Set _data to None,
+                # log it and continue.
+                _data = None
                 loginf("rtgd",
-                        "Unexpected exception of type %s" % (type(e), ))
+                       "Unexpected exception of type %s" % (type(e), ))
                 weeutil.weeutil.log_traceback('rtgd: **** ')
                 loginf("rtgd",
-                        "Unexpected exception of type %s" % (type(e), ))
+                       "Unexpected exception of type %s" % (type(e), ))
                 loginf("rtgd", "File read failed")
             # we got something so reset our last read timestamp
             if _data is not None:
