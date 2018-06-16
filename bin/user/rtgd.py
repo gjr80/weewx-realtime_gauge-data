@@ -2,7 +2,7 @@
 #
 # A weeWX service to generate a loop based gauge-data.txt.
 #
-# Copyright (C) 2017 Gary Roderick                  gjroderick<at>gmail.com
+# Copyright (C) 2017-2018 Gary Roderick             gjroderick<at>gmail.com
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free
@@ -701,12 +701,12 @@ class RealtimeGaugeData(StdService):
     def get_rain(self, tspan):
         """Calculate rainfall over a given timespan."""
 
-        _result = {}
         _rain_vt = self.db_manager.getAggregate(tspan, 'rain', 'sum')
         if _rain_vt:
             return _rain_vt
         else:
             return None
+
 
 # ============================================================================
 #                       class RealtimeGaugeDataThread
@@ -2479,7 +2479,7 @@ class WUThread(threading.Thread):
                 api_key = config_dict['Forecast']['WU'].get('api_key')
             else:
                 raise MissingApiKey("Cannot find valid Weather Underground API key")
-        except:
+        except AttributeError:
             raise MissingApiKey("Cannot find Weather Underground API key")
         # Get 'query' (ie the location) to be used for use in WU API calls.
         # Refer weewx.conf for details.
@@ -2499,13 +2499,13 @@ class WUThread(threading.Thread):
         Run a continuous loop querying the API, queuing the resulting forecast
         data and checking for the shutdown signal. Since subsequent API queries
         are triggered by an elapsed period of time rather than an external
-        event (eg recipt of archive record) it makes sense to sleep for a
+        event (eg receipt of archive record) it makes sense to sleep for a
         period before checking if it is time to query. However, this limits the
         responsiveness of the thread to the shutdown singal unless the sleep
         period is very short (seconds). An alternative is to use the blocking
         feature of Queue.get() to spend time blocking rather than sleeping. If
         the blocking period is greater than the API lockout period then we can
-        avoid activating the API blockout period.
+        avoid activating the API lockout period.
         """
 
         # since we are in a thread some additional try..except clauses will
@@ -2542,7 +2542,7 @@ class WUThread(threading.Thread):
                     # nothing in the queue so continue
                     pass
                 else:
-                    # somethign was in the queue, if it is the shutdown signal
+                    # something was in the queue, if it is the shutdown signal
                     # then return otherwise continue
                     if _package is None:
                         # we have a shutdown signal so return to exit
@@ -2588,7 +2588,9 @@ class WUThread(threading.Thread):
                     logdbg("WUThread",
                            "Downloaded updated Weather Underground %s information" % self.feature)
                 except Exception, e:
-                    # Some unknown exception occurred. Log it and continue.
+                    # Some unknown exception occurred. Set _response to None,
+                    # log it and continue.
+                    _response = None
                     loginf("WUThread",
                            "Unexpected exception of type %s" % (type(e), ))
                     weeutil.weeutil.log_traceback('WUThread: **** ')
