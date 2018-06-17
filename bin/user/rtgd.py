@@ -23,12 +23,12 @@
 #   4 June 2018         v0.3.5
 #       - added support for Darksky forecast API
 #       - refactored code for obtaining scroller text
-#       - each scoller text source now uses its own 2nd level (ie [[ ]]) config 
+#       - each scoller text source now uses its own 2nd level (ie [[ ]]) config
 #         with the scroller source specified under [RealtimeGaugeData]
 #   26 April 2018       v0.3.4 (not released)
-#       - Added support for optional fields mrfall and yrfall that provide 
-#         month and year to date rainfall respectively. Optional fields are 
-#         calculated/added to output if config options mtd_rain and/or ytd_rain 
+#       - Added support for optional fields mrfall and yrfall that provide
+#         month and year to date rainfall respectively. Optional fields are
+#         calculated/added to output if config options mtd_rain and/or ytd_rain
 #         are set True.
 #   26 April 2018       v0.3.3
 #       - implemented atomic write when writing gauge-data.txt to file
@@ -206,7 +206,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
 
     # The SteelSeries Weather Gauges displays the content of the gauge-data.txt
     # 'forecast' field in the scrolling text display. The RTGD service can
-    # populate the 'forecast' field from a number of sources. The available 
+    # populate the 'forecast' field from a number of sources. The available
     # sources are:
     #
     # 1. a user specified text
@@ -215,19 +215,19 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # 4. Darksky forecast from the Darksky API
     # 5. Zambretti forecast from the weeWX forecast extension
     #
-    # The source to be used is specified using the scroller_source config 
-    # option. The scroller_source should be set to one of the following strings 
+    # The source to be used is specified using the scroller_source config
+    # option. The scroller_source should be set to one of the following strings
     # to use the indicated source:
     # 1. text - to use user specified text
     # 2. file - to user the first line of a text file
     # 3. Weather Underground - to use a Weather Underground forecast
     # 4. Darksky - to use a Darksky forecast
     # 5. Zambretti - to use a Zambretti forecast
-    # 
+    #
     # The scroller_source config option is case insensitive. A corresponding
-    # second level config section (ie [[ ]]) is required for the source to be 
-    # used. Refer to step 4 below for details. If the scroller_source config 
-    # option is omitted or left blank the 'forecast' filed will be blank and no 
+    # second level config section (ie [[ ]]) is required for the source to be
+    # used. Refer to step 4 below for details. If the scroller_source config
+    # option is omitted or left blank the 'forecast' filed will be blank and no
     # scroller text will be displayed.
     scroller_source = text|file|WU|Darksky|Zambretti
 
@@ -290,8 +290,8 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
                                        'km_per_hour' or 'meter_per_second'
         group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
 
-4.  If the scoller_source config option has been set add a second level config 
-stanza for the specified source. Config stanzas for each of the supported 
+4.  If the scoller_source config option has been set add a second level config
+stanza for the specified source. Config stanzas for each of the supported
 sources are:
 
     -   user specified text:
@@ -305,7 +305,7 @@ sources are:
 
         # Specify settings to be used for first line of text file source
         [[File]]
-            # Path and file name of file to use as source for the 'forecast' 
+            # Path and file name of file to use as source for the 'forecast'
             # field. Must be a text file, first line only of file is read.
             file = path/to/file/file_name
 
@@ -313,7 +313,7 @@ sources are:
             interval = 1800
 
     -   Weather Underground forecast
-    
+
         # Specify settings to be used for Weather Underground forecast source
         [[WU]]
             # WU API key to be used when calling the WU API
@@ -354,36 +354,36 @@ sources are:
             # Key used to access Darksky API. String. Mandatory.
             key = xxxxxxxxxxxxxxxx
 
-            # Latitude to use for forecast. Decimal degrees, negative for 
+            # Latitude to use for forecast. Decimal degrees, negative for
             # southern hemishpere. Optional. Default is station latitude.
             latitude = yy.yyyyy
 
-            # Longitude to use for forecast. Decimal degrees, negative for 
+            # Longitude to use for forecast. Decimal degrees, negative for
             # western hemishpere. Optional. Default is station longitude.
             longitude = zz.zzzz
 
-            # Darksky forecast text to use. String either minutely, hourly or 
-            # daily. Optional. Default is hourly. Refer Darksky API 
-            # documentation at 
+            # Darksky forecast text to use. String either minutely, hourly or
+            # daily. Optional. Default is hourly. Refer Darksky API
+            # documentation at
             # https://darksky.net/dev/docs#forecast-request
             source = minutely|hourly|daily
 
-            # Language to use. String. Optional. Default is English. Available 
-            # language codes are listed in the Darksky API documetnation at 
+            # Language to use. String. Optional. Default is English. Available
+            # language codes are listed in the Darksky API documetnation at
             # https://darksky.net/dev/docs#forecast-request
             language = en
 
             # Units to use in forecast text. String either auto, us, si, ca or
-            # uk2. Optional. Default is auto. Available units codes are 
-            # explained in the Darksky API documetnation at 
+            # uk2. Optional. Default is auto. Available units codes are
+            # explained in the Darksky API documetnation at
             # https://darksky.net/dev/docs#forecast-request
             units = auto|us|si|ca|uk2
 
-            # Interval (in seconds) between forecast downloads. Optional. 
+            # Interval (in seconds) between forecast downloads. Optional.
             # Default is 1800.
             interval = 1800
 
-            # Maximum number attempts to obtain an API response. Optional. 
+            # Maximum number attempts to obtain an API response. Optional.
             # Default is 3.
             max_tries = 3
 
@@ -391,20 +391,20 @@ sources are:
 
         # Specify settings to be used for Zambretti forecast source
         [[Zambretti]]
-            # Interval (in seconds) between forecast updates. Optional. 
+            # Interval (in seconds) between forecast updates. Optional.
             # Default is 1800.
-            # Note. In order to use the Zambretti forecast source the weeWX 
-            # forecast extension must be installled and the Zambretti forecast 
-            # enabled. RTGD reads the current Zambretti forecast every interval 
-            # seconds. The forecast extension controls how often the Zambretti 
+            # Note. In order to use the Zambretti forecast source the weeWX
+            # forecast extension must be installled and the Zambretti forecast
+            # enabled. RTGD reads the current Zambretti forecast every interval
+            # seconds. The forecast extension controls how often the Zambretti
             # forecast is updated.
             interval = 1800
-        
+
             # Maximum number attempts to obtain the forecast. Optional. Default
             # is 3.
             max_tries = 3
 
-            # Time to wait (in seconds) between attempts to read the forecast. 
+            # Time to wait (in seconds) between attempts to read the forecast.
             # Optional. Default is 3.
             retry_wait = 3
 
@@ -622,11 +622,11 @@ class RealtimeGaugeData(StdService):
                                                    altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
         self.rtgd_thread.start()
 
-        # are we providing month and/or year to date rain, default is no we are 
+        # are we providing month and/or year to date rain, default is no we are
         # not
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
-        
+
         # bind our self to the relevant weeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
@@ -642,7 +642,7 @@ class RealtimeGaugeData(StdService):
         source_class = SCROLLER_SOURCES.get(_source)
         if source_class is None:
             # We have an invalid source specified. Log this and use the default
-            # class Source which will provide a zero length string for the 
+            # class Source which will provide a zero length string for the
             # scroller text.
             loginf("rtgd", "Unknown source specified for scroller_text")
             source_class = Source
@@ -699,7 +699,7 @@ class RealtimeGaugeData(StdService):
                        "queued min/max barometer values: %s" % _package['payload'])
         # if required get updated month to date rainfall and put in the queue
         if self.mtd_rain:
-            _tspan = weeutil.weeutil.archiveMonthSpan(event.record['dateTime']) 
+            _tspan = weeutil.weeutil.archiveMonthSpan(event.record['dateTime'])
             _rain = self.get_rain(_tspan)
             # if we have some data then package it in a dict since this is not the
             # only data we send via the queue
@@ -715,7 +715,7 @@ class RealtimeGaugeData(StdService):
                            "queued month to date rain: %s" % _package['payload'])
         # if required get updated year to date rainfall and put in the queue
         if self.ytd_rain:
-            _tspan = weeutil.weeutil.archiveYearSpan(event.record['dateTime']) 
+            _tspan = weeutil.weeutil.archiveYearSpan(event.record['dateTime'])
             _rain = self.get_rain(_tspan)
             # if we have some data then package it in a dict since this is not the
             # only data we send via the queue
@@ -729,7 +729,7 @@ class RealtimeGaugeData(StdService):
                 elif weewx.debug >= 3:
                     logdbg("rtgd",
                            "queued year to date rain: %s" % _package['payload'])
-    
+
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
 
@@ -995,11 +995,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
 
-        # are we providing month and/or year to date rain, default is no we are 
+        # are we providing month and/or year to date rain, default is no we are
         # not
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
-        # initialise some properties if we are providing month and/or year to 
+        # initialise some properties if we are providing month and/or year to
         # date rain
         if self.mtd_rain:
             self.month_rain = None
@@ -1892,11 +1892,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
         _text = self.scroller_text if self.scroller_text is not None else ''
-
-##### debug code
-        loginf("rtgd", "scroller_text=%s" % (self.scroller_text,))
-##### debug code
-
         data['forecast'] = time.strftime(_text, time.localtime(ts))
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
@@ -1909,7 +1904,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             if self.month_rain is not None:
                 rainM = convert(self.month_rain, self.rain_group).value
                 rainB_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
-                rainB = convert(rainB_vt, self.rain_group).value 
+                rainB = convert(rainB_vt, self.rain_group).value
                 if rainM is not None and rainB is not None:
                     rainM = rainM + rainB
                 else:
@@ -1922,7 +1917,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             if self.year_rain is not None:
                 rainY = convert(self.year_rain, self.rain_group).value
                 rainB_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
-                rainB = convert(rainB_vt, self.rain_group).value 
+                rainB = convert(rainB_vt, self.rain_group).value
                 if rainY is not None and rainB is not None:
                     rainY = rainY + rainB
                 else:
@@ -2473,7 +2468,7 @@ class ThreadedSource(threading.Thread):
 
     ThreadedSource constructor parameters:
 
-        control_queue:       A Queue object used by our parent to control 
+        control_queue:       A Queue object used by our parent to control
                              (shutdown) this thread.
         result_queue:        A Queue object used to pass forecast data to the
                              destination
@@ -2484,13 +2479,13 @@ class ThreadedSource(threading.Thread):
 
         run.            Thread entry point, controls data fetching, parsing and
                         dispatch. Monitors the control queue.
-        get_data.       Obtain the raw scroller text data. This method must be 
+        get_data.       Obtain the raw scroller text data. This method must be
                         written for each child class.
-        parse_data.     Parse the raw scroller text data and return the final 
-                        format data. This method must be written for each child 
+        parse_data.     Parse the raw scroller text data and return the final
+                        format data. This method must be written for each child
                         class.
     """
-    
+
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my superclass
@@ -2554,11 +2549,11 @@ class ThreadedSource(threading.Thread):
             logcrit("rtgd", "Unexpected exception of type %s" % (type(e), ))
             weeutil.weeutil.log_traceback('rtgd: **** ')
             logcrit("rtgd", "Thread exiting. Reason: %s" % (e, ))
-    
+
     def setup(self):
         """Perform any post post-__init__() setup.
-        
-        This method is executed as the very first thing in the thread run() 
+
+        This method is executed as the very first thing in the thread run()
         method. It must be defined if required for each child class.
         """
 
@@ -2566,16 +2561,16 @@ class ThreadedSource(threading.Thread):
 
     def get_response(self):
         """Obtain the raw source data.
-        
+
         This method must be defined for each child class.
         """
 
         return None
-        
+
     def parse_response(self, response):
         """Parse the source response and return the required data.
-        
-        This method must be defined if the raw data from the source must be 
+
+        This method must be defined if the raw data from the source must be
         further processed to extract the final scroller text.
         """
 
@@ -2591,17 +2586,17 @@ class Source(object):
     """base class for a non-threaded scroller text source."""
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
-        
-        # since we are not running in a thread we only need keep track of the 
+
+        # since we are not running in a thread we only need keep track of the
         # result queue
         self.result_queue = result_queue
 
     def start(self):
         """Our entry point.
-        
-        Unlike most other source class Source does not run in a thread but 
-        rather is a simple non-threaded class that provides a result once and 
-        then does nothing else. The start() method has been defined as the 
+
+        Unlike most other source class Source does not run in a thread but
+        rather is a simple non-threaded class that provides a result once and
+        then does nothing else. The start() method has been defined as the
         entry point so we can be 'started' just like a threading.Thread object.
         """
 
@@ -2615,7 +2610,7 @@ class Source(object):
 
     def get_data(self):
         """Get scroller user specified scroller text string.
-        
+
         This method must be defined for each child class.
         """
 
@@ -2656,7 +2651,7 @@ class WUSource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my base class
-        super(WUSource, self).__init__(control_queue, result_queue, 
+        super(WUSource, self).__init__(control_queue, result_queue,
                                             engine, config_dict)
 
         # set thread name
@@ -2665,7 +2660,7 @@ class WUSource(ThreadedSource):
         # get the WU config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
         wu_config_dict = _rtgd_config_dict.get("WU", dict())
-        
+
         # the WU API 'feature' to be used for the forecast data
         self.feature = 'forecast'
         # interval between API calls
@@ -2938,7 +2933,7 @@ class ZambrettiSource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my base class
-        super(ZambrettiSource, self).__init__(control_queue, result_queue, 
+        super(ZambrettiSource, self).__init__(control_queue, result_queue,
                                             engine, config_dict)
 
         # set thread name
@@ -2954,20 +2949,20 @@ class ZambrettiSource(ThreadedSource):
         # log what we will do
         loginf("rtgd",
                "RealTimeGaugeData scroller text will use Zambretti forecast data")
-    
+
     def setup(self):
-        """Get a Xambretti object.        
-        
+        """Get a Xambretti object.
+
         We need to do this here rather than in __init__() due to SQLite thread
         limitations.
         """
 
-        self.zambretti = Zambretti(self.config_dict, 
+        self.zambretti = Zambretti(self.config_dict,
                                    self.zambretti_config_dict)
-        
+
     def get_response(self):
         """Get the raw Zambretti forecast text."""
-        
+
         _data = self.zambretti.get_data()
         return _data
 
@@ -3002,10 +2997,10 @@ class Zambretti(object):
         self.retry_wait = to_int(zambretti_config_dict.get('retry_wait', 3))
         # initialise container for timestamp of last db query
         self.last_query_ts = None
-        
+
         # flag as to whether the weeWX forecasting extension is installed
         self.forecasting_installed = False
-        
+
         # Get a db manager for the forecast database and import the Zambretti
         # label lookup dict. If an exception is raised then we can assume the
         # forecast extension is not installed.
@@ -3024,8 +3019,8 @@ class Zambretti(object):
             # can do business
             self.forecasting_installed = True
         except Exception, e:
-            # Something went wrong so log the error. Our forecasting_installed 
-            # flag will not have been set so it is safe to continue but there 
+            # Something went wrong so log the error. Our forecasting_installed
+            # flag will not have been set so it is safe to continue but there
             # will be no Zambretti text
             logdbg('rtgd',
                    'Error initialising Zambretti forecast, is the forecast extension installed.')
@@ -3037,7 +3032,7 @@ class Zambretti(object):
     def get_data(self):
         """Get scroller user specified scroller text string.
 
-        If Zambretti is not installed or nothing is found then a short 
+        If Zambretti is not installed or nothing is found then a short
         informative string is returned.
         """
 
@@ -3045,10 +3040,10 @@ class Zambretti(object):
         now = time.time()
         logdbg2("rtgd",
                 "Last Zambretti forecast obtained at %s" % self.last_query_ts)
-        # If we haven't made a db query previously or if its been too long 
+        # If we haven't made a db query previously or if its been too long
         # since the last query then make the query
         if (self.last_query_ts is None) or ((now + 1 - self.interval) >= self.last_query_ts):
-            # if the forecast extension is not installed then return an 
+            # if the forecast extension is not installed then return an
             # appropriate message
             if not self.is_installed:
                 return self.UNAVAILABLE_MESSAGE
@@ -3060,7 +3055,7 @@ class Zambretti(object):
                 try:
                     record = self.dbm.getSql(sql)
                     if record is not None:
-                        # we have a non-None response so save the time of the 
+                        # we have a non-None response so save the time of the
                         # query and return the decoded forecast text
                         self.last_query_ts = now
                         return self.zambretti_label_dict[record[1]]
@@ -3091,14 +3086,14 @@ class Zambretti(object):
 class DarkskySource(ThreadedSource):
     """Thread that obtains Darksky forecast data and places it in a queue.
 
-    The DarkskyThread class queries the Darksky API and places selected 
-    forecast data in JSON format in a queue used by the data consumer. The 
-    Darksky API is called at a user selectable frequency. The thread listens 
+    The DarkskyThread class queries the Darksky API and places selected
+    forecast data in JSON format in a queue used by the data consumer. The
+    Darksky API is called at a user selectable frequency. The thread listens
     for a shutdown signal from its parent.
 
     DarkskyThread constructor parameters:
 
-        control_queue:       A Queue object used by our parent to control 
+        control_queue:       A Queue object used by our parent to control
                              (shutdown) this thread.
         result_queue:        A Queue object used to pass forecast data to the
                              destination
@@ -3164,7 +3159,7 @@ class DarkskySource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my base class:
-        super(DarkskySource, self).__init__(control_queue, result_queue, 
+        super(DarkskySource, self).__init__(control_queue, result_queue,
                                             engine, config_dict)
 
         # set thread name
@@ -3174,7 +3169,7 @@ class DarkskySource(ThreadedSource):
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
         darksky_config_dict = _rtgd_config_dict.get("Darksky", dict())
 
-        # Darksky uses lat, long to 'locate' the forecast. Check if lat and 
+        # Darksky uses lat, long to 'locate' the forecast. Check if lat and
         # long are specified in the darksky_config_dict, if not use station lat
         # and long.
         lat = darksky_config_dict.get("latitude", engine.stn_info.latitude_f)
@@ -3228,7 +3223,7 @@ class DarkskySource(ThreadedSource):
             None.
 
         Returns:
-            The Darksky API response in JSON format or None if no/invalid 
+            The Darksky API response in JSON format or None if no/invalid
             response was obtained.
         """
 
@@ -3244,8 +3239,8 @@ class DarkskySource(ThreadedSource):
                 # Make the call, wrap in a try..except just in case
                 try:
                     _response = self.api.get_data(exclude=self.exclude,
-                                                  extend=self.extend, 
-                                                  language=self.language, 
+                                                  extend=self.extend,
+                                                  language=self.language,
                                                   units=self.units,
                                                   max_tries=self.max_tries)
                     logdbg("rtgd",
@@ -3275,7 +3270,7 @@ class DarkskySource(ThreadedSource):
     def parse_response(self, response):
         """Parse a Darksky forecast response.
 
-        Take a Darksky forecast response, check for (Darksky defined) errors 
+        Take a Darksky forecast response, check for (Darksky defined) errors
         then extract and return the required summary text.
 
         Input:
@@ -3285,7 +3280,7 @@ class DarkskySource(ThreadedSource):
             Summary text or None.
         """
 
-        # There is not too much validation of the data we can do other than 
+        # There is not too much validation of the data we can do other than
         # looking at the 'flags' object
         if 'flags' in response:
             if 'darksky-unavailable' in response['flags']:
@@ -3314,14 +3309,14 @@ class DarkskySource(ThreadedSource):
                 # our default source is available but does it have a summary
                 if 'summary' in response[self.DEFAULT_SOURCE]:
                     # we have a summary field
-                    summary = response[self.DEFAULT_SOURCE]['summary'].encode('ascii', 
+                    summary = response[self.DEFAULT_SOURCE]['summary'].encode('ascii',
                                                                               'ignore')
-                    # log the fact we are using the default instead of our 
+                    # log the fact we are using the default instead of our
                     # config option then return the summary field
                     logdbg("rtgd",
                            "Using default source '%s' for Darksky forecast" % (self.DEFAULT_SOURCE, ))
                     return summary
-                # if we made it here we have our defalt source but it has no 
+                # if we made it here we have our defalt source but it has no
                 # summary field, log it and return None
                 return None
             else:
@@ -3329,17 +3324,17 @@ class DarkskySource(ThreadedSource):
                 # in order, some we will have already tried
                 for _source in self.VALID_SOURCES:
                     if _source in response:
-                        # we have an available source, but does it have a a 
+                        # we have an available source, but does it have a a
                         # summary field
                         if 'summary' in response[_source]:
                             # we have a summary field
-                            summary = response[_source]['summary'].encode('ascii', 
+                            summary = response[_source]['summary'].encode('ascii',
                                                                           'ignore')
                             # log the field we used then return the summary
                             logdbg("rtgd",
                                    "Using default source '%s' for Darksky forecast" % (_source, ))
                             return summary
-                # If we made it here then we have no source and hence no 
+                # If we made it here then we have no source and hence no
                 # available summary. Log it and return None.
                 logdbg("rtgd", "No Darksky forecast summary data available")
                 return None
@@ -3357,17 +3352,17 @@ class DarkskyForecastAPI(object):
 
         darksky_config_dict: Dictionary containing the following keys:
             key:       Darksky secret key to be used
-            latitude:  Latitude of the location concerned 
-            longitude: Longitude of the location concerned 
+            latitude:  Latitude of the location concerned
+            longitude: Longitude of the location concerned
 
     DarkskyForecastAPI methods:
 
-        get_data. Submit a data request to the Darksky API and return the 
+        get_data. Submit a data request to the Darksky API and return the
                   response.
 
-        _build_optional: Build a string containing the optional parameters to 
+        _build_optional: Build a string containing the optional parameters to
                          submitted as part of the API request URL.
-        
+
         _hit_api: Submit the API request and capture the response.
 
         obfuscated_key: Property to return an obfuscated secret key.
@@ -3383,25 +3378,25 @@ class DarkskyForecastAPI(object):
         self.latitude = lat
         self.longitude = long
 
-    def get_data(self, exclude=None, extend=None, language='en', units='auto', 
+    def get_data(self, exclude=None, extend=None, language='en', units='auto',
                  max_tries=3):
         """Make a data request via the API and return the response.
 
         Construct an API call URL, make the call and return the response.
 
         Parameters:
-            exclude:   List of any data blocks to exclude from the API response. 
-                       Refer to the optional parameter 'exclude' at 
-                       https://darksky.net/dev/docs. Setting to None will omit 
+            exclude:   List of any data blocks to exclude from the API response.
+                       Refer to the optional parameter 'exclude' at
+                       https://darksky.net/dev/docs. Setting to None will omit
                        the parameter. None or list of strings, default is None.
-            extend:    Whether to extend the hour by hour data. Refer to the 
+            extend:    Whether to extend the hour by hour data. Refer to the
                        optional parameter 'extend' at https://darksky.net/dev/docs.
-                       Setting to None will omit the parameter. None or 'hourly', 
+                       Setting to None will omit the parameter. None or 'hourly',
                        default is None.
-            language:  The language to be used in any response text. Refer to 
-                       the optional parameter 'language' at 
+            language:  The language to be used in any response text. Refer to
+                       the optional parameter 'language' at
                        https://darksky.net/dev/docs. String, default is 'en'.
-            units:     The units to be used in the response. Refer to the 
+            units:     The units to be used in the response. Refer to the
                        optional parameter 'units' at https://darksky.net/dev/docs.
                        String, default is 'auto'.
             max_tries: The maximum number of attempts to be made to obtain a
@@ -3415,9 +3410,9 @@ class DarkskyForecastAPI(object):
         url = '/'.join([self.BASE_URL,
                         self.key,
                         '%s,%s' % (self.latitude, self.longitude)])
-        
+
         # now build the optional parameters string
-        optional_string = self._build_optional(exclude=exclude, extend=extend, 
+        optional_string = self._build_optional(exclude=exclude, extend=extend,
                                                language=language, units=units)
         # if it has any content then add it to the URL
         if len(optional_string) > 0:
@@ -3438,7 +3433,7 @@ class DarkskyForecastAPI(object):
         json_response = json.loads(_response) if _response is not None else None
         # return the response
         return json_response
-        
+
     @staticmethod
     def _build_optional(exclude=None, extend=None, language='en', units='auto'):
         """Build the optional parameters string."""
@@ -3457,7 +3452,7 @@ class DarkskyForecastAPI(object):
         # units
         if units is not None:
             opt_params_list.append('units=%s' % units)
-        # now if we have any parameters concatenate them separating each with 
+        # now if we have any parameters concatenate them separating each with
         # an ampersand
         opt_params = "&".join(opt_params_list)
         # return the resulting string
@@ -3487,7 +3482,7 @@ class DarkskyForecastAPI(object):
     def obfuscated_key(self):
         """Produce and obfuscated copy of the key."""
 
-        # replace all characters in the key with an asterisk except for the 
+        # replace all characters in the key with an asterisk except for the
         # last 4
         return '*'*(len(self.key) - 4) + self.key[-4:]
 
@@ -3518,7 +3513,7 @@ class FileSource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my base class
-        super(FileSource, self).__init__(control_queue, result_queue, engine, 
+        super(FileSource, self).__init__(control_queue, result_queue, engine,
                                          config_dict)
 
         # set thread name
@@ -3527,7 +3522,7 @@ class FileSource(ThreadedSource):
         # get the File config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
         file_config_dict = _rtgd_config_dict.get("File", dict())
-        
+
         # interval between file reads
         self.interval = to_int(file_config_dict.get('interval', 1800))
         # get source file, check it refers to a file
@@ -3538,16 +3533,16 @@ class FileSource(ThreadedSource):
 
         # initialise the time of last file read
         self.last_read_ts = None
-        
+
         # log what we will do
         if self.scroller_file is not None:
             loginf("rtgd",
                    "RealTimeGaugeData scroller text will use text from file '%s'" % self.scroller_file)
-    
+
     def get_response(self):
         """Get a single line of text from a file.
 
-        Checks to see if it is time to read the file, if so the file is read 
+        Checks to see if it is time to read the file, if so the file is read
         and the stripped raw text returned.
 
         Inputs:
@@ -3581,7 +3576,7 @@ class FileSource(ThreadedSource):
             # we got something so reset our last read timestamp
             if _data is not None:
                 self.last_read_ts = now
-            # and finally return the read data 
+            # and finally return the read data
             return _data
         return None
 
@@ -3595,11 +3590,11 @@ class TextSource(Source):
     """Class to return user specified text string."""
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
-        
+
         # Initialize my base class
-        super(TextSource, self).__init__(control_queue, result_queue, engine, 
+        super(TextSource, self).__init__(control_queue, result_queue, engine,
                                          config_dict)
-        
+
         # since we are not running in a thread we only need keep track of our
         # config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
