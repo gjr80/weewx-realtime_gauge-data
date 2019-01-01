@@ -11,13 +11,13 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.3.5                                        Date: 4 June 2018
+# Version: 0.3.5                                        Date: 1 January 2019
 #
 # Revision History
-#   4 June 2018         v0.3.5
-#       - reworked default install [RealtimeGaugeData] config stanza as per 
+#   1 January 2019      v0.3.5
+#       - reworked default install [RealtimeGaugeData] config stanza as per
 #         changes to rtgd.py
-#       - installation now includes a blank [[Darksky]] config stanza
+#       - installation now includes a blank [[DS]] config stanza
 #   26 April 2018       v0.3.4 (not released)
 #       - bumped version only
 #   26 April 2018       v0.3.3
@@ -94,7 +94,7 @@ class RtgdInstaller(ExtensionInstaller):
                 'RealtimeGaugeData': {
                     'date_format': '%Y.%m.%d %H:%M',
                     'rtgd_path': '/home/weewx/public_html',
-                    'scroller_source': 'text|file|WU|Darksky|Zambretti'
+                    'scroller_source': 'text|file|WU|DS|Zambretti',
                     'StringFormats': {
                         'degree_C': '%.1f',
                         'degree_F': '%.1f',
@@ -124,8 +124,8 @@ class RtgdInstaller(ExtensionInstaller):
                         'group_speed': 'km_per_hour',
                         'group_temperature': 'degree_C'
                     },
-                    'Darksky': {
-                        'api': 'xxxxxxxxxxxxxxxx'
+                    'DS': {
+                        'api_key': 'xxxxxxxxxxxxxxxx'
                     }
                 }
             },
