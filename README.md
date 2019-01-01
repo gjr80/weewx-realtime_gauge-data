@@ -11,10 +11,10 @@ The *Realtime gauge-data* extension requires weeWX v3.4.0 or greater. Use of the
 A number of fields have additional pre-requisites:
 
 -   *CurrentSolarMax*. Requires the [pyephem](http://weewx.com/docs/setup.htm "pyephem installation") module be installed.
--   *forecast*. Requires one of the following:
+-   *forecast*:
 
-    -   the weeWX *forecast* extension be installed, or
-    -   a text file containing the final forecast text be accessible to the weeWX machine.
+    -   If using the Zambretti forecast text then the weeWX *forecasting* extension must be installed.
+    -   If a text file is to be used as the scroller text source then a suitable text file must be available on the weeWX machine.
 
 ## Installation ##
 
@@ -35,7 +35,7 @@ The *Realtime gauge-data* extension can be installed manually or automatically u
 1.  Download the latest *Realtime gauge-data* extension from the *Realtime gauge-data* extension [releases page](https://github.com/gjr80/weewx-realtime_gauge-data/releases) into a directory accessible from the weeWX machine.
 
 
-        wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.3.4/rtgd-0.3.4.tar.gz
+        wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.3.5/rtgd-0.3.4.tar.gz
 
     where $DOWNLOAD_ROOT is the path to the directory where the *Realtime gauge-data* extension is to be downloaded.
 
@@ -73,7 +73,7 @@ This will result in the *gauge-data.txt* file being generated on receipt of each
 
 1.  Download the latest *Realtime gauge-data* extension from the Realtime gauge-data [releases page](https://github.com/gjr80/weewx-realtime_gauge-data/releases) into a directory accessible from the weeWX machine.
 
-        wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.3.4/rtgd-0.3.4.tar.gz
+        wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.3.5/rtgd-0.3.4.tar.gz
 
     where $DOWNLOAD_ROOT is the path to the directory where the *Realtime gauge-data* extension is to be downloaded.
 
