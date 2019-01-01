@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.5                                      Date: 4 June 2018
+# Version: 0.3.5                                      Date: 1 January 2019
 #
 # Revision History
-#   4 June 2018         v0.3.5
+#   1 January 2019      v0.3.5
 #       - added support for Darksky forecast API
+#       - added support for Zambretti forecast text (subject to weeWX
+#         forecasting extension being installed)
 #       - refactored code for obtaining scroller text
 #       - each scroller text block now uses its own 2nd level (ie [[ ]]) config
 #         with the scroller block specified under [RealtimeGaugeData]
@@ -352,7 +354,7 @@ sources are:
         # Specify settings to be used for Darksky forecast block
         [[DS]]
             # Key used to access Darksky API. String. Mandatory.
-            key = xxxxxxxxxxxxxxxx
+            api_key = xxxxxxxxxxxxxxxx
 
             # Latitude to use for forecast. Decimal degrees, negative for 
             # southern hemisphere. Optional. Default is station latitude.
@@ -368,13 +370,13 @@ sources are:
             # https://darksky.net/dev/docs#forecast-request
             block = minutely|hourly|daily
 
-            # Language to use. String. Optional. Default is English. Available 
-            # language codes are listed in the Darksky API documentation at
-            # https://darksky.net/dev/docs#forecast-request
+            # Language to use. String. Optional. Default is en (English).
+            # Available language codes are listed in the Darksky API
+            # documentation at https://darksky.net/dev/docs#forecast-request
             language = en
 
             # Units to use in forecast text. String either auto, us, si, ca or
-            # uk2. Optional. Default is auto. Available units codes are 
+            # uk2. Optional. Default is ca. Available units codes are
             # explained in the Darksky API documentation at
             # https://darksky.net/dev/docs#forecast-request
             units = auto|us|si|ca|uk2
@@ -638,6 +640,8 @@ class RealtimeGaugeData(StdService):
         _source = rtgd_config_dict.get('scroller_source', 'text').lower()
         # permit any variant of 'wu' as shorthand for Weather Underground
         _source = 'weatherunderground' if _source == 'wu' else _source
+        # permit any variant of 'ds' as shorthand for Dark Sky
+        _source = 'darksky' if _source == 'ds' else _source
         # if we made it this far we have all we need to create an object
         source_class = SCROLLER_SOURCES.get(_source)
         if source_class is None:
@@ -2676,7 +2680,7 @@ class WUSource(ThreadedSource):
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
-        # Initialize my base class
+        # initialize my base class
         super(WUSource, self).__init__(control_queue, result_queue, 
                                        engine, config_dict)
 
@@ -3147,7 +3151,7 @@ class DarkskySource(ThreadedSource):
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
-        # Initialize my base class:
+        # initialize my base class:
         super(DarkskySource, self).__init__(control_queue, result_queue, 
                                             engine, config_dict)
 
@@ -3156,9 +3160,9 @@ class DarkskySource(ThreadedSource):
 
         # get the darksky config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
-        darksky_config_dict = _rtgd_config_dict.get("Darksky", dict())
+        darksky_config_dict = _rtgd_config_dict.get("DS", dict())
 
-        # Darksky uses lat, long to 'locate' the forecast. Check if lat and 
+        # Dark Sky uses lat, long to 'locate' the forecast. Check if lat and
         # long are specified in the darksky_config_dict, if not use station lat
         # and long.
         lat = darksky_config_dict.get("latitude", engine.stn_info.latitude_f)
@@ -3322,6 +3326,7 @@ class DarkskyForecastAPI(object):
         obfuscated_key: Property to return an obfuscated secret key.
     """
 
+    # base URL from which to construct an API call URL
     BASE_URL = 'https://api.darksky.net/forecast'
     # blocks we may want to exclude
     BLOCKS = ('currently', 'minutely', 'hourly', 'daily', 'alerts')
@@ -3331,6 +3336,7 @@ class DarkskyForecastAPI(object):
 
         # save the secret key to be used
         self.key = key
+        # save lat and long
         self.latitude = lat
         self.longitude = long
 
@@ -3457,7 +3463,7 @@ class FileSource(ThreadedSource):
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
-        # Initialize my base class
+        # initialize my base class
         super(FileSource, self).__init__(control_queue, result_queue, engine, 
                                          config_dict)
 
