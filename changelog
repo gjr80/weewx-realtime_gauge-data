@@ -1,7 +1,9 @@
 v0.3.5
 *   added support for Darksky forecast API
+*   added support for Zambretti forecast text (subject to weeWX forecasting
+    extension being installed)
 *   refactored code for obtaining scroller text
-*   each scoller text source now uses its own 2nd level (ie [[ ]]) config with 
+*   each scroller text source now uses its own 2nd level (ie [[ ]]) config with
     the scroller source specified under [RealtimeGaugeData]
 v0.3.4 (not released)
 *   added support for optional fields mrfall and yrfall
