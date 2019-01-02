@@ -17,10 +17,17 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.4                                      Date: 26 April 2018
+# Version: 0.3.5                                      Date: 1 January 2019
 #
 # Revision History
-#   26 April 2018       v0.3.4
+#   1 January 2019      v0.3.5
+#       - added support for Darksky forecast API
+#       - added support for Zambretti forecast text (subject to weeWX
+#         forecasting extension being installed)
+#       - refactored code for obtaining scroller text
+#       - each scroller text block now uses its own 2nd level (ie [[ ]]) config
+#         with the scroller block specified under [RealtimeGaugeData]
+#   26 April 2018       v0.3.4 (not released)
 #       - Added support for optional fields mrfall and yrfall that provide 
 #         month and year to date rainfall respectively. Optional fields are 
 #         calculated/added to output if config options mtd_rain and/or ytd_rain 
@@ -34,7 +41,7 @@
 #         check result
 #       - refactored lost contact flag check code, now uses a dedicated method
 #         to determine whether sensor contact has been lost
-#       - changed a syslog entry to indicate 'rtgd' as the source not 'engine'
+#       - changed a syslog entry to indicate 'rtgd' as the block not 'engine'
 #   4 September 2017    v0.3.0
 #       - added ability to include Weather Underground forecast text
 #   8 July 2017         v0.2.14
@@ -168,8 +175,10 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Remote URL to which the gauge-data.txt data will be posted via HTTP POST.
     # Optional, omit to disable HTTP POST.
     remote_server_url = http://remote/address
+
     # timeout in seconds for remote URL posts. Optional, default is 2
     timeout = 1
+
     # Text returned from remote URL indicating success. Optional, default is no
     # response text.
     response_text = success
@@ -199,29 +208,30 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
 
     # The SteelSeries Weather Gauges displays the content of the gauge-data.txt
     # 'forecast' field in the scrolling text display. The RTGD service can
-    # populate the 'forecast' field in a number of ways. The RTGD service works
-    # through the following sources, in order, and the first options that
-    # provides valid data (ie non-None) is used to populate the 'forecast'
-    # field:
+    # populate the 'forecast' field from a number of sources. The available 
+    # sources are:
     #
-    # 1. text at [RealtimeGaugeData] scroller_text option
-    # 2. file specified at [RealtimeGaugeData] scroller_file option
-    # 3. Weather Underground API sourced forecast text for location specified
-    #    at [RealtimeGaugeData] [[WU]]
-    # 4. Zambretti forecast if weeWX Forecast extension is installed
+    # 1. a user specified text
+    # 2. the first line of a text file
+    # 3. Weather Underground forecast from the Weather Underground API
+    # 4. Darksky forecast from the Darksky API
+    # 5. Zambretti forecast from the weeWX forecast extension
     #
-    # If none of the above are set/installed or provide a non-None result the,
-    # forecast field is set to '' (empty string).
-
-    # Text to display on the scroller. Must be enclosed in quotes if spaces
-    # included. Python strftime format codes may be embedded in the string to
-    # display the current time/date. Optional, omit to disable.
-    scroller_text = 'some text'
-
-    # File to use as source for the scroller text. File must be a text file,
-    # first line only of file is read. Only used if scroller_text is blank or
-    # omitted. Optional, omit to disable.
-    scroller_file = /var/tmp/scroller.txt
+    # The block to be used is specified using the scroller_source config 
+    # option. The scroller_source should be set to one of the following strings 
+    # to use the indicated block:
+    # 1. text - to use user specified text
+    # 2. file - to user the first line of a text file
+    # 3. Weather Underground - to use a Weather Underground forecast
+    # 4. Darksky - to use a Darksky forecast
+    # 5. Zambretti - to use a Zambretti forecast
+    # 
+    # The scroller_source config option is case insensitive. A corresponding
+    # second level config section (ie [[ ]]) is required for the block to be 
+    # used. Refer to step 4 below for details. If the scroller_source config 
+    # option is omitted or left blank the 'forecast' filed will be blank and no 
+    # scroller text will be displayed.
+    scroller_source = text|file|WU|DS|Zambretti
 
     # Update windrun value each loop period or just on each archive period.
     # Optional, default is False.
@@ -282,55 +292,132 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
                                        'km_per_hour' or 'meter_per_second'
         group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
 
-    # Specify settings to be used to obtain WU forecast text to display in the
-    # 'forecast' field. Optional.
-    [[WU]]
-        # Enable/disable WU forecast text
-        enable = true
+4.  If the scroller_source config option has been set add a second level config
+stanza for the specified block. Config stanzas for each of the supported 
+sources are:
 
-        # WU API key to be used when calling the WU API
-        api_key = xxxxxxxxxxxxxxxx
+    -   user specified text:
 
-        # Interval (in seconds) between forecast downloads. Default
-        # is 1800.
-        interval = 1800
+        # Specify settings to be used for user specified text block
+        [[Text]]
+            # user specified text to populate the 'forecast' field
+            text = enter text here
 
-        # Minimum period (in seconds) between  API calls. This prevents
-        # conditions where a misbehaving program could call the WU API
-        # repeatedly thus violating the API usage conditions.
-        # Default is 60.
-        api_lockout_period = 60
+    -   first line of text file:
 
-        # Maximum number attempts to obtain an API response. Default is 3.
-        max_WU_tries = 3
+        # Specify settings to be used for first line of text file block
+        [[File]]
+            # Path and file name of file to use as block for the 'forecast' 
+            # field. Must be a text file, first line only of file is read.
+            file = path/to/file/file_name
 
-        # The location for the forecast and current conditions can be one
-        # of the following:
-        #   CA/San_Francisco     - US state/city
-        #   60290                - US zip code
-        #   Australia/Sydney     - Country/City
-        #   37.8,-122.4          - latitude,longitude
-        #   KJFK                 - airport code
-        #   pws:KCASANFR70       - PWS id
-        #   autoip               - AutoIP address location
-        #   autoip.json?geo_ip=38.102.136.138 - specific IP address
-        #                                       location
-        # If no location is specified, station latitude and longitude are
-        # used
-        location = enter location here
+            # Interval (in seconds) between between file reads. Default is 1800.
+            interval = 1800
 
-        # The forecast text can be presented using either US imperial or Metric
-        # units. Optional string 'US' or 'Metric', default is 'Metric'
-        units =
+    -   Weather Underground forecast
+    
+        # Specify settings to be used for Weather Underground forecast block
+        [[WU]]
+            # WU API key to be used when calling the WU API
+            api_key = xxxxxxxxxxxxxxxx
 
-4.  Add the RealtimeGaugeData service to the list of report services under
+            # Interval (in seconds) between forecast downloads. Default
+            # is 1800.
+            interval = 1800
+
+            # Minimum period (in seconds) between  API calls. This prevents
+            # conditions where a misbehaving program could call the WU API
+            # repeatedly thus violating the API usage conditions.
+            # Default is 60.
+            api_lockout_period = 60
+
+            # Maximum number attempts to obtain an API response. Default is 3.
+            max_tries = 3
+
+            # The location for the forecast and current conditions can be one
+            # of the following:
+            #   CA/San_Francisco     - US state/city
+            #   60290                - US zip code
+            #   Australia/Sydney     - Country/City
+            #   37.8,-122.4          - latitude,longitude
+            #   KJFK                 - airport code
+            #   pws:KCASANFR70       - PWS id
+            #   autoip               - AutoIP address location
+            #   autoip.json?geo_ip=38.102.136.138 - specific IP address
+            #                                       location
+            # If no location is specified, station latitude and longitude are
+            # used
+            location = enter location here
+
+    -   Darksky forecast
+
+        # Specify settings to be used for Darksky forecast block
+        [[DS]]
+            # Key used to access Darksky API. String. Mandatory.
+            api_key = xxxxxxxxxxxxxxxx
+
+            # Latitude to use for forecast. Decimal degrees, negative for 
+            # southern hemisphere. Optional. Default is station latitude.
+            latitude = yy.yyyyy
+
+            # Longitude to use for forecast. Decimal degrees, negative for 
+            # western hemisphere. Optional. Default is station longitude.
+            longitude = zz.zzzz
+
+            # Darksky forecast text to use. String either minutely, hourly or 
+            # daily. Optional. Default is hourly. Refer Darksky API 
+            # documentation at 
+            # https://darksky.net/dev/docs#forecast-request
+            block = minutely|hourly|daily
+
+            # Language to use. String. Optional. Default is en (English).
+            # Available language codes are listed in the Darksky API
+            # documentation at https://darksky.net/dev/docs#forecast-request
+            language = en
+
+            # Units to use in forecast text. String either auto, us, si, ca or
+            # uk2. Optional. Default is ca. Available units codes are
+            # explained in the Darksky API documentation at
+            # https://darksky.net/dev/docs#forecast-request
+            units = auto|us|si|ca|uk2
+
+            # Interval (in seconds) between forecast downloads. Optional. 
+            # Default is 1800.
+            interval = 1800
+
+            # Maximum number attempts to obtain an API response. Optional. 
+            # Default is 3.
+            max_tries = 3
+
+    -   Zambretti forecast
+
+        # Specify settings to be used for Zambretti forecast block
+        [[Zambretti]]
+            # Interval (in seconds) between forecast updates. Optional. 
+            # Default is 1800.
+            # Note. In order to use the Zambretti forecast block the weeWX 
+            # forecast extension must be installed and the Zambretti forecast
+            # enabled. RTGD reads the current Zambretti forecast every interval 
+            # seconds. The forecast extension controls how often the Zambretti 
+            # forecast is updated.
+            interval = 1800
+        
+            # Maximum number attempts to obtain the forecast. Optional. Default
+            # is 3.
+            max_tries = 3
+
+            # Time to wait (in seconds) between attempts to read the forecast. 
+            # Optional. Default is 3.
+            retry_wait = 3
+
+5.  Add the RealtimeGaugeData service to the list of report services under
 [Engines] [[WxEngine]] in weewx.conf:
 
 [Engines]
     [[WxEngine]]
         report_services = ..., user.rtgd.RealtimeGaugeData
 
-5.  If you intend to save the realtime generated gauge-data.txt in the same
+6.  If you intend to save the realtime generated gauge-data.txt in the same
 location as the ss skin generated gauge-data.txt then you must disable the
 skin generated gauge-data.txt by commenting out the [[[data]]] entry and all
 subordinate settings under [CheetahGenerator] [[ToDate]] in
@@ -344,21 +431,21 @@ $SKIN_ROOT/ss/skin.conf:
         # [[[data]]]
         #     template = gauge-data.txt.tmpl
 
-6.  Edit $SKIN_ROOT/ss/scripts/gauges.js and change the realTimeURL_weewx
+7.  Edit $SKIN_ROOT/ss/scripts/gauges.js and change the realTimeURL_weewx
 setting (circa line 68) to refer to the location of the realtime generated
 gauge-data.txt. Change the realtimeInterval setting (circa line 37) to reflect
 the update period of the realtime gauge-data.txt in seconds. This setting
 controls the count down timer and update frequency of the SteelSeries Weather
 Gauges.
 
-7.  Delete the file $HTML_ROOT/ss/scripts/gauges.js.
+8.  Delete the file $HTML_ROOT/ss/scripts/gauges.js.
 
-8.  Stop/start weeWX
+9.  Stop/start weeWX
 
-9.  Confirm that gauge-data.txt is being generated regularly as per the period
+10.  Confirm that gauge-data.txt is being generated regularly as per the period
 and nth_loop settings under [RealtimeGaugeData] in weewx.conf.
 
-10.  Confirm the SteelSeries Weather Gauges are being updated each time
+11.  Confirm the SteelSeries Weather Gauges are being updated each time
 gauge-data.txt is generated.
 
 To do:
@@ -404,7 +491,6 @@ import time
 import urllib2
 
 # weeWX imports
-import weedb
 import weewx
 import weeutil.weeutil
 import weewx.units
@@ -414,7 +500,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
 # version number of this script
-RTGD_VERSION = '0.3.4'
+RTGD_VERSION = '0.3.5'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -463,30 +549,30 @@ def logmsg(level, msg):
     syslog.syslog(level, msg)
 
 
-def logcrit(id, msg):
-    logmsg(syslog.LOG_CRIT, '%s: %s' % (id, msg))
+def logcrit(sid, msg):
+    logmsg(syslog.LOG_CRIT, '%s: %s' % (sid, msg))
 
 
-def logdbg(id, msg):
-    logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+def logdbg(sid, msg):
+    logmsg(syslog.LOG_DEBUG, '%s: %s' % (sid, msg))
 
 
-def logdbg2(id, msg):
+def logdbg2(sid, msg):
     if weewx.debug >= 2:
-        logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+        logmsg(syslog.LOG_DEBUG, '%s: %s' % (sid, msg))
 
 
-def logdbg3(id, msg):
+def logdbg3(sid, msg):
     if weewx.debug >= 3:
-        logmsg(syslog.LOG_DEBUG, '%s: %s' % (id, msg))
+        logmsg(syslog.LOG_DEBUG, '%s: %s' % (sid, msg))
 
 
-def loginf(id, msg):
-    logmsg(syslog.LOG_INFO, '%s: %s' % (id, msg))
+def loginf(sid, msg):
+    logmsg(syslog.LOG_INFO, '%s: %s' % (sid, msg))
 
 
-def logerr(id, msg):
-    logmsg(syslog.LOG_ERR, '%s: %s' % (id, msg))
+def logerr(sid, msg):
+    logmsg(syslog.LOG_ERR, '%s: %s' % (sid, msg))
 
 
 # ============================================================================
@@ -495,7 +581,7 @@ def logerr(id, msg):
 
 
 class MissingApiKey(IOError):
-    """Raised when a WU API key cannot be found"""
+    """Raised when an API key cannot be found for an external service"""
 
 
 # ============================================================================
@@ -523,23 +609,10 @@ class RealtimeGaugeData(StdService):
                                                                   'wx_binding')
         self.db_manager = weewx.manager.open_manager(manager_dict)
 
-        #
-        wu_config_dict = rtgd_config_dict.get('WU', None)
-        if wu_config_dict is not None and to_bool(wu_config_dict.get('enable', False)):
-            self.wu_ctl_queue = Queue.Queue()
-            self.result_queue = Queue.Queue()
-            self.wu_thread = WUThread(self.wu_ctl_queue,
-                                      self.result_queue,
-                                      config_dict,
-                                      wu_config_dict,
-                                      lat=engine.stn_info.latitude_f,
-                                      long=engine.stn_info.longitude_f,
-                                      )
-            self.wu_thread.start()
-        else:
-            self.wu_thread = None
-            self.result_queue = None
-
+        # get a source object that will provide the scroller text
+        self.source = self.source_factory(config_dict, rtgd_config_dict, engine)
+        # 'start' our block object
+        self.source.start()
         # get an instance of class RealtimeGaugeDataThread and start the
         # thread running
         self.rtgd_thread = RealtimeGaugeDataThread(self.rtgd_ctl_queue,
@@ -556,10 +629,39 @@ class RealtimeGaugeData(StdService):
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
         
-        # bind ourself to the relevant weeWX events
+        # bind our self to the relevant weeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
         self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
+
+        self.source_ctl_queue = None
+        self.result_queue = None
+
+    def source_factory(self, config_dict, rtgd_config_dict, engine):
+        """Factory to produce a block object."""
+
+        _source = rtgd_config_dict.get('scroller_source', 'text').lower()
+        # permit any variant of 'wu' as shorthand for Weather Underground
+        _source = 'weatherunderground' if _source == 'wu' else _source
+        # permit any variant of 'ds' as shorthand for Dark Sky
+        _source = 'darksky' if _source == 'ds' else _source
+        # if we made it this far we have all we need to create an object
+        source_class = SCROLLER_SOURCES.get(_source)
+        if source_class is None:
+            # We have an invalid block specified. Log this and use the default
+            # class Source which will provide a zero length string for the 
+            # scroller text.
+            loginf("rtgd", "Unknown block specified for scroller_text")
+            source_class = Source
+        # create queues for passing data and controlling our block object
+        self.source_ctl_queue = Queue.Queue()
+        self.result_queue = Queue.Queue()
+        # get the block object
+        source_object = source_class(self.source_ctl_queue,
+                                     self.result_queue,
+                                     engine,
+                                     config_dict)
+        return source_object
 
     def new_loop_packet(self, event):
         """Puts new loop packets in the rtgd queue."""
@@ -659,11 +761,11 @@ class RealtimeGaugeData(StdService):
                 # Put a None in the rtgd_ctl_queue to signal the thread to
                 # shutdown
                 self.rtgd_ctl_queue.put(None)
-        if hasattr(self, 'wu_ctl_queue') and hasattr(self, 'wu_thread'):
-            if self.wu_ctl_queue and self.wu_thread.isAlive():
-                # Put a None in the wu_ctl_queue to signal the thread to
+        if hasattr(self, 'source_ctl_queue') and hasattr(self, 'source_thread'):
+            if self.source_ctl_queue and self.source_thread.isAlive():
+                # Put a None in the source_ctl_queue to signal the thread to
                 # shutdown
-                self.wu_ctl_queue.put(None)
+                self.source_ctl_queue.put(None)
         if hasattr(self, 'rtgd_thread') and self.rtgd_thread.isAlive():
             # Wait up to 15 seconds for the thread to exit:
             self.rtgd_thread.join(15.0)
@@ -672,14 +774,14 @@ class RealtimeGaugeData(StdService):
                        "Unable to shut down %s thread" % self.rtgd_thread.name)
             else:
                 logdbg("rtgd", "Shut down %s thread." % self.rtgd_thread.name)
-        if hasattr(self, 'wu_thread') and self.wu_thread.isAlive():
+        if hasattr(self, 'source_thread') and self.source_thread.isAlive():
             # Wait up to 15 seconds for the thread to exit:
-            self.wu_thread.join(15.0)
-            if self.wu_thread.isAlive():
+            self.source_thread.join(15.0)
+            if self.source_thread.isAlive():
                 logerr("rtgd",
-                       "Unable to shut down %s thread" % self.wu_thread.name)
+                       "Unable to shut down %s thread" % self.source_thread.name)
             else:
-                logdbg("rtgd", "Shut down %s thread." % self.wu_thread.name)
+                logdbg("rtgd", "Shut down %s thread." % self.source_thread.name)
 
     def get_minmax_obs(self, obs_type):
         """Obtain the alltime max/min values for an observation."""
@@ -701,12 +803,12 @@ class RealtimeGaugeData(StdService):
     def get_rain(self, tspan):
         """Calculate rainfall over a given timespan."""
 
+        _result = {}
         _rain_vt = self.db_manager.getAggregate(tspan, 'rain', 'sum')
         if _rain_vt:
             return _rain_vt
         else:
             return None
-
 
 # ============================================================================
 #                       class RealtimeGaugeDataThread
@@ -754,15 +856,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.timeout = to_int(rtgd_config_dict.get('timeout', 2))
         # response text from remote URL if post was successful
         self.response = rtgd_config_dict.get('response_text', None)
-
-        # get scroller text if there is any
-        self.scroller_text = rtgd_config_dict.get('scroller_text', None)
-        if self.scroller_text is not None and self.scroller_text.strip() == '':
-            self.scroller_text = None
-        # get scroller file if specified, check it refers to a file
-        self.scroller_file = rtgd_config_dict.get('scroller_file', None)
-        if self.scroller_file is not None and not os.path.isfile(self.scroller_file):
-            self.scroller_file = None
 
         # get windrose settings
         try:
@@ -886,8 +979,8 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # Lost contact
         # do we ignore the lost contact 'calculation'
-        self.ignore_lcontact = to_bool(rtgd_config_dict.get('ignore_lost_contact',
-                                                            False))
+        self.ignore_lost_contact = to_bool(rtgd_config_dict.get('ignore_lost_contact',
+                                                                False))
         # set the lost contact flag, assume we start off with contact
         self.lost_contact_flag = False
 
@@ -897,8 +990,31 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.min_barometer = None
         self.max_barometer = None
 
-        # initialise forecast text
-        self.forecast_text = None
+        self.db_manager = None
+        self.apptemp_manager = None
+        self.day_stats = None
+        self.apptemp_day_stats = None
+
+        self.packet_cache = None
+
+        # initialise packet obs types and unit groups
+        self.p_temp_type = None
+        self.p_temp_group = None
+        self.p_wind_type = None
+        self.p_wind_group = None
+        self.p_baro_type = None
+        self.p_baro_group = None
+        self.p_rain_type = None
+        self.p_rain_group = None
+        self.p_rainr_type = None
+        self.p_rainr_group = None
+        self.p_alt_type = None
+        self.p_alt_group = None
+
+        self.rose = None
+
+        # initialise the scroller text
+        self.scroller_text = None
 
         # get some station info
         self.latitude = latitude
@@ -932,7 +1048,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is %s seconds" % self.min_interval
         loginf("rtgd", _msg)
         # lost contact
-        if self.ignore_lcontact:
+        if self.ignore_lost_contact:
             loginf("rtgd", "RealTimeGaugeData will ignore sensor contact state")
 
     def run(self):
@@ -952,13 +1068,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get a db manager for appTemp
         self.apptemp_manager = weewx.manager.open_manager_with_config(self.config_dict,
                                                                       self.apptemp_binding)
-        # get a Zambretti forecast objects
-        self.forecast = ZambrettiForecast(self.config_dict)
-        logdbg("rtgdthread",
-               "Zambretti is installed: %s" % self.forecast.is_installed())
         # initialise our day stats
         self.day_stats = self.db_manager._get_day_summary(time.time())
-        # initialise our day stats from our appTemp source
+        # initialise our day stats from our appTemp block
         self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
         # get a windrose to start with since it is only on receipt of an
         # archive record
@@ -1012,7 +1124,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 # we have forecast text so log and save it
                                 logdbg2("rtgdthread",
                                         "received forecast text: %s" % _package['payload'])
-                                self.forecast_text = _package['payload']
+                                self.scroller_text = _package['payload']
                 # now deal with the control queue
                 try:
                     # block for one second waiting for package, if nothing
@@ -1098,7 +1210,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.packet_cache.update(packet, packet['dateTime'])
         # do those things that must be done with every loop packet
         # ie update our lows and highs and our 5 and 10 min wind lists
-        self.buffer.setLowsAndHighs(packet)
+        self.buffer.set_lows_and_highs(packet)
         # generate if we have no minimum interval setting or if minimum
         # interval seconds have elapsed since our last generation
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
@@ -1236,38 +1348,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         # and copy the temporary file to our destination
         os.rename(self.rtgd_path_file_tmp, self.rtgd_path_file)
 
-    def get_scroller_text(self):
-        """Obtain the text string to be used in the scroller.
-
-        Scroller text may come from any one of four sources, each is checked in
-        the following order and the first non-zero length string result found
-        is used:
-        - string in weewx.conf [RealtimeGaugeData]
-        - string in a text file
-        - WU API forecast text
-        - Zambretti forecast
-
-        If nothing is found then a zero length string is returned.
-        """
-
-        # first look for a string in weewx.conf
-        if self.scroller_text is not None:
-            _scroller = self.scroller_text
-        # if nothing then look for a file
-        elif self.scroller_file is not None:
-            with open(self.scroller_file, 'r') as f:
-                _scroller = f.readline().strip()
-        # if nothing look for a WU forecast
-        elif self.forecast_text is not None:
-            _scroller = self.forecast_text
-        # if nothing look for a Zambretti forecast
-        elif self.forecast.is_installed():
-            _scroller = self.forecast.get_zambretti_text()
-        # finally there is nothing so return a 0 length string
-        else:
-            _scroller = ''
-        return _scroller
-
     def calculate(self, packet):
         """Construct a data dict for gauge-data.txt.
 
@@ -1294,13 +1374,13 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                           'rainRate')
             (self.p_alt_type, self.p_alt_group) = getStandardUnitType(self.packet_units,
                                                                       'altitude')
-        data = {}
+        data = dict()
         # timeUTC - UTC date/time in format YYYY,mm,dd,HH,MM,SS
         data['timeUTC'] = datetime.datetime.utcfromtimestamp(ts).strftime("%Y,%m,%d,%H,%M,%S")
         # date - date in (default) format Y.m.d HH:MM
         data['date'] = time.strftime(self.date_format, time.localtime(ts))
         # dateFormat - date format
-        data['dateFormat'] = self.date_format.replace('%','')
+        data['dateFormat'] = self.date_format.replace('%', '')
         # SensorContactLost - 1 if the station has lost contact with its remote
         # sensors "Fine Offset only" 0 if contact has been established
         data['SensorContactLost'] = self.flag_format % self.lost_contact_flag
@@ -1323,35 +1403,37 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                      self.temp_group).value
         data['temp'] = self.temp_format % temp
         # tempTL - today's low temperature
-        tempTL_vt = ValueTuple(self.day_stats['outTemp'].min,
-                               self.p_temp_type,
-                               self.p_temp_group)
-        tempTL = convert(tempTL_vt, self.temp_group).value
-        tempTL_loop_vt = ValueTuple(self.buffer.tempL_loop[0],
-                                    self.p_temp_type,
-                                    self.p_temp_group)
-        tempL_loop = convert(tempTL_loop_vt, self.temp_group).value
-        tempTL = weeutil.weeutil.min_with_none([tempL_loop, tempTL])
-        tempTL = tempTL if tempTL is not None else temp
-        data['tempTL'] = self.temp_format % tempTL
+        temp_tl_vt = ValueTuple(self.day_stats['outTemp'].min,
+                                self.p_temp_type,
+                                self.p_temp_group)
+        temp_tl = convert(temp_tl_vt, self.temp_group).value
+        temp_tl_loop_vt = ValueTuple(self.buffer.tempL_loop[0],
+                                     self.p_temp_type,
+                                     self.p_temp_group)
+        temp_l_loop = convert(temp_tl_loop_vt, self.temp_group).value
+        temp_tl = weeutil.weeutil.min_with_none([temp_l_loop, temp_tl])
+        temp_tl = temp_tl if temp_tl is not None else temp
+        data['tempTL'] = self.temp_format % temp_tl
         # tempTH - today's high temperature
-        tempTH_vt = ValueTuple(self.day_stats['outTemp'].max,
-                               self.p_temp_type,
-                               self.p_temp_group)
-        tempTH = convert(tempTH_vt, self.temp_group).value
-        tempTH_loop_vt = ValueTuple(self.buffer.tempH_loop[0],
-                                    self.p_temp_type,
-                                    self.p_temp_group)
-        tempH_loop = convert(tempTH_loop_vt, self.temp_group).value
-        tempTH = max(tempH_loop, tempTH)
-        tempTH = tempTH if tempTH is not None else temp
-        data['tempTH'] = self.temp_format % tempTH
+        temp_th_vt = ValueTuple(self.day_stats['outTemp'].max,
+                                self.p_temp_type,
+                                self.p_temp_group)
+        temp_th = convert(temp_th_vt, self.temp_group).value
+        temp_th_loop_vt = ValueTuple(self.buffer.tempH_loop[0],
+                                     self.p_temp_type,
+                                     self.p_temp_group)
+        temp_h_loop = convert(temp_th_loop_vt, self.temp_group).value
+        temp_th = max(temp_h_loop, temp_th)
+        temp_th = temp_th if temp_th is not None else temp
+        data['tempTH'] = self.temp_format % temp_th
         # TtempTL - time of today's low temp (hh:mm)
-        TtempTL = time.localtime(self.day_stats['outTemp'].mintime) if tempL_loop >= tempTL else time.localtime(self.buffer.tempL_loop[1])
-        data['TtempTL'] = time.strftime(self.time_format, TtempTL)
+        ttemp_tl = time.localtime(self.day_stats['outTemp'].mintime) if temp_l_loop >= temp_tl else \
+            time.localtime(self.buffer.tempL_loop[1])
+        data['TtempTL'] = time.strftime(self.time_format, ttemp_tl)
         # TtempTH - time of today's high temp (hh:mm)
-        TtempTH = time.localtime(self.day_stats['outTemp'].maxtime) if tempH_loop <= tempTH else time.localtime(self.buffer.tempH_loop[1])
-        data['TtempTH'] = time.strftime(self.time_format, TtempTH)
+        ttemp_th = time.localtime(self.day_stats['outTemp'].maxtime) if temp_h_loop <= temp_th else \
+            time.localtime(self.buffer.tempH_loop[1])
+        data['TtempTH'] = time.strftime(self.time_format, ttemp_th)
         # temptrend - temperature trend value
         _temp_trend_val = calc_trend('outTemp', temp_vt, self.temp_group,
                                      self.db_manager, ts - 3600, 300)
@@ -1368,20 +1450,22 @@ class RealtimeGaugeDataThread(threading.Thread):
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
         # humTL - today's low relative humidity
-        humTL = weeutil.weeutil.min_with_none([self.buffer.humL_loop[0],
+        hum_tl = weeutil.weeutil.min_with_none([self.buffer.humL_loop[0],
                                                self.day_stats['outHumidity'].min])
-        humTL = humTL if humTL is not None else hum
-        data['humTL'] = self.hum_format % humTL
+        hum_tl = hum_tl if hum_tl is not None else hum
+        data['humTL'] = self.hum_format % hum_tl
         # humTH - today's high relative humidity
-        humTH = max(self.buffer.humH_loop[0], self.day_stats['outHumidity'].max, 0.0)
-        humTH = humTH if humTH is not None else hum
-        data['humTH'] = self.hum_format % humTH
+        hum_th = max(self.buffer.humH_loop[0], self.day_stats['outHumidity'].max, 0.0)
+        hum_th = hum_th if hum_th is not None else hum
+        data['humTH'] = self.hum_format % hum_th
         # ThumTL - time of today's low relative humidity (hh:mm)
-        ThumTL = time.localtime(self.day_stats['outHumidity'].mintime) if self.buffer.humL_loop[0] >= humTL else time.localtime(self.buffer.humL_loop[1])
-        data['ThumTL'] = time.strftime(self.time_format, ThumTL)
+        thum_tl = time.localtime(self.day_stats['outHumidity'].mintime) if self.buffer.humL_loop[0] >= hum_tl else \
+            time.localtime(self.buffer.humL_loop[1])
+        data['ThumTL'] = time.strftime(self.time_format, thum_tl)
         # ThumTH - time of today's high relative humidity (hh:mm)
-        ThumTH = time.localtime(self.day_stats['outHumidity'].maxtime) if self.buffer.humH_loop[0] <= humTH else time.localtime(self.buffer.humH_loop[1])
-        data['ThumTH'] = time.strftime(self.time_format, ThumTH)
+        thum_th = time.localtime(self.day_stats['outHumidity'].maxtime) if self.buffer.humH_loop[0] <= hum_th else \
+            time.localtime(self.buffer.humH_loop[1])
+        data['ThumTH'] = time.strftime(self.time_format, thum_th)
         # inhum - inside humidity
         if 'inHumidity' not in packet_d:
             data['inhum'] = self.hum_format % 0.0
@@ -1397,35 +1481,37 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                   self.temp_group).value
         data['dew'] = self.temp_format % dew
         # dewpointTL - today's low dew point
-        dewpointTL_vt = ValueTuple(self.day_stats['dewpoint'].min,
-                                   self.p_temp_type,
-                                   self.p_temp_group)
-        dewpointTL = convert(dewpointTL_vt, self.temp_group).value
-        dewpointTL_loop_vt = ValueTuple(self.buffer.dewpointL_loop[0],
-                                        self.p_temp_type,
-                                        self.p_temp_group)
-        dewpointL_loop = convert(dewpointTL_loop_vt, self.temp_group).value
-        dewpointTL = weeutil.weeutil.min_with_none([dewpointL_loop, dewpointTL])
-        dewpointTL = dewpointTL if dewpointTL is not None else dew
-        data['dewpointTL'] = self.temp_format % dewpointTL
+        dewpoint_tl_vt = ValueTuple(self.day_stats['dewpoint'].min,
+                                    self.p_temp_type,
+                                    self.p_temp_group)
+        dewpoint_tl = convert(dewpoint_tl_vt, self.temp_group).value
+        dewpoint_tl_loop_vt = ValueTuple(self.buffer.dewpointL_loop[0],
+                                         self.p_temp_type,
+                                         self.p_temp_group)
+        dewpoint_l_loop = convert(dewpoint_tl_loop_vt, self.temp_group).value
+        dewpoint_tl = weeutil.weeutil.min_with_none([dewpoint_l_loop, dewpoint_tl])
+        dewpoint_tl = dewpoint_tl if dewpoint_tl is not None else dew
+        data['dewpointTL'] = self.temp_format % dewpoint_tl
         # dewpointTH - today's high dew point
-        dewpointTH_vt = ValueTuple(self.day_stats['dewpoint'].max,
-                                   self.p_temp_type,
-                                   self.p_temp_group)
-        dewpointTH = convert(dewpointTH_vt, self.temp_group).value
-        dewpointTH_loop_vt = ValueTuple(self.buffer.dewpointH_loop[0],
-                                        self.p_temp_type,
-                                        self.p_temp_group)
-        dewpointH_loop = convert(dewpointTH_loop_vt, self.temp_group).value
-        dewpointTH = max(dewpointH_loop, dewpointTH)
-        dewpointTH = dewpointTH if dewpointTH is not None else dew
-        data['dewpointTH'] = self.temp_format % dewpointTH
+        dewpoint_th_vt = ValueTuple(self.day_stats['dewpoint'].max,
+                                    self.p_temp_type,
+                                    self.p_temp_group)
+        dewpoint_th = convert(dewpoint_th_vt, self.temp_group).value
+        dewpoint_th_loop_vt = ValueTuple(self.buffer.dewpointH_loop[0],
+                                         self.p_temp_type,
+                                         self.p_temp_group)
+        dewpoint_h_loop = convert(dewpoint_th_loop_vt, self.temp_group).value
+        dewpoint_th = max(dewpoint_h_loop, dewpoint_th)
+        dewpoint_th = dewpoint_th if dewpoint_th is not None else dew
+        data['dewpointTH'] = self.temp_format % dewpoint_th
         # TdewpointTL - time of today's low dew point (hh:mm)
-        TdewpointTL = time.localtime(self.day_stats['dewpoint'].mintime) if dewpointL_loop >= dewpointTL else time.localtime(self.buffer.dewpointL_loop[1])
-        data['TdewpointTL'] = time.strftime(self.time_format, TdewpointTL)
+        tdewpoint_tl = time.localtime(self.day_stats['dewpoint'].mintime) if dewpoint_l_loop >= dewpoint_tl else \
+            time.localtime(self.buffer.dewpointL_loop[1])
+        data['TdewpointTL'] = time.strftime(self.time_format, tdewpoint_tl)
         # TdewpointTH - time of today's high dew point (hh:mm)
-        TdewpointTH = time.localtime(self.day_stats['dewpoint'].maxtime) if dewpointH_loop <= dewpointTH else time.localtime(self.buffer.dewpointH_loop[1])
-        data['TdewpointTH'] = time.strftime(self.time_format, TdewpointTH)
+        tdewpoint_th = time.localtime(self.day_stats['dewpoint'].maxtime) if dewpoint_h_loop <= dewpoint_th else \
+            time.localtime(self.buffer.dewpointH_loop[1])
+        data['TdewpointTH'] = time.strftime(self.time_format, tdewpoint_th)
         # wchill - wind chill
         wchill_vt = ValueTuple(packet_d['windchill'],
                                self.p_temp_type,
@@ -1435,20 +1521,21 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                            self.temp_group).value
         data['wchill'] = self.temp_format % wchill
         # wchillTL - today's low wind chill
-        wchillTL_vt = ValueTuple(self.day_stats['windchill'].min,
-                                 self.p_temp_type,
-                                 self.p_temp_group)
-        wchillTL = convert(wchillTL_vt, self.temp_group).value
-        wchillTL_loop_vt = ValueTuple(self.buffer.wchillL_loop[0],
-                                      self.p_temp_type,
-                                      self.p_temp_group)
-        wchillL_loop = convert(wchillTL_loop_vt, self.temp_group).value
-        wchillTL = weeutil.weeutil.min_with_none([wchillL_loop, wchillTL])
-        wchillTL = wchillTL if wchillTL is not None else wchill
-        data['wchillTL'] = self.temp_format % wchillTL
+        wchill_tl_vt = ValueTuple(self.day_stats['windchill'].min,
+                                  self.p_temp_type,
+                                  self.p_temp_group)
+        wchill_tl = convert(wchill_tl_vt, self.temp_group).value
+        wchill_tl_loop_vt = ValueTuple(self.buffer.wchillL_loop[0],
+                                       self.p_temp_type,
+                                       self.p_temp_group)
+        wchill_l_loop = convert(wchill_tl_loop_vt, self.temp_group).value
+        wchill_tl = weeutil.weeutil.min_with_none([wchill_l_loop, wchill_tl])
+        wchill_tl = wchill_tl if wchill_tl is not None else wchill
+        data['wchillTL'] = self.temp_format % wchill_tl
         # TwchillTL - time of today's low wind chill (hh:mm)
-        TwchillTL = time.localtime(self.day_stats['windchill'].mintime) if wchillL_loop >= wchillTL else time.localtime(self.buffer.wchillL_loop[1])
-        data['TwchillTL'] = time.strftime(self.time_format, TwchillTL)
+        twchill_tl = time.localtime(self.day_stats['windchill'].mintime) if wchill_l_loop >= wchill_tl else \
+            time.localtime(self.buffer.wchillL_loop[1])
+        data['TwchillTL'] = time.strftime(self.time_format, twchill_tl)
         # heatindex - heat index
         heatindex_vt = ValueTuple(packet_d['heatindex'],
                                   self.p_temp_type,
@@ -1458,20 +1545,21 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                     self.temp_group).value
         data['heatindex'] = self.temp_format % heatindex
         # heatindexTH - today's high heat index
-        heatindexTH_vt = ValueTuple(self.day_stats['heatindex'].max,
-                                    self.p_temp_type,
-                                    self.p_temp_group)
-        heatindexTH = convert(heatindexTH_vt, self.temp_group).value
-        heatindexTH_loop_vt = ValueTuple(self.buffer.heatindexH_loop[0],
-                                         self.p_temp_type,
-                                         self.p_temp_group)
-        heatindexH_loop = convert(heatindexTH_loop_vt, self.temp_group).value
-        heatindexTH = max(heatindexH_loop, heatindexTH)
-        heatindexTH = heatindexTH if heatindexTH is not None else heatindex
-        data['heatindexTH'] = self.temp_format % heatindexTH
+        heatindex_th_vt = ValueTuple(self.day_stats['heatindex'].max,
+                                     self.p_temp_type,
+                                     self.p_temp_group)
+        heatindex_th = convert(heatindex_th_vt, self.temp_group).value
+        heatindex_th_loop_vt = ValueTuple(self.buffer.heatindexH_loop[0],
+                                          self.p_temp_type,
+                                          self.p_temp_group)
+        heatindex_h_loop = convert(heatindex_th_loop_vt, self.temp_group).value
+        heatindex_th = max(heatindex_h_loop, heatindex_th)
+        heatindex_th = heatindex_th if heatindex_th is not None else heatindex
+        data['heatindexTH'] = self.temp_format % heatindex_th
         # TheatindexTH - time of today's high heat index (hh:mm)
-        TheatindexTH = time.localtime(self.day_stats['heatindex'].maxtime) if heatindexH_loop >= heatindexTH else time.localtime(self.buffer.heatindexH_loop[1])
-        data['TheatindexTH'] = time.strftime(self.time_format, TheatindexTH)
+        theatindex_th = time.localtime(self.day_stats['heatindex'].maxtime) if heatindex_h_loop >= heatindex_th else \
+            time.localtime(self.buffer.heatindexH_loop[1])
+        data['TheatindexTH'] = time.strftime(self.time_format, theatindex_th)
         # apptemp - apparent temperature
         if 'appTemp' in packet_d:
             # appTemp has been calculated for us so use it
@@ -1481,16 +1569,16 @@ class RealtimeGaugeDataThread(threading.Thread):
         else:
             # apptemp not available so calculate it
             # first get the arguments for the calculation
-            temp_C = convert(temp_vt, 'degree_C').value
+            temp_c = convert(temp_vt, 'degree_C').value
             windspeed_vt = ValueTuple(packet_d['windSpeed'],
                                       self.p_wind_type,
                                       self.p_wind_group)
             windspeed_ms = convert(windspeed_vt, 'meter_per_second').value
             # now calculate it
-            apptemp_C = weewx.wxformulas.apptempC(temp_C,
+            apptemp_c = weewx.wxformulas.apptempC(temp_c,
                                                   packet_d['outHumidity'],
                                                   windspeed_ms)
-            apptemp_vt = ValueTuple(apptemp_C, 'degree_C', 'group_temperature')
+            apptemp_vt = ValueTuple(apptemp_c, 'degree_C', 'group_temperature')
         apptemp = convert(apptemp_vt, self.temp_group).value
         apptemp = apptemp if apptemp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                               self.temp_group).value
@@ -1501,44 +1589,48 @@ class RealtimeGaugeDataThread(threading.Thread):
         # TapptempTH - time of today's high apparent temperature (hh:mm)
         if 'appTemp' in self.apptemp_day_stats:
             # we have day stats for appTemp
-            apptempTL_vt = ValueTuple(self.apptemp_day_stats['appTemp'].min,
-                                      self.p_temp_type,
-                                      self.p_temp_group)
-            apptempTL = convert(apptempTL_vt, self.temp_group).value
-            apptempTL_loop_vt = ValueTuple(self.buffer.apptempL_loop[0],
-                                           self.p_temp_type,
-                                           self.p_temp_group)
-            apptempL_loop = convert(apptempTL_loop_vt, self.temp_group).value
-            apptempTL = weeutil.weeutil.min_with_none([apptempL_loop, apptempTL])
-            apptempTH_vt = ValueTuple(self.apptemp_day_stats['appTemp'].max,
-                                      self.p_temp_type,
-                                      self.p_temp_group)
-            apptempTH = convert(apptempTH_vt, self.temp_group).value
-            apptempTH_loop_vt = ValueTuple(self.buffer.apptempH_loop[0],
-                                           self.p_temp_type,
-                                           self.p_temp_group)
-            apptempH_loop = convert(apptempTH_loop_vt, self.temp_group).value
-            apptempTH = max(apptempH_loop, apptempTH)
-            TapptempTL = time.localtime(self.apptemp_day_stats['appTemp'].mintime) if apptempL_loop >= apptempTL else time.localtime(self.buffer.apptempL_loop[1])
-            TapptempTH = time.localtime(self.apptemp_day_stats['appTemp'].maxtime) if apptempH_loop <= apptempTH else time.localtime(self.buffer.apptempH_loop[1])
+            apptemp_tl_vt = ValueTuple(self.apptemp_day_stats['appTemp'].min,
+                                       self.p_temp_type,
+                                       self.p_temp_group)
+            apptemp_tl = convert(apptemp_tl_vt, self.temp_group).value
+            apptemp_tl_loop_vt = ValueTuple(self.buffer.apptempL_loop[0],
+                                            self.p_temp_type,
+                                            self.p_temp_group)
+            apptemp_l_loop = convert(apptemp_tl_loop_vt, self.temp_group).value
+            apptemp_tl = weeutil.weeutil.min_with_none([apptemp_l_loop, apptemp_tl])
+            apptemp_th_vt = ValueTuple(self.apptemp_day_stats['appTemp'].max,
+                                       self.p_temp_type,
+                                       self.p_temp_group)
+            apptemp_th = convert(apptemp_th_vt, self.temp_group).value
+            apptemp_th_loop_vt = ValueTuple(self.buffer.apptempH_loop[0],
+                                            self.p_temp_type,
+                                            self.p_temp_group)
+            apptemp_h_loop = convert(apptemp_th_loop_vt, self.temp_group).value
+            apptemp_th = max(apptemp_h_loop, apptemp_th)
+            tapptemp_tl = time.localtime(self.apptemp_day_stats['appTemp'].mintime) if \
+                apptemp_l_loop >= apptemp_tl else \
+                time.localtime(self.buffer.apptempL_loop[1])
+            tapptemp_th = time.localtime(self.apptemp_day_stats['appTemp'].maxtime) if \
+                apptemp_h_loop <= apptemp_th else \
+                time.localtime(self.buffer.apptempH_loop[1])
         else:
             # There are no appTemp day stats. Normally we would return None but
             # the SteelSeries Gauges do not like None/null. Return the current
             # appTemp value so as to not upset the gauge auto scaling. The day
             # apptemp range wedge will not show, and the mouse-over low/highs
             # will be wrong but it is the best we can do.
-            apptempTL = apptemp
-            apptempTH = apptemp
-            TapptempTL = datetime.date.today().timetuple()
-            TapptempTH = datetime.date.today().timetuple()
-        apptempTL = apptempTL if apptempTL is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                                    self.temp_group).value
-        data['apptempTL'] = self.temp_format % apptempTL
-        apptempTH = apptempTH if apptempTH is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                                    self.temp_group).value
-        data['apptempTH'] = self.temp_format % apptempTH
-        data['TapptempTL'] = time.strftime(self.time_format, TapptempTL)
-        data['TapptempTH'] = time.strftime(self.time_format, TapptempTH)
+            apptemp_tl = apptemp
+            apptemp_th = apptemp
+            tapptemp_tl = datetime.date.today().timetuple()
+            tapptemp_th = datetime.date.today().timetuple()
+        apptemp_tl = apptemp_tl if apptemp_tl is not None else \
+            convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        data['apptempTL'] = self.temp_format % apptemp_tl
+        apptemp_th = apptemp_th if apptemp_th is not None else \
+            convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
+        data['apptempTH'] = self.temp_format % apptemp_th
+        data['TapptempTL'] = time.strftime(self.time_format, tapptemp_tl)
+        data['TapptempTH'] = time.strftime(self.time_format, tapptemp_th)
         # humidex - humidex
         if 'humidex' in packet_d:
             # humidex is in the packet so use it
@@ -1548,14 +1640,13 @@ class RealtimeGaugeDataThread(threading.Thread):
             humidex = convert(humidex_vt, self.temp_group).value
         else:   # No humidex in our loop packet so all we can do is calculate it.
             # humidex is not in the packet so calculate it
-            temp_C = convert(temp_vt, 'degree_C').value
-            dewpoint_C = convert(dew_vt, 'degree_C').value
-            humidex_C = weewx.wxformulas.humidexC(temp_C,
+            temp_c = convert(temp_vt, 'degree_C').value
+            humidex_c = weewx.wxformulas.humidexC(temp_c,
                                                   packet_d['outHumidity'])
-            humidex_vt = ValueTuple(humidex_C, 'degree_C', 'group_temperature')
+            humidex_vt = ValueTuple(humidex_c, 'degree_C', 'group_temperature')
             humidex = convert(humidex_vt, self.temp_group).value
-        humidex = humidex if humidex is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                              self.temp_group).value
+        humidex = humidex if humidex is not None else \
+            convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
         data['humidex'] = self.temp_format % humidex
         # press - barometer
         press_vt = ValueTuple(packet_d['barometer'],
@@ -1569,31 +1660,33 @@ class RealtimeGaugeDataThread(threading.Thread):
         # TpressTL - time of today's low barometer (hh:mm)
         # TpressTH - time of today's high barometer (hh:mm)
         if 'barometer' in self.day_stats:
-            pressTL_vt = ValueTuple(self.day_stats['barometer'].min,
-                                    self.p_baro_type,
-                                    self.p_baro_group)
-            pressTL = convert(pressTL_vt, self.pres_group).value
-            pressL_loop_vt = ValueTuple(self.buffer.pressL_loop[0],
-                                        self.p_baro_type,
-                                        self.p_baro_group)
-            pressL_loop = convert(pressL_loop_vt, self.pres_group).value
-            pressTL = weeutil.weeutil.min_with_none([pressL_loop, pressTL])
-            pressTL = pressTL if pressTL is not None else press
-            data['pressTL'] = self.pres_format % pressTL
-            pressTH_vt = ValueTuple(self.day_stats['barometer'].max,
-                                    self.p_baro_type,
-                                    self.p_baro_group)
-            pressTH = convert(pressTH_vt, self.pres_group).value
-            pressH_loop_vt = ValueTuple(self.buffer.pressH_loop[0],
-                                        self.p_baro_type,
-                                        self.p_baro_group)
-            pressH_loop = convert(pressH_loop_vt, self.pres_group).value
-            pressTH = max(pressH_loop, pressTH, 0.0)
-            data['pressTH'] = self.pres_format % pressTH
-            TpressTL = time.localtime(self.day_stats['barometer'].mintime) if pressL_loop >= pressTL else time.localtime(self.buffer.pressL_loop[1])
-            data['TpressTL'] = time.strftime(self.time_format, TpressTL)
-            TpressTH = time.localtime(self.day_stats['barometer'].maxtime) if pressH_loop <= pressTH else time.localtime(self.buffer.pressH_loop[1])
-            data['TpressTH'] = time.strftime(self.time_format, TpressTH)
+            press_tl_vt = ValueTuple(self.day_stats['barometer'].min,
+                                     self.p_baro_type,
+                                     self.p_baro_group)
+            press_tl = convert(press_tl_vt, self.pres_group).value
+            press_l_loop_vt = ValueTuple(self.buffer.pressL_loop[0],
+                                         self.p_baro_type,
+                                         self.p_baro_group)
+            press_l_loop = convert(press_l_loop_vt, self.pres_group).value
+            press_tl = weeutil.weeutil.min_with_none([press_l_loop, press_tl])
+            press_tl = press_tl if press_tl is not None else press
+            data['pressTL'] = self.pres_format % press_tl
+            press_th_vt = ValueTuple(self.day_stats['barometer'].max,
+                                     self.p_baro_type,
+                                     self.p_baro_group)
+            press_th = convert(press_th_vt, self.pres_group).value
+            press_h_loop_vt = ValueTuple(self.buffer.pressH_loop[0],
+                                         self.p_baro_type,
+                                         self.p_baro_group)
+            press_h_loop = convert(press_h_loop_vt, self.pres_group).value
+            press_th = max(press_h_loop, press_th, 0.0)
+            data['pressTH'] = self.pres_format % press_th
+            tpress_tl = time.localtime(self.day_stats['barometer'].mintime) if press_l_loop >= press_tl else \
+                time.localtime(self.buffer.pressL_loop[1])
+            data['TpressTL'] = time.strftime(self.time_format, tpress_tl)
+            tpress_th = time.localtime(self.day_stats['barometer'].maxtime) if press_h_loop <= press_th else \
+                time.localtime(self.buffer.pressH_loop[1])
+            data['TpressTH'] = time.strftime(self.time_format, tpress_th)
         else:
             data['pressTL'] = self.pres_format % 0.0
             data['pressTH'] = self.pres_format % 0.0
@@ -1601,33 +1694,33 @@ class RealtimeGaugeDataThread(threading.Thread):
             data['TpressTH'] = None
         # pressL - all time low barometer
         if self.min_barometer is not None:
-            pressL_vt = ValueTuple(self.min_barometer,
-                                   self.p_baro_type,
-                                   self.p_baro_group)
+            press_l_vt = ValueTuple(self.min_barometer,
+                                    self.p_baro_type,
+                                    self.p_baro_group)
         else:
-            pressL_vt = ValueTuple(850, 'hPa', self.p_baro_group)
-        pressL = convert(pressL_vt, self.pres_group).value
-        data['pressL'] = self.pres_format % pressL
+            press_l_vt = ValueTuple(850, 'hPa', self.p_baro_group)
+        press_l = convert(press_l_vt, self.pres_group).value
+        data['pressL'] = self.pres_format % press_l
         # pressH - all time high barometer
         if self.max_barometer is not None:
-            pressH_vt = ValueTuple(self.max_barometer,
-                                   self.p_baro_type,
-                                   self.p_baro_group)
+            press_h_vt = ValueTuple(self.max_barometer,
+                                    self.p_baro_type,
+                                    self.p_baro_group)
         else:
-            pressH_vt = ValueTuple(1100, 'hPa', self.p_baro_group)
-        pressH = convert(pressH_vt, self.pres_group).value
-        data['pressH'] = self.pres_format % pressH
+            press_h_vt = ValueTuple(1100, 'hPa', self.p_baro_group)
+        press_h = convert(press_h_vt, self.pres_group).value
+        data['pressH'] = self.pres_format % press_h
         # presstrendval -  pressure trend value
         _p_trend_val = calc_trend('barometer', press_vt, self.pres_group,
                                   self.db_manager, ts - 3600, 300)
         presstrendval = _p_trend_val if _p_trend_val is not None else 0.0
         data['presstrendval'] = self.pres_format % presstrendval
         # rfall - rain today
-        rainDay = self.day_stats['rain'].sum + self.buffer.rainsum
-        rainT_vt = ValueTuple(rainDay, self.p_rain_type, self.p_rain_group)
-        rainT = convert(rainT_vt, self.rain_group).value
-        rainT = rainT if rainT is not None else 0.0
-        data['rfall'] = self.rain_format % rainT
+        rain_day = self.day_stats['rain'].sum + self.buffer.rainsum
+        rain_t_vt = ValueTuple(rain_day, self.p_rain_type, self.p_rain_group)
+        rain_t = convert(rain_t_vt, self.rain_group).value
+        rain_t = rain_t if rain_t is not None else 0.0
+        data['rfall'] = self.rain_format % rain_t
         # rrate - current rain rate (per hour)
         if 'rainRate' in packet_d:
             rrate_vt = ValueTuple(packet_d['rainRate'],
@@ -1639,30 +1732,31 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['rrate'] = self.rainrate_format % rrate
         # rrateTM - today's maximum rain rate (per hour)
         if 'rainRate' in self.day_stats:
-            rrateTM_vt = ValueTuple(self.day_stats['rainRate'].max,
-                                    self.p_rainr_type,
-                                    self.p_rainr_group)
-            rrateTM = convert(rrateTM_vt, self.rainrate_group).value
+            rrate_tm_vt = ValueTuple(self.day_stats['rainRate'].max,
+                                     self.p_rainr_type,
+                                     self.p_rainr_group)
+            rrate_tm = convert(rrate_tm_vt, self.rainrate_group).value
         else:
-            rrateTM = 0
-        rrateTM_loop_vt = ValueTuple(self.buffer.rrateH_loop[0], self.p_rainr_type, self.p_rainr_group)
-        rrateH_loop = convert(rrateTM_loop_vt, self.rainrate_group).value
-        rrateTM = max(rrateH_loop, rrateTM, rrate, 0.0)
-        data['rrateTM'] = self.rainrate_format % rrateTM
+            rrate_tm = 0
+        rrate_tm_loop_vt = ValueTuple(self.buffer.rrateH_loop[0], self.p_rainr_type, self.p_rainr_group)
+        rrate_h_loop = convert(rrate_tm_loop_vt, self.rainrate_group).value
+        rrate_tm = max(rrate_h_loop, rrate_tm, rrate, 0.0)
+        data['rrateTM'] = self.rainrate_format % rrate_tm
         # TrrateTM - time of today's maximum rain rate (per hour)
         if 'rainRate' not in self.day_stats:
             data['TrrateTM'] = '00:00'
         else:
-            TrrateTM = time.localtime(self.day_stats['rainRate'].maxtime) if rrateH_loop <= rrateTM else time.localtime(self.buffer.rrateH_loop[1])
-            data['TrrateTM'] = time.strftime(self.time_format, TrrateTM)
+            trrate_tm = time.localtime(self.day_stats['rainRate'].maxtime) if rrate_h_loop <= rrate_tm else \
+                time.localtime(self.buffer.rrateH_loop[1])
+            data['TrrateTM'] = time.strftime(self.time_format, trrate_tm)
         # hourlyrainTH - Today's highest hourly rain
-        # ###FIX ME - need to determine hourlyrainTH
+        # FIXME. Need to determine hourlyrainTH
         data['hourlyrainTH'] = "0.0"
         # ThourlyrainTH - time of Today's highest hourly rain
-        # ###FIX ME - need to determine ThourlyrainTH
+        # FIXME. Need to determine ThourlyrainTH
         data['ThourlyrainTH'] = "00:00"
         # LastRainTipISO -
-        # ###FIX ME - need to determine LastRainTipISO
+        # FIXME. Need to determine LastRainTipISO
         data['LastRainTipISO'] = "00:00"
         # wlatest - latest wind speed reading
         wlatest_vt = ValueTuple(packet_d['windSpeed'],
@@ -1675,36 +1769,37 @@ class RealtimeGaugeDataThread(threading.Thread):
         wspeed = wspeed if wspeed is not None else 0.0
         data['wspeed'] = self.wind_format % wspeed
         # windTM - today's high wind speed (average)
-        windTM_vt = ValueTuple(self.day_stats['windSpeed'].max,
-                               self.p_wind_type,
-                               self.p_wind_group)
-        windTM = convert(windTM_vt, self.wind_group).value
-        windTM_loop_vt = ValueTuple(self.buffer.windM_loop[0],
-                                    self.p_wind_type,
-                                    self.p_wind_group)
-        windM_loop = convert(windTM_loop_vt, self.wind_group).value
-        windTM = max(windM_loop, windTM, 0.0)
-        data['windTM'] = self.wind_format % windTM
+        wind_tm_vt = ValueTuple(self.day_stats['windSpeed'].max,
+                                self.p_wind_type,
+                                self.p_wind_group)
+        wind_tm = convert(wind_tm_vt, self.wind_group).value
+        wind_tm_loop_vt = ValueTuple(self.buffer.windM_loop[0],
+                                     self.p_wind_type,
+                                     self.p_wind_group)
+        wind_m_loop = convert(wind_tm_loop_vt, self.wind_group).value
+        wind_tm = max(wind_m_loop, wind_tm, 0.0)
+        data['windTM'] = self.wind_format % wind_tm
         # wgust - 10 minute high gust
-        wgust = self.buffer.tenMinuteWindGust()
+        wgust = self.buffer.ten_minute_wind_gust()
         wgust_vt = ValueTuple(wgust, self.p_wind_type, self.p_wind_group)
         wgust = convert(wgust_vt, self.wind_group).value
         wgust = wgust if wgust is not None else 0.0
         data['wgust'] = self.wind_format % wgust
         # wgustTM - today's high wind gust
-        wgustTM_vt = ValueTuple(self.day_stats['wind'].max,
-                                self.p_wind_type,
-                                self.p_wind_group)
-        wgustTM = convert(wgustTM_vt, self.wind_group).value
-        wgustM_loop_vt = ValueTuple(self.buffer.wgustM_loop[0],
-                                    self.p_wind_type,
-                                    self.p_wind_group)
-        wgustM_loop = convert(wgustM_loop_vt, self.wind_group).value
-        wgustTM = max(wgustM_loop, wgustTM, 0.0)
-        data['wgustTM'] = self.wind_format % wgustTM
+        wgust_tm_vt = ValueTuple(self.day_stats['wind'].max,
+                                 self.p_wind_type,
+                                 self.p_wind_group)
+        wgust_tm = convert(wgust_tm_vt, self.wind_group).value
+        wgust_m_loop_vt = ValueTuple(self.buffer.wgustM_loop[0],
+                                     self.p_wind_type,
+                                     self.p_wind_group)
+        wgust_m_loop = convert(wgust_m_loop_vt, self.wind_group).value
+        wgust_tm = max(wgust_m_loop, wgust_tm, 0.0)
+        data['wgustTM'] = self.wind_format % wgust_tm
         # TwgustTM - time of today's high wind gust (hh:mm)
-        TwgustTM = time.localtime(self.day_stats['wind'].maxtime) if wgustM_loop <= wgustTM else time.localtime(self.buffer.wgustM_loop[2])
-        data['TwgustTM'] = time.strftime(self.time_format, TwgustTM)
+        twgust_tm = time.localtime(self.day_stats['wind'].maxtime) if wgust_m_loop <= wgust_tm else \
+            time.localtime(self.buffer.wgustM_loop[2])
+        data['TwgustTM'] = time.strftime(self.time_format, twgust_tm)
         # bearing - wind bearing (degrees)
         bearing = packet_d['windDir'] if packet_d['windDir'] is not None else self.last_latest_dir
         self.last_latest_dir = bearing
@@ -1717,46 +1812,48 @@ class RealtimeGaugeDataThread(threading.Thread):
         # As our self.day_stats is really a weeWX accumulator filled with the
         # relevant days stats we need to use .max_dir rather than .gustdir
         # to get the gust direction for the day.
-        bearingTM = self.day_stats['wind'].max_dir if self.day_stats['wind'].max_dir is not None else 0
-        bearingTM = self.buffer.wgustM_loop[1] if wgustTM == wgustM_loop else bearingTM
-        data['bearingTM'] = self.dir_format % bearingTM
+        bearing_tm = self.day_stats['wind'].max_dir if self.day_stats['wind'].max_dir is not None else 0
+        bearing_tm = self.buffer.wgustM_loop[1] if wgust_tm == wgust_m_loop else bearing_tm
+        data['bearingTM'] = self.dir_format % bearing_tm
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
         # down to nearest 10 degrees
         if self.windDirAvg is not None:
             try:
-                fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else None for x, y, s, d, t in self.buffer.wind_dir_list)
+                from_bearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else
+                                   None for x, y, s, d, t in self.buffer.wind_dir_list)
             except (TypeError, ValueError):
-                fromBearing = None
-            BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
-            if BearingRangeFrom10 < 0:
-                BearingRangeFrom10 += 360
-            elif BearingRangeFrom10 > 360:
-                BearingRangeFrom10 -= 360
+                from_bearing = None
+            bearing_range_from10 = self.windDirAvg - from_bearing if from_bearing is not None else 0.0
+            if bearing_range_from10 < 0:
+                bearing_range_from10 += 360
+            elif bearing_range_from10 > 360:
+                bearing_range_from10 -= 360
         else:
-            BearingRangeFrom10 = 0.0
-        data['BearingRangeFrom10'] = self.dir_format % BearingRangeFrom10
+            bearing_range_from10 = 0.0
+        data['BearingRangeFrom10'] = self.dir_format % bearing_range_from10
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
         # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
         # up to the nearest 10 degrees
         if self.windDirAvg is not None:
             try:
-                toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x, y, s, d, t in self.buffer.wind_dir_list)
+                to_bearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else
+                                 None for x, y, s, d, t in self.buffer.wind_dir_list)
             except (TypeError, ValueError):
-                toBearing = None
-            BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
-            if BearingRangeTo10 < 0:
-                BearingRangeTo10 += 360
-            elif BearingRangeTo10 > 360:
-                BearingRangeTo10 -= 360
+                to_bearing = None
+            bearing_range_to10 = self.windDirAvg + to_bearing if to_bearing is not None else 0.0
+            if bearing_range_to10 < 0:
+                bearing_range_to10 += 360
+            elif bearing_range_to10 > 360:
+                bearing_range_to10 -= 360
         else:
-            BearingRangeTo10 = 0.0
-        data['BearingRangeTo10'] = self.dir_format % BearingRangeTo10
+            bearing_range_to10 = 0.0
+        data['BearingRangeTo10'] = self.dir_format % bearing_range_to10
         # domwinddir - Today's dominant wind direction as compass point
         deg = 90.0 - math.degrees(math.atan2(self.day_stats['wind'].ysum,
                                   self.day_stats['wind'].xsum))
         dom_dir = deg if deg >= 0 else deg + 360.0
-        data['domwinddir'] = degreeToCompass(dom_dir)
+        data['domwinddir'] = degree_to_compass(dom_dir)
         # WindRoseData -
         data['WindRoseData'] = self.rose
         # windrun - wind run (today)
@@ -1765,8 +1862,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             wind_sum_vt = ValueTuple(self.day_stats['wind'].sum,
                                      self.p_wind_type,
                                      self.p_wind_group)
-            windrun_day_average = (last_ts - startOfDay(ts))/3600.0 * convert(wind_sum_vt,
-                                                                              self.wind_group).value/self.day_stats['wind'].count
+            windrun_day_average = (last_ts - startOfDay(ts))/3600.0 * \
+                convert(wind_sum_vt, self.wind_group).value/self.day_stats['wind'].count
         except (ValueError, TypeError, ZeroDivisionError):
             windrun_day_average = 0.0
         if self.windrun_loop:   # is loop/realtime estimate
@@ -1789,31 +1886,31 @@ class RealtimeGaugeDataThread(threading.Thread):
             data['Tbeaufort'] = "0"
         # UV - UV index
         if 'UV' not in packet_d:
-            UV = 0.0
+            uv = 0.0
         else:
-            UV = packet_d['UV'] if packet_d['UV'] is not None else 0.0
-        data['UV'] = self.uv_format % UV
+            uv = packet_d['UV'] if packet_d['UV'] is not None else 0.0
+        data['UV'] = self.uv_format % uv
         # UVTH - today's high UV index
         if 'UV' not in self.day_stats:
-            UVTH = UV
+            uv_th = uv
         else:
-            UVTH = self.day_stats['UV'].max
-        UVTH = max(self.buffer.UVH_loop[0], UVTH, UV, 0.0)
-        data['UVTH'] = self.uv_format % UVTH
+            uv_th = self.day_stats['UV'].max
+        uv_th = max(self.buffer.UVH_loop[0], uv_th, uv, 0.0)
+        data['UVTH'] = self.uv_format % uv_th
         # SolarRad - solar radiation W/m2
         if 'radiation' not in packet_d:
-            SolarRad = 0.0
+            solar_rad = 0.0
         else:
-            SolarRad = packet_d['radiation']
-        SolarRad = SolarRad if SolarRad is not None else 0.0
-        data['SolarRad'] = self.rad_format % SolarRad
+            solar_rad = packet_d['radiation']
+        solar_rad = solar_rad if solar_rad is not None else 0.0
+        data['SolarRad'] = self.rad_format % solar_rad
         # SolarTM - today's maximum solar radiation W/m2
         if 'radiation' not in self.day_stats:
-            SolarTM = 0.0
+            solar_tm = 0.0
         else:
-            SolarTM = self.day_stats['radiation'].max
-        SolarTM = max(self.buffer.SolarH_loop[0], SolarTM, SolarRad, 0.0)
-        data['SolarTM'] = self.rad_format % SolarTM
+            solar_tm = self.day_stats['radiation'].max
+        solar_tm = max(self.buffer.SolarH_loop[0], solar_tm, solar_rad, 0.0)
+        data['SolarTM'] = self.rad_format % solar_tm
         # CurrentSolarMax - Current theoretical maximum solar radiation
         if self.solar_algorithm == 'Bras':
             curr_solar_max = weewx.wxformulas.solar_rad_Bras(self.latitude,
@@ -1833,8 +1930,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             cb = packet_d['cloudbase']
             cb_vt = ValueTuple(cb, self.p_alt_type, self.p_alt_group)
         else:
-            temp_C = convert(temp_vt, 'degree_C').value
-            cb = weewx.wxformulas.cloudbase_Metric(temp_C,
+            temp_c = convert(temp_vt, 'degree_C').value
+            cb = weewx.wxformulas.cloudbase_Metric(temp_c,
                                                    packet_d['outHumidity'],
                                                    self.altitude_m)
             cb_vt = ValueTuple(cb, 'meter', self.p_alt_group)
@@ -1842,7 +1939,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         cloudbase = cloudbase if cloudbase is not None else 0.0
         data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
-        _text = self.get_scroller_text()
+        _text = self.scroller_text if self.scroller_text is not None else ''
         data['forecast'] = time.strftime(_text, time.localtime(ts))
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
@@ -1853,29 +1950,29 @@ class RealtimeGaugeDataThread(threading.Thread):
         # month to date rain, only calculate if we have been asked
         if self.mtd_rain:
             if self.month_rain is not None:
-                rainM = convert(self.month_rain, self.rain_group).value
-                rainB_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
-                rainB = convert(rainB_vt, self.rain_group).value 
-                if rainM is not None and rainB is not None:
-                    rainM = rainM + rainB
+                rain_m = convert(self.month_rain, self.rain_group).value
+                rain_b_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
+                rain_b = convert(rain_b_vt, self.rain_group).value
+                if rain_m is not None and rain_b is not None:
+                    rain_m = rain_m + rain_b
                 else:
-                    rainM = 0.0
+                    rain_m = 0.0
             else:
-                rainM = 0.0
-            data['mrfall'] = self.rain_format % rainM
+                rain_m = 0.0
+            data['mrfall'] = self.rain_format % rain_m
         # year to date rain, only calculate if we have been asked
         if self.ytd_rain:
             if self.year_rain is not None:
-                rainY = convert(self.year_rain, self.rain_group).value
-                rainB_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
-                rainB = convert(rainB_vt, self.rain_group).value 
-                if rainY is not None and rainB is not None:
-                    rainY = rainY + rainB
+                rain_y = convert(self.year_rain, self.rain_group).value
+                rain_b_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
+                rain_b = convert(rain_b_vt, self.rain_group).value
+                if rain_y is not None and rain_b is not None:
+                    rain_y = rain_y + rain_b
                 else:
-                    rainY = 0.0
+                    rain_y = 0.0
             else:
-                rainY = 0.0
-            data['yrfall'] = self.rain_format % rainY
+                rain_y = 0.0
+            data['yrfall'] = self.rain_format % rain_y
         return data
 
     def new_archive_record(self, record):
@@ -1904,15 +2001,15 @@ class RealtimeGaugeDataThread(threading.Thread):
         # Reset our loop stats.
         self.buffer.reset_loop_stats()
 
-    def get_lost_contact(self, rec, type):
+    def get_lost_contact(self, rec, packet_type):
         """Determine is station has lost contact with sensors."""
 
         # default to lost contact = False
         result = False
         # if we are not ignoring the lost contact test do the check
-        if not self.ignore_lcontact:
-            if ((type == 'loop' and self.station_type in LOOP_STATIONS) or
-                    (type == 'archive' and self.station_type in ARCHIVE_STATIONS)):
+        if not self.ignore_lost_contact:
+            if ((packet_type == 'loop' and self.station_type in LOOP_STATIONS) or
+                    (packet_type == 'archive' and self.station_type in ARCHIVE_STATIONS)):
                 _v = STATION_LOST_CONTACT[self.station_type]['value']
                 try:
                     result = rec[STATION_LOST_CONTACT[self.station_type]['field']] == _v
@@ -2006,7 +2103,7 @@ class RtgdBuffer(object):
         self.UVH_loop = [None, None]
         self.SolarH_loop = [None, None]
 
-    def averageWind(self):
+    def average_wind(self):
         """ Calculate average wind speed over an archive interval period.
 
         Archive stats are defined on fixed 'archive interval' boundaries.
@@ -2033,7 +2130,7 @@ class RtgdBuffer(object):
             average = 0.0
         return average
 
-    def tenMinuteAverageWindDir(self):
+    def ten_minute_average_wind_dir(self):
         """ Calculate average wind direction over the last 10 minutes.
 
         Takes list of last 10 minutes of loop wind speed and direction data and
@@ -2056,7 +2153,7 @@ class RtgdBuffer(object):
             avg_dir = None
         return avg_dir
 
-    def tenMinuteWindGust(self):
+    def ten_minute_wind_gust(self):
         """ Calculate 10 minute wind gust.
 
         Takes list of last 10 minutes of loop wind speed data and finds the max
@@ -2074,10 +2171,10 @@ class RtgdBuffer(object):
 
         gust = None
         if len(self.wind_list) > 0:
-            gust = max(s for s,t in self.wind_list)
+            gust = max(s for s, t in self.wind_list)
         return gust
 
-    def setLowsAndHighs(self, packet):
+    def set_lows_and_highs(self, packet):
         """ Update loop highs and lows with new loop data.
 
         Almost operates as a mini weeWX accumulator but wind data is stored in
@@ -2100,27 +2197,34 @@ class RtgdBuffer(object):
         ts = packet_d['dateTime']
 
         # process temp
-        outTemp = packet_d.get('outTemp', None)
-        if outTemp is not None:
-            self.tempL_loop = [outTemp, ts] if (outTemp < self.tempL_loop[0] or self.tempL_loop[0] is None) else self.tempL_loop
-            self.tempH_loop = [outTemp, ts] if outTemp > self.tempH_loop[0] else self.tempH_loop
+        out_temp = packet_d.get('outTemp', None)
+        if out_temp is not None:
+            self.tempL_loop = [out_temp, ts] if (out_temp < self.tempL_loop[0] or self.tempL_loop[0] is None) else \
+                self.tempL_loop
+            self.tempH_loop = [out_temp, ts] if out_temp > self.tempH_loop[0] else self.tempH_loop
 
         # process dewpoint
         dewpoint = packet_d.get('dewpoint', None)
         if dewpoint is not None:
-            self.dewpointL_loop = [dewpoint, ts] if (dewpoint < self.dewpointL_loop[0] or self.dewpointL_loop[0] is None) else self.dewpointL_loop
+            self.dewpointL_loop = [dewpoint, ts] if \
+                (dewpoint < self.dewpointL_loop[0] or self.dewpointL_loop[0] is None) else \
+                self.dewpointL_loop
             self.dewpointH_loop = [dewpoint, ts] if dewpoint > self.dewpointH_loop[0] else self.dewpointH_loop
 
         # process appTemp
-        appTemp = packet_d.get('appTemp', None)
-        if appTemp is not None:
-            self.apptempL_loop = [appTemp, ts] if (appTemp < self.apptempL_loop[0] or self.apptempL_loop[0] is None) else self.apptempL_loop
-            self.apptempH_loop = [appTemp, ts] if appTemp > self.apptempH_loop[0] else self.apptempH_loop
+        app_temp = packet_d.get('appTemp', None)
+        if app_temp is not None:
+            self.apptempL_loop = [app_temp, ts] if \
+                (app_temp < self.apptempL_loop[0] or self.apptempL_loop[0] is None) else \
+                self.apptempL_loop
+            self.apptempH_loop = [app_temp, ts] if app_temp > self.apptempH_loop[0] else self.apptempH_loop
 
         # process windchill
         windchill = packet_d.get('windchill', None)
         if windchill is not None:
-            self.wchillL_loop = [windchill, ts] if (windchill < self.wchillL_loop[0] or self.wchillL_loop[0] is None) else self.wchillL_loop
+            self.wchillL_loop = [windchill, ts] if \
+                (windchill < self.wchillL_loop[0] or self.wchillL_loop[0] is None) else \
+                self.wchillL_loop
 
         # process heatindex
         heatindex = packet_d.get('heatindex', None)
@@ -2130,7 +2234,9 @@ class RtgdBuffer(object):
         # process barometer
         barometer = packet_d.get('barometer', None)
         if barometer is not None:
-            self.pressL_loop = [barometer, ts] if (barometer < self.pressL_loop[0] or self.pressL_loop[0] is None) else self.pressL_loop
+            self.pressL_loop = [barometer, ts] if \
+                (barometer < self.pressL_loop[0] or self.pressL_loop[0] is None) else \
+                self.pressL_loop
             self.pressH_loop = [barometer, ts] if barometer > self.pressH_loop[0] else self.pressH_loop
 
         # process rain
@@ -2138,20 +2244,22 @@ class RtgdBuffer(object):
         self.rainsum += rain if rain is not None else self.rainsum
 
         # process rainRate
-        rainRate = packet_d.get('rainRate', None)
-        if rainRate is not None:
-            self.rrateH_loop = [rainRate, ts] if rainRate > self.rrateH_loop[0] else self.rrateH_loop
+        rain_rate = packet_d.get('rainRate', None)
+        if rain_rate is not None:
+            self.rrateH_loop = [rain_rate, ts] if rain_rate > self.rrateH_loop[0] else self.rrateH_loop
 
         # process humidity
-        outHumidity = packet_d.get('outHumidity', None)
-        if outHumidity is not None:
-            self.humL_loop = [outHumidity, ts] if (outHumidity < self.humL_loop[0] or self.humL_loop[0] is None) else self.humL_loop
-            self.humH_loop = [outHumidity, ts] if outHumidity > self.humH_loop[0] else self.humH_loop
+        out_humidity = packet_d.get('outHumidity', None)
+        if out_humidity is not None:
+            self.humL_loop = [out_humidity, ts] if \
+                (out_humidity < self.humL_loop[0] or self.humL_loop[0] is None) else \
+                self.humL_loop
+            self.humH_loop = [out_humidity, ts] if out_humidity > self.humH_loop[0] else self.humH_loop
 
         # process UV
-        UV = packet_d.get('UV', None)
-        if UV is not None:
-            self.UVH_loop = [UV, ts] if UV > self.UVH_loop[0] else self.UVH_loop
+        uv = packet_d.get('UV', None)
+        if uv is not None:
+            self.UVH_loop = [uv, ts] if uv > self.UVH_loop[0] else self.UVH_loop
 
         # process radiation
         radiation = packet_d.get('radiation', None)
@@ -2160,19 +2268,19 @@ class RtgdBuffer(object):
 
         # process windSpeed/windDir
         # if windDir exists then get it, if it does not exist get None
-        windDir = packet_d.get('windDir', None)
+        wind_dir = packet_d.get('windDir', None)
         # if windSpeed exists get it, if it does not exist or is None then
         # get 0.0
-        windSpeed = packet_d.get('windSpeed', 0.0)
-        windSpeed = 0.0 if windSpeed is None else windSpeed
-        self.windsum += windSpeed
+        wind_speed = packet_d.get('windSpeed', 0.0)
+        wind_speed = 0.0 if wind_speed is None else wind_speed
+        self.windsum += wind_speed
         self.windcount += 1
         # Have we seen a new high gust? If so update self.wgustM_loop but only
         # if we have a corresponding wind direction
-        if windSpeed > self.wgustM_loop[0] and windDir is not None:
-            self.wgustM_loop = [windSpeed, windDir, ts]
+        if wind_speed > self.wgustM_loop[0] and wind_dir is not None:
+            self.wgustM_loop = [wind_speed, wind_dir, ts]
         # average wind speed
-        self.wind_list.append([windSpeed, ts])
+        self.wind_list.append([wind_speed, ts])
         # if we have samples in our list then delete any too old
         if len(self.wind_list) > 0:
             # calc ts of oldest sample we want to retain
@@ -2180,16 +2288,16 @@ class RtgdBuffer(object):
             # Remove any samples older than 5 minutes
             self.wind_list = [s for s in self.wind_list if s[1] > old_ts]
         # get our latest (archive_interval) average wind
-        windM_loop = self.averageWind()
+        wind_m_loop = self.average_wind()
         # have we seen a new high (archive_interval) avg wind? if so update
         # self.windM_loop
-        self.windM_loop = [windM_loop, ts] if windM_loop > self.windM_loop[0] else self.windM_loop
+        self.windM_loop = [wind_m_loop, ts] if wind_m_loop > self.windM_loop[0] else self.windM_loop
         # Update the 10 minute wind direction list, but only if windDir is not
         # None
-        if windDir is not None:
-            self.wind_dir_list.append([windSpeed * math.cos(math.radians(90.0 - windDir)),
-                                      windSpeed * math.sin(math.radians(90.0 - windDir)),
-                                      windSpeed, windDir, ts])
+        if wind_dir is not None:
+            self.wind_dir_list.append([wind_speed * math.cos(math.radians(90.0 - wind_dir)),
+                                      wind_speed * math.sin(math.radians(90.0 - wind_dir)),
+                                      wind_speed, wind_dir, ts])
         # if we have samples in our list then delete any too old
         if len(self.wind_dir_list) > 0:
             # calc ts of oldest sample we want to retain
@@ -2203,7 +2311,7 @@ class RtgdBuffer(object):
 # ============================================================================
 
 
-class CachedPacket():
+class CachedPacket(object):
     """Class to cache loop packets.
 
     The purpose of the cache is to ensure that necessary fields for the
@@ -2247,7 +2355,7 @@ class CachedPacket():
         """
 
         self.cache = dict()
-        # if we have a dateTime field in our record source use that otherwise
+        # if we have a dateTime field in our record block use that otherwise
         # use the current system time
         _ts = rec['dateTime'] if 'dateTime' in rec else int(time.time() + 0.5)
         # only prime those fields in CachedPacket.OBS
@@ -2308,7 +2416,7 @@ class CachedPacket():
 # ============================================================================
 
 
-def degreeToCompass(x):
+def degree_to_compass(x):
     """Convert degrees to ordinal compass point.
 
     Input:
@@ -2410,122 +2518,69 @@ def calc_windrose(now, db_manager, period, points):
 
 
 # ============================================================================
-#                              class WUThread
+#                           class ThreadedSource
 # ============================================================================
 
 
-class WUThread(threading.Thread):
-    """Thread that obtains WU API forecast data and places it in a queue.
+class ThreadedSource(threading.Thread):
+    """Base class for a threaded scroller text block.
 
-    The WUThread class queries the WU API and places selected forecast data in
-    JSON format in a queue used by the data consumer. The WU API is called at a
-    user selectable frequency. The thread listens for a shutdown signal from
-    its parent.
+    ThreadedSource constructor parameters:
 
-    WUThread constructor parameters:
+        control_queue:       A Queue object used by our parent to control 
+                             (shutdown) this thread.
+        result_queue:        A Queue object used to pass forecast data to the
+                             destination
+        engine:              an instance of weewx.engine.StdEngine
+        config_dict:         A weeWX config dictionary.
 
-        control_queue:  A Queue object used by our parent to control (shutdown)
-                        this thread.
-        result_queue:   A Queue object used to pass forecast data to the
-                        destination
-        config_dict:    A weeWX config dictionary.
-        wu_config_dict: A config dictionary for the WUThread.
-        lat:            Station latitude in decimal degrees.
-        long:           Station longitude in decimal degrees.
+    ThreadedSource methods:
 
-    WUThread methods:
-
-        run.               Control querying of the API and monitor the control
-                           queue.
-        query_wu.          Query the API and put selected forecast data in the
-                           result queue.
-        parse_wu_response. Parse a WU API response and return selected data.
+        run.            Thread entry point, controls data fetching, parsing and
+                        dispatch. Monitors the control queue.
+        get_data.       Obtain the raw scroller text data. This method must be 
+                        written for each child class.
+        parse_data.     Parse the raw scroller text data and return the final 
+                        format data. This method must be written for each child 
+                        class.
     """
-
-    def __init__(self, control_queue, result_queue, config_dict,
-                 wu_config_dict, lat, long):
+    
+    def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my superclass
         threading.Thread.__init__(self)
 
-        # setup a few thread things
-        self.setName('RtgdWuThread')
+        # setup a some thread things
         self.setDaemon(True)
+        # thread name needs to be set in the child class __init__() eg:
+        #   self.setName('RtgdDarkskyThread')
 
         # save the queues we will use
         self.control_queue = control_queue
         self.result_queue = result_queue
 
-        # the WU API 'feature' to be used for the forecast data
-        self.feature = 'forecast'
-        # interval between API calls
-        self.interval = to_int(wu_config_dict.get('interval', 1800))
-        # max no of tries we will make in any one attempt to contact WU via API
-        self.max_WU_tries = to_int(wu_config_dict.get('max_WU_tries', 3))
-        # Get API call lockout period. This is the minimum period between API
-        # calls for the same feature. This prevents an error condition making
-        # multiple rapid API calls and thus breac the API usage conditions.
-        self.lockout_period = to_int(wu_config_dict.get('api_lockout_period',
-                                                        60))
-        # initialise container for timestamp of last WU api call
-        self.last_call_ts = None
-        # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
-        # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
-        # try..except loop to catch exceptions (ie one or both don't exist.
-        try:
-            if wu_config_dict.get('api_key') is not None:
-                api_key = wu_config_dict.get('api_key')
-            elif config_dict['Forecast']['WU'].get('api_key', None) is not None:
-                api_key = config_dict['Forecast']['WU'].get('api_key')
-            else:
-                raise MissingApiKey("Cannot find valid Weather Underground API key")
-        except AttributeError:
-            raise MissingApiKey("Cannot find Weather Underground API key")
-        # Get 'query' (ie the location) to be used for use in WU API calls.
-        # Refer weewx.conf for details.
-        self.query = wu_config_dict.get('location', (lat, long))
-        # get a WeatherUndergroundAPI object to handle the API calls
-        self.api = WeatherUndergroundAPI(api_key)
-        # get units to be used in forecast text
-        self.units = wu_config_dict.get('units', 'METRIC').upper()
-
-        # log what we will do
-        loginf("engine",
-               "RealTimeGaugeData will download forecast data from Weather Underground")
-
     def run(self):
-        """Control the querying of the API and the shutdown of the thread.
+        """Entry point for the thread."""
 
-        Run a continuous loop querying the API, queuing the resulting forecast
-        data and checking for the shutdown signal. Since subsequent API queries
-        are triggered by an elapsed period of time rather than an external
-        event (eg receipt of archive record) it makes sense to sleep for a
-        period before checking if it is time to query. However, this limits the
-        responsiveness of the thread to the shutdown singal unless the sleep
-        period is very short (seconds). An alternative is to use the blocking
-        feature of Queue.get() to spend time blocking rather than sleeping. If
-        the blocking period is greater than the API lockout period then we can
-        avoid activating the API lockout period.
-        """
-
+        self.setup()
         # since we are in a thread some additional try..except clauses will
         # help give additional output in case of an error rather than having
         # the thread die silently
         try:
-            # Run a continuous loop, obtaining WU data as required and
+            # Run a continuous loop, obtaining API data as required and
             # monitoring the control queue for the shutdown signal. Only break
             # out if we receive the shutdown signal (None) from our parent.
             while True:
                 # run an inner loop querying the API and checking for the
                 # shutdown signal
                 # first up query the API
-                _response = self.query_wu()
-                # if we have a non-None response then we have data from WU,
+                _response = self.get_response()
+                # if we have a non-None response then we have data from Darksky,
                 # parse the response, gather the required data and put it in
                 # the result queue
                 if _response is not None:
-                    # parse the WU response and extract the forecast text
-                    _data = self.parse_wu_response(_response)
+                    # parse the API response and extract the forecast text
+                    _data = self.parse_response(_response)
                     # if we have some data then place it in the result queue
                     if _data is not None:
                         # construct our data dict for the queue
@@ -2550,12 +2605,162 @@ class WUThread(threading.Thread):
         except Exception, e:
             # Some unknown exception occurred. This is probably a serious
             # problem. Exit with some notification.
-            logcrit("WUThread",
-                    "Unexpected exception of type %s" % (type(e), ))
-            weeutil.weeutil.log_traceback('WUThread: **** ')
-            logcrit("WUThread", "Thread exiting. Reason: %s" % (e, ))
+            logcrit("rtgd", "Unexpected exception of type %s" % (type(e), ))
+            weeutil.weeutil.log_traceback('rtgd: **** ')
+            logcrit("rtgd", "Thread exiting. Reason: %s" % (e, ))
+    
+    def setup(self):
+        """Perform any post post-__init__() setup.
+        
+        This method is executed as the very first thing in the thread run() 
+        method. It must be defined if required for each child class.
+        """
 
-    def query_wu(self):
+        pass
+
+    def get_response(self):
+        """Obtain the raw block data.
+        
+        This method must be defined for each child class.
+        """
+
+        return None
+        
+    def parse_response(self, response):
+        """Parse the block response and return the required data.
+        
+        This method must be defined if the raw data from the block must be 
+        further processed to extract the final scroller text.
+        """
+
+        return response
+
+
+# ============================================================================
+#                             class Source
+# ============================================================================
+
+
+class Source(object):
+    """base class for a non-threaded scroller text block."""
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+        
+        # since we are not running in a thread we only need keep track of the 
+        # result queue
+        self.result_queue = result_queue
+
+    def start(self):
+        """Our entry point.
+        
+        Unlike most other block class Source does not run in a thread but 
+        rather is a simple non-threaded class that provides a result once and 
+        then does nothing else. The start() method has been defined as the 
+        entry point so we can be 'started' just like a threading.Thread object.
+        """
+
+        # get the scroller text string
+        _text = self.get_data()
+        # construct our data dict for the queue
+        _package = {'type': 'forecast',
+                    'payload': _text}
+        # now add it to the queue
+        self.result_queue.put(_package)
+
+    def get_data(self):
+        """Get scroller user specified scroller text string.
+        
+        This method must be defined for each child class.
+        """
+
+        return ''
+
+
+# ============================================================================
+#                              class WUSource
+# ============================================================================
+
+
+class WUSource(ThreadedSource):
+    """Thread that obtains WU API forecast data and places it in a queue.
+
+    The WUThread class queries the WU API and places selected forecast data in
+    JSON format in a queue used by the data consumer. The WU API is called at a
+    user selectable frequency. The thread listens for a shutdown signal from
+    its parent.
+
+    WUThread constructor parameters:
+
+        control_queue:  A Queue object used by our parent to control (shutdown)
+                        this thread.
+        result_queue:   A Queue object used to pass forecast data to the
+                        destination
+        engine:         An instance of class weewx.weewx.Engine
+        config_dict:    A weeWX config dictionary.
+
+    WUThread methods:
+
+        run.               Control querying of the API and monitor the control
+                           queue.
+        query_wu.          Query the API and put selected forecast data in the
+                           result queue.
+        parse_wu_response. Parse a WU API response and return selected data.
+    """
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+
+        # initialize my base class
+        super(WUSource, self).__init__(control_queue, result_queue, 
+                                       engine, config_dict)
+
+        # set thread name
+        self.setName('RtgdWuThread')
+
+        # get the WU config dict
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        wu_config_dict = _rtgd_config_dict.get("WU", dict())
+        
+        # the WU API 'feature' to be used for the forecast data
+        self.feature = 'forecast'
+        # interval between API calls
+        self.interval = to_int(wu_config_dict.get('interval', 1800))
+        # max no of tries we will make in any one attempt to contact WU via API
+        self.max_WU_tries = to_int(wu_config_dict.get('max_WU_tries', 3))
+        # Get API call lockout period. This is the minimum period between API
+        # calls for the same feature. This prevents an error condition making
+        # multiple rapid API calls and thus breac the API usage conditions.
+        self.lockout_period = to_int(wu_config_dict.get('api_lockout_period',
+                                                        60))
+        # initialise container for timestamp of last WU api call
+        self.last_call_ts = None
+        # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
+        # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
+        # try..except loop to catch exceptions (ie one or both don't exist.
+        try:
+            if wu_config_dict.get('api_key') is not None:
+                api_key = wu_config_dict.get('api_key')
+            elif config_dict['Forecast']['WU'].get('api_key', None) is not None:
+                api_key = config_dict['Forecast']['WU'].get('api_key')
+            else:
+                raise MissingApiKey("Cannot find valid Weather Underground API key")
+        except KeyError:
+            raise MissingApiKey("Cannot find Weather Underground API key")
+        # Get 'query' (ie the location) to be used for use in WU API calls.
+        # Refer weewx.conf for details.
+        # get lat and long
+        latitude = wu_config_dict.get("latitude", engine.stn_info.latitude_f)
+        longitude = wu_config_dict.get("longitude", engine.stn_info.longitude_f)
+        self.query = wu_config_dict.get('location', "%s,%s" % (latitude, longitude))
+        # get a WeatherUndergroundAPI object to handle the API calls
+        self.api = WeatherUndergroundAPI(api_key)
+        # get units to be used in forecast text
+        self.units = wu_config_dict.get('units', 'METRIC').upper()
+
+        # log what we will do
+        loginf("rtgd",
+               "RealTimeGaugeData scroller text will use Weather Underground forecast data")
+
+    def get_response(self):
         """If required query the WU API and return the response.
 
         Checks to see if it is time to query the API, if so queries the API
@@ -2572,7 +2777,7 @@ class WUThread(threading.Thread):
 
         # get the current time
         now = time.time()
-        logdbg2("WUThread",
+        logdbg2("rtgd",
                 "Last Weather Underground API call at %s" % self.last_call_ts)
         # has the lockout period passed since the last call
         if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
@@ -2585,18 +2790,18 @@ class WUThread(threading.Thread):
                                                       query=self.query,
                                                       resp_format='json',
                                                       max_tries=self.max_WU_tries)
-                    logdbg("WUThread",
+                    logdbg("rtgd",
                            "Downloaded updated Weather Underground %s information" % self.feature)
                 except Exception, e:
                     # Some unknown exception occurred. Set _response to None,
                     # log it and continue.
                     _response = None
-                    loginf("WUThread",
+                    loginf("rtgd",
                            "Unexpected exception of type %s" % (type(e), ))
                     weeutil.weeutil.log_traceback('WUThread: **** ')
-                    loginf("WUThread",
+                    loginf("rtgd",
                            "Unexpected exception of type %s" % (type(e), ))
-                    loginf("WUThread",
+                    loginf("rtgd",
                            "Weather Underground '%s' API query failed" % self.feature)
                 # if we got something back then reset our last call timestamp
                 if _response is not None:
@@ -2604,13 +2809,13 @@ class WUThread(threading.Thread):
                 return _response
         else:
             # API call limiter kicked in so say so
-            loginf("WUThread",
-                   "Tried to make an API call within %d sec of the previous call." % (self.lockout_period, ))
+            loginf("rtgd",
+                   "Tried to make a WU API call within %d sec of the previous call." % (self.lockout_period, ))
             loginf("        ",
-                   "API call limit reached. API call skipped.")
+                   "WU API call limit reached. API call skipped.")
         return None
 
-    def parse_wu_response(self, response):
+    def parse_response(self, response):
         """ Validate/parse a WU response and return the required fields.
 
         Take a WU API response, check for (WU defined) errors then extract and
@@ -2628,13 +2833,13 @@ class WUThread(threading.Thread):
         _response_json = json.loads(response)
         # check for recognised format
         if 'response' not in _response_json:
-            loginf("WUThread",
+            loginf("rtgd",
                    "Unknown format in Weather Underground '%s'" % (self.feature, ))
             return None
         _response = _response_json['response']
         # check for WU provided error else start pulling in the data we want
         if 'error' in _response:
-            loginf("WUThread",
+            loginf("rtgd",
                    "Error in Weather Underground '%s' response" % (self.feature, ))
             return None
         # we have forecast data so return the data we want
@@ -2738,8 +2943,8 @@ class WeatherUndergroundAPI(object):
                              'q',
                              query])
             _obf_url = '.'.join([_obf, resp_format])
-            logdbg("weatherundergroundapi",
-                   "Submitting API call using URL: %s" % (_obf_url, ))
+            logdbg("rtgd",
+                   "Submitting Weather Underground API call using URL: %s" % (_obf_url, ))
         # we will attempt the call max_tries times
         for count in range(max_tries):
             # attempt the call
@@ -2749,41 +2954,112 @@ class WeatherUndergroundAPI(object):
                 w.close()
                 return _response
             except (urllib2.URLError, socket.timeout), e:
-                logerr("weatherundergroundapi",
+                logerr("rtgd",
                        "Failed to get '%s' on attempt %d" % (query, count+1))
                 logerr("weatherundergroundapi", "   **** %s" % e)
         else:
-            logerr("weatherundergroundapi",
+            logerr("rtgd",
                    "Failed to get Weather Underground '%s'" % (query, ))
         return None
 
 
 # ============================================================================
-#                          class ZambrettiForecast
+#                           class ZambrettiSource
 # ============================================================================
 
 
-class ZambrettiForecast(object):
+class ZambrettiSource(ThreadedSource):
+    """Thread that obtains Zambretti forecast text and places it in a queue.
+
+    Requires the weeWX forecast extension to be installed and configured to
+    provide the Zambretti forecast.
+
+    ZambrettiSource constructor parameters:
+
+        control_queue:  A Queue object used by our parent to control (shutdown)
+                        this thread.
+        result_queue:   A Queue object used to pass forecast data to the
+                        destination
+        engine:         An instance of class weewx.weewx.Engine
+        config_dict:    A weeWX config dictionary.
+
+    ZambrettiSource methods:
+
+        run.               Control fetching the forecast and monitor the control
+                           queue.
+    """
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+
+        # Initialize my base class
+        super(ZambrettiSource, self).__init__(control_queue, result_queue, 
+                                              engine, config_dict)
+
+        # set thread name
+        self.setName('RtgdZambrettiThread')
+
+        self.config_dict = config_dict
+        # get the Zambretti config dict
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        self.zambretti_config_dict = _rtgd_config_dict.get("Zambretti")
+
+        self.zambretti = None
+
+        # log what we will do
+        loginf("rtgd",
+               "RealTimeGaugeData scroller text will use Zambretti forecast data")
+    
+    def setup(self):
+        """Get a Zambretti object.
+        
+        We need to do this here rather than in __init__() due to SQLite thread
+        limitations.
+        """
+
+        self.zambretti = Zambretti(self.config_dict, 
+                                   self.zambretti_config_dict)
+        
+    def get_response(self):
+        """Get the raw Zambretti forecast text."""
+        
+        _data = self.zambretti.get_data()
+        return _data
+
+
+# ============================================================================
+#                              class Zambretti
+# ============================================================================
+
+
+class Zambretti(object):
     """Class to extract Zambretti forecast text.
 
     Requires the weeWX forecast extension to be installed and configured to
     provide the Zambretti forecast otherwise 'Forecast not available' will be
-    returned."""
+    returned.
+    """
 
     DEFAULT_FORECAST_BINDING = 'forecast_binding'
     DEFAULT_BINDING_DICT = {'database': 'forecast_sqlite',
                             'manager': 'weewx.manager.Manager',
                             'table_name': 'archive',
                             'schema': 'user.forecast.schema'}
+    UNAVAILABLE_MESSAGE = 'Zambretti forecast unavailable'
 
-    def __init__(self, config_dict):
-        """Initialise the ZambrettiForecast object."""
+    def __init__(self, config_dict, zambretti_config_dict):
 
+        # interval between queries
+        self.interval = to_int(zambretti_config_dict.get('interval', 1800))
+        # max no of tries we will make in any one attempt to query the db
+        self.max_tries = to_int(zambretti_config_dict.get('max_tries', 3))
+        # wait time between db query retries
+        self.retry_wait = to_int(zambretti_config_dict.get('retry_wait', 3))
+        # initialise container for timestamp of last db query
+        self.last_query_ts = None
+        
         # flag as to whether the weeWX forecasting extension is installed
         self.forecasting_installed = False
-        # set some forecast db access parameters
-        self.db_max_tries = 3
-        self.db_retry_wait = 3
+        
         # Get a db manager for the forecast database and import the Zambretti
         # label lookup dict. If an exception is raised then we can assume the
         # forecast extension is not installed.
@@ -2791,8 +3067,8 @@ class ZambrettiForecast(object):
             # create a db manager config dict
             dbm_dict = weewx.manager.get_manager_dict(config_dict['DataBindings'],
                                                       config_dict['Databases'],
-                                                      ZambrettiForecast.DEFAULT_FORECAST_BINDING,
-                                                      default_binding_dict=ZambrettiForecast.DEFAULT_BINDING_DICT)
+                                                      Zambretti.DEFAULT_FORECAST_BINDING,
+                                                      default_binding_dict=Zambretti.DEFAULT_BINDING_DICT)
             # get a db manager for the forecast database
             self.dbm = weewx.manager.open_manager(dbm_dict)
             # import the Zambretti forecast text
@@ -2801,41 +3077,527 @@ class ZambrettiForecast(object):
             # if we made it this far the forecast extension is installed and we
             # can do business
             self.forecasting_installed = True
-        except (weewx.UnknownBinding, weedb.DatabaseError,
-                weewx.UnsupportedFeature, KeyError, ImportError):
-            # something went wrong, our forecasting_installed flag will not
-            # have been set so we can just continue on
-            pass
+        except Exception, e:
+            # Something went wrong so log the error. Our forecasting_installed 
+            # flag will not have been set so it is safe to continue but there 
+            # will be no Zambretti text
+            logdbg('rtgd',
+                   'Error initialising Zambretti forecast, is the forecast extension installed.')
+            logdbg('rtgd',
+                   'Unexpected exception of type %s' % (type(e), ))
+            weeutil.weeutil.log_traceback('rtgd: **** ',
+                                          loglevel=syslog.LOG_DEBUG)
 
+    def get_data(self):
+        """Get scroller user specified scroller text string.
+
+        If Zambretti is not installed or nothing is found then a short 
+        informative string is returned.
+        """
+
+        # get the current time
+        now = time.time()
+        logdbg2("rtgd",
+                "Last Zambretti forecast obtained at %s" % self.last_query_ts)
+        # If we haven't made a db query previously or if its been too long 
+        # since the last query then make the query
+        if (self.last_query_ts is None) or ((now + 1 - self.interval) >= self.last_query_ts):
+            # if the forecast extension is not installed then return an 
+            # appropriate message
+            if not self.is_installed:
+                return self.UNAVAILABLE_MESSAGE
+            # make the query
+            # SQL query to get the latest Zambretti forecast code
+            sql = "SELECT dateTime,zcode FROM %s WHERE method = 'Zambretti' ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
+            # execute the query, wrap in try..except just in case
+            for count in range(self.max_tries):
+                try:
+                    record = self.dbm.getSql(sql)
+                    if record is not None:
+                        # we have a non-None response so save the time of the 
+                        # query and return the decoded forecast text
+                        self.last_query_ts = now
+                        return self.zambretti_label_dict[record[1]]
+                except Exception, e:
+                    logerr('rtgd', 'get zambretti failed (attempt %d of %d): %s' %
+                           ((count + 1), self.max_tries, e))
+                    logdbg('rtgd', 'waiting %d seconds before retry' %
+                           self.retry_wait)
+                    time.sleep(self.retry_wait)
+            # if we made it here we have been unable to get a response from the
+            # forecast db so return a suitable message
+            return self.UNAVAILABLE_MESSAGE
+        else:
+            return None
+
+    @property
     def is_installed(self):
         """Is the forecasting extension installed."""
 
         return self.forecasting_installed
 
-    def get_zambretti_text(self):
-        """Return the current Zambretti forecast text."""
 
-        # if the forecast extension is not installed then return an appropriate
-        # message
-        if not self.forecasting_installed:
-            return 'Forecast not available'
+# ============================================================================
+#                           class DarkskyThread
+# ============================================================================
 
-        # SQL query to get the latest Zambretti forecast code
-        sql = "SELECT dateTime,zcode FROM %s WHERE method = 'Zambretti' ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
-        # try to execute the query
-        for count in range(self.db_max_tries):
+
+class DarkskySource(ThreadedSource):
+    """Thread that obtains Darksky forecast data and places it in a queue.
+
+    The DarkskyThread class queries the Darksky API and places selected 
+    forecast data in JSON format in a queue used by the data consumer. The 
+    Darksky API is called at a user selectable frequency. The thread listens 
+    for a shutdown signal from its parent.
+
+    DarkskyThread constructor parameters:
+
+        control_queue:       A Queue object used by our parent to control 
+                             (shutdown) this thread.
+        result_queue:        A Queue object used to pass forecast data to the
+                             destination
+        engine:              A weewx.engine.StdEngine object
+        conf_dict:           A weeWX config dictionary.
+
+    DarkskyThread methods:
+
+        run.            Control querying of the API and monitor the control
+                        queue.
+        get_response.   Query the API and put selected forecast data in the
+                        result queue.
+        parse_response. Parse a Darksky API response and return selected data.
+    """
+
+    VALID_UNITS = ['auto', 'ca', 'uk2', 'us', 'si']
+
+    VALID_LANGUAGES = ('ar', 'az', 'be', 'bg', 'bs', 'ca', 'cs', 'da', 'de',
+                       'el', 'en', 'es', 'et', 'fi', 'fr', 'hr', 'hu', 'id',
+                       'is', 'it', 'ja', 'ka', 'ko', 'kw', 'nb', 'nl', 'pl',
+                       'pt', 'ro', 'ru', 'sk', 'sl', 'sr', 'sv', 'tet', 'tr',
+                       'uk', 'x-pig-latin', 'zh', 'zh-tw')
+
+    DEFAULT_BLOCK = 'hourly'
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+
+        # initialize my base class:
+        super(DarkskySource, self).__init__(control_queue, result_queue, 
+                                            engine, config_dict)
+
+        # set thread name
+        self.setName('RtgdDarkskyThread')
+
+        # get the darksky config dict
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        darksky_config_dict = _rtgd_config_dict.get("DS", dict())
+
+        # Dark Sky uses lat, long to 'locate' the forecast. Check if lat and
+        # long are specified in the darksky_config_dict, if not use station lat
+        # and long.
+        latitude = darksky_config_dict.get("latitude", engine.stn_info.latitude_f)
+        longitude = darksky_config_dict.get("longitude", engine.stn_info.longitude_f)
+
+        # interval between API calls
+        self.interval = to_int(darksky_config_dict.get('interval', 1800))
+        # max no of tries we will make in any one attempt to contact the API
+        self.max_tries = to_int(darksky_config_dict.get('max_tries', 3))
+        # Get API call lockout period. This is the minimum period between API
+        # calls for the same feature. This prevents an error condition making
+        # multiple rapid API calls and thus breac the API usage conditions.
+        self.lockout_period = to_int(darksky_config_dict.get('api_lockout_period',
+                                                             60))
+        # initialise container for timestamp of last API call
+        self.last_call_ts = None
+        # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
+        # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
+        # try..except loop to catch exceptions (ie one or both don't exist.
+        key = darksky_config_dict.get('api_key', None)
+        if key is None:
+            raise MissingApiKey("Cannot find valid Darksky key")
+        # get a DarkskyForecastAPI object to handle the API calls
+        self.api = DarkskyForecastAPI(key, latitude, longitude)
+        # get units to be used in forecast text
+        _units = darksky_config_dict.get('units', 'ca').lower()
+        # validate units
+        self.units = _units if _units in self.VALID_UNITS else 'ca'
+        # get language to be used in forecast text
+        _language = darksky_config_dict.get('language', 'en').lower()
+        # validate language
+        self.language = _language if _language in self.VALID_LANGUAGES else 'en'
+        # get the Darksky block to be used, default to our default
+        self.block = darksky_config_dict.get('block', self.DEFAULT_BLOCK).lower()
+
+        # log what we will do
+        loginf("rtgd",
+               "RealTimeGaugeData scroller text will use Darksky forecast data")
+
+    def get_response(self):
+        """If required query the Darksky API and return the JSON response.
+
+        Checks to see if it is time to query the API, if so queries the API
+        and returns the raw response in JSON format. To prevent the user
+        exceeding their API call limit the query is only made if at least
+        self.lockout_period seconds have elapsed since the last call.
+
+        Inputs:
+            None.
+
+        Returns:
+            The Darksky API response in JSON format or None if no/invalid 
+            response was obtained.
+        """
+
+        # get the current time
+        now = time.time()
+        logdbg2("rtgd",
+                "Last Darksky API call at %s" % self.last_call_ts)
+        # has the lockout period passed since the last call
+        if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
+            # If we haven't made an API call previously or if its been too long
+            # since the last call then make the call
+            if (self.last_call_ts is None) or ((now + 1 - self.interval) >= self.last_call_ts):
+                # Make the call, wrap in a try..except just in case
+                try:
+                    _response = self.api.get_data(block=self.block,
+                                                  language=self.language,
+                                                  units=self.units,
+                                                  max_tries=self.max_tries)
+                    logdbg("rtgd",
+                           "Downloaded updated Darksky forecast")
+                except Exception, e:
+                    # Some unknown exception occurred. Set _response to None,
+                    # log it and continue.
+                    _response = None
+                    loginf("rtgd",
+                           "Unexpected exception of type %s" % (type(e), ))
+                    weeutil.weeutil.log_traceback('rtgd: **** ')
+                    loginf("rtgd",
+                           "Unexpected exception of type %s" % (type(e), ))
+                    loginf("rtgd", "Darksky forecast API query failed")
+                # if we got something back then reset our last call timestamp
+                if _response is not None:
+                    self.last_call_ts = now
+                return _response
+        else:
+            # API call limiter kicked in so say so
+            loginf("rtgd",
+                   "Tried to make an Darksky API call within %d sec of the previous call." % (self.lockout_period, ))
+            loginf("        ",
+                   "Darksky API call limit reached. API call skipped.")
+        return None
+
+    def parse_response(self, response):
+        """Parse a Darksky forecast response.
+
+        Take a Darksky forecast response, check for (Darksky defined) errors 
+        then extract and return the required summary text.
+
+        Input:
+            response: A Darksky forecast API response in JSON format.
+
+        Returns:
+            Summary text or None.
+        """
+
+        # There is not too much validation of the data we can do other than 
+        # looking at the 'flags' object
+        if 'flags' in response:
+            if 'darksky-unavailable' in response['flags']:
+                loginf("rtgd",
+                       "Darksky data for this location temporarily unavailable")
+                return None
+        else:
+            logdbg("rtgd", "No flag object in Darksky API response.")
+
+        # get the summary data to be used
+        # is our block available, can't assume it is
+        if self.block in response:
+            # we have our block, but is the summary there
+            if 'summary' in response[self.block]:
+                # we have a summary field
+                summary = response[self.block]['summary'].encode('ascii', 'ignore')
+                return summary
+            else:
+                # we have no summary field, so log it and return None
+                logdbg("rtgd",
+                       "Summary data not available for '%s' forecast" % (self.block,))
+                return None
+        else:
+            logdbg("rtgd", 'Dark Sky %s block not available' % self.block)
+            return 'Dark Sky %s block not available' % self.block
+
+
+# ============================================================================
+#                         class DarkskyForecastAPI
+# ============================================================================
+
+
+class DarkskyForecastAPI(object):
+    """Query the Darksky API and return the API response.
+
+    DarkskyForecastAPI constructor parameters:
+
+        darksky_config_dict: Dictionary containing the following keys:
+            key:       Darksky secret key to be used
+            latitude:  Latitude of the location concerned 
+            longitude: Longitude of the location concerned 
+
+    DarkskyForecastAPI methods:
+
+        get_data. Submit a data request to the Darksky API and return the 
+                  response.
+
+        _build_optional: Build a string containing the optional parameters to 
+                         submitted as part of the API request URL.
+        
+        _hit_api: Submit the API request and capture the response.
+
+        obfuscated_key: Property to return an obfuscated secret key.
+    """
+
+    # base URL from which to construct an API call URL
+    BASE_URL = 'https://api.darksky.net/forecast'
+    # blocks we may want to exclude
+    BLOCKS = ('currently', 'minutely', 'hourly', 'daily', 'alerts')
+
+    def __init__(self, key, latitude, longitude):
+        # initialise a DarkskyForecastAPI object
+
+        # save the secret key to be used
+        self.key = key
+        # save lat and long
+        self.latitude = latitude
+        self.longitude = longitude
+
+    def get_data(self, block='hourly', language='en', units='auto',
+                 max_tries=3):
+        """Make a data request via the API and return the response.
+
+        Construct an API call URL, make the call and return the response.
+
+        Parameters:
+            block:    Darksky block to be used. None or list of strings, default is None.
+            language:  The language to be used in any response text. Refer to
+                       the optional parameter 'language' at 
+                       https://darksky.net/dev/docs. String, default is 'en'.
+            units:     The units to be used in the response. Refer to the 
+                       optional parameter 'units' at https://darksky.net/dev/docs.
+                       String, default is 'auto'.
+            max_tries: The maximum number of attempts to be made to obtain a
+                       response from the API. Number, default is 3.
+
+        Returns:
+            The Darksky API response in JSON format.
+        """
+
+        # start constructing the API call URL to be used
+        url = '/'.join([self.BASE_URL,
+                        self.key,
+                        '%s,%s' % (self.latitude, self.longitude)])
+        
+        # now build the optional parameters string
+        optional_string = self._build_optional(block=block,
+                                               language=language,
+                                               units=units)
+        # if it has any content then add it to the URL
+        if len(optional_string) > 0:
+            url = '?'.join([url, optional_string])
+
+        # if debug >=1 log the URL used but obfuscate the key
+        if weewx.debug >= 1:
+            _obfuscated_url = '/'.join([self.BASE_URL,
+                                        self.obfuscated_key,
+                                        '%s,%s' % (self.latitude, self.longitude)])
+            _obfuscated_url = '?'.join([_obfuscated_url, optional_string])
+            logdbg("darkskyapi",
+                   "Submitting API call using URL: %s" % (_obfuscated_url, ))
+        # make the API call
+        _response = self._hit_api(url, max_tries)
+        # if we have a response we need to deserialise it
+        json_response = json.loads(_response) if _response is not None else None
+        # return the response
+        return json_response
+
+    def _build_optional(self, block='hourly', language='en', units='auto'):
+        """Build the optional parameters string."""
+
+        # initialise a list of non-None optional parameters and their values
+        opt_params_list = []
+        # exclude all but our block
+        _blocks = [b for b in self.BLOCKS if b != block]
+        opt_params_list.append('exclude=%s' % ','.join(_blocks))
+        # language
+        if language is not None:
+            opt_params_list.append('lang=%s' % language)
+        # units
+        if units is not None:
+            opt_params_list.append('units=%s' % units)
+        # now if we have any parameters concatenate them separating each with 
+        # an ampersand
+        opt_params = "&".join(opt_params_list)
+        # return the resulting string
+        return opt_params
+
+    @staticmethod
+    def _hit_api(url, max_tries=3):
+        """Make the API call and return the result."""
+
+        # we will attempt the call max_tries times
+        for count in range(max_tries):
+            # attempt the call
             try:
-                record = self.dbm.getSql(sql)
-                # if we get a non-None response then return the decoded
-                # forecast text
-                if record is not None:
-                    return self.zambretti_label_dict[record[1]]
+                w = urllib2.urlopen(url)
+                response = w.read()
+                w.close()
+                return response
+            except (urllib2.URLError, socket.timeout), e:
+                logerr("darkskyapi",
+                       "Failed to get API response on attempt %d" % (count+1, ))
+                logerr("darkskyapi", "   **** %s" % e)
+        else:
+            logerr("darkskyapi", "Failed to get API response")
+        return None
+
+    @property
+    def obfuscated_key(self):
+        """Produce and obfuscated copy of the key."""
+
+        # replace all characters in the key with an asterisk except for the 
+        # last 4
+        return '*'*(len(self.key) - 4) + self.key[-4:]
+
+
+# ============================================================================
+#                             class FileSource
+# ============================================================================
+
+
+class FileSource(ThreadedSource):
+    """Thread to return a single line of text from a file.
+
+    FileSource constructor parameters:
+
+        control_queue:  A Queue object used by our parent to control (shutdown)
+                        this thread.
+        result_queue:   A Queue object used to pass forecast data to the
+                        destination
+        engine:         An instance of class weewx.weewx.Engine
+        config_dict:    A weeWX config dictionary.
+
+    FileSource methods:
+
+        run.               Control fetching the text and monitor the control
+                           queue.
+    """
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+
+        # initialize my base class
+        super(FileSource, self).__init__(control_queue, result_queue, engine, 
+                                         config_dict)
+
+        # set thread name
+        self.setName('RtgdFileThread')
+
+        # get the File config dict
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        file_config_dict = _rtgd_config_dict.get("File", dict())
+        
+        # interval between file reads
+        self.interval = to_int(file_config_dict.get('interval', 1800))
+        # get block file, check it refers to a file
+        self.scroller_file = file_config_dict.get('file')
+        if self.scroller_file is None or not os.path.isfile(self.scroller_file):
+            logdbg("rtgd", "File block not specified or not a valid path/file")
+            self.scroller_file = None
+
+        # initialise the time of last file read
+        self.last_read_ts = None
+        
+        # log what we will do
+        if self.scroller_file is not None:
+            loginf("rtgd",
+                   "RealTimeGaugeData scroller text will use text from file '%s'" % self.scroller_file)
+    
+    def get_response(self):
+        """Get a single line of text from a file.
+
+        Checks to see if it is time to read the file, if so the file is read 
+        and the stripped raw text returned.
+
+        Inputs:
+            None.
+
+        Returns:
+            The first line of text from the file.
+        """
+
+        # get the current time
+        now = time.time()
+        logdbg2("rtgd", "Last File read at %s" % self.last_read_ts)
+        if (self.last_read_ts is None) or ((now + 1 - self.interval) >= self.last_read_ts):
+            # read the file, wrap in a try..except just in case
+            _data = None
+            try:
+                if self.scroller_file is not None:
+                    with open(self.scroller_file, 'r') as f:
+                        _data = f.readline().strip()
+                logdbg("rtgd", "File read")
             except Exception, e:
-                logerr('rtgdthread: zambretti:', 'get zambretti failed (attempt %d of %d): %s' %
-                       ((count + 1), self.db_max_tries, e))
-                logdbg('rtgdthread: zambretti', 'waiting %d seconds before retry' %
-                       self.db_retry_wait)
-                time.sleep(self.db_retry_wait)
-        # if we made it here we have been unable to get a response from the
-        # forecast db so return a suitable message
-        return 'Forecast not available'
+                # Some unknown exception occurred. Set _data to None,
+                # log it and continue.
+                _data = None
+                loginf("rtgd",
+                       "Unexpected exception of type %s" % (type(e), ))
+                weeutil.weeutil.log_traceback('rtgd: **** ')
+                loginf("rtgd",
+                       "Unexpected exception of type %s" % (type(e), ))
+                loginf("rtgd", "File read failed")
+            # we got something so reset our last read timestamp
+            if _data is not None:
+                self.last_read_ts = now
+            # and finally return the read data 
+            return _data
+        return None
+
+
+# ============================================================================
+#                             class TextSource
+# ============================================================================
+
+
+class TextSource(Source):
+    """Class to return user specified text string."""
+
+    def __init__(self, control_queue, result_queue, engine, config_dict):
+        
+        # Initialize my base class
+        super(TextSource, self).__init__(control_queue, result_queue, engine, 
+                                         config_dict)
+        
+        # since we are not running in a thread we only need keep track of our
+        # config dict
+        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
+        self.text_config_dict = _rtgd_config_dict.get("Text", dict())
+
+        # log what we will do
+        loginf("rtgd",
+               "RealTimeGaugeData scroller text will use a fixed string")
+
+    def get_data(self):
+        """Get scroller user specified scroller text string.
+
+        If nothing is found then a zero length string is returned.
+        """
+
+        # get scroller text from weewx.conf [RealtimeGaugeData]
+        _text = self.text_config_dict.get('text')
+        return _text
+
+
+# available scroller text block classes
+SCROLLER_SOURCES = {'text': TextSource,
+                    'file': FileSource,
+                    'weatherunderground': WUSource,
+                    'darksky': DarkskySource,
+                    'zambretti': ZambrettiSource}
