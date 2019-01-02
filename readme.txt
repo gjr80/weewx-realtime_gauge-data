@@ -3,9 +3,24 @@ SteelSeries Weather Gauges by weeWX. The extension consists of a weeWX service
 that generates the file gauge-data.txt used to update the SteelSeries Weather
 Gauges.
 
+
 Pre-Requisites
 
 The Realtime gauge-data extension requires weeWX v3.4.0 or greater.
+
+A number of fields have additional pre-requisites:
+
+-   CurrentSolarMax. Requires the pyephem(http://weewx.com/docs/setup.htm)
+    module be installed.
+
+-   forecast:
+
+    -   If using the Zambretti forecast text then the weeWX forecasting
+        extension must be installed.
+
+    -   If a text file is to be used as the scroller text source then a
+        suitable text file must be available on the weeWX machine.
+
 
 Installation Instructions
 
@@ -42,7 +57,7 @@ gauge-data releases page (https://github.com/gjr80/weewx-realtime_gauge-data
 /releases) into
 a directory accessible from the weeWX machine.
 
-    wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
+    $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
 /releases/download/v0.3.5/rtgd-0.3.5.tar.gz
 
 	where $DOWNLOAD_ROOT is the path to the directory where the Realtime
@@ -50,32 +65,40 @@ a directory accessible from the weeWX machine.
 
 2.  Stop weeWX:
 
-    sudo /etc/init.d/weewx stop
+    $ sudo /etc/init.d/weewx stop
 
 	or
 
-    sudo service weewx stop
+    $ sudo service weewx stop
+
+	or
+
+    $ sudo systemctl stop weewx
 
 3.  Install the Realtime gauge-data extension downloaded at step 1 using the
 wee_extension utility:
 
-    wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.3.5.tar.gz
+    $ wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.3.5.tar.gz
 
     This will result in output similar to the following:
 
         Request to install '/var/tmp/rtgd-0.3.5.tar.gz'
         Extracting from tar archive /var/tmp/rtgd-0.3.5.tar.gz
         Saving installer file to /home/weewx/bin/user/installer/Rtgd
-        Saved configuration dictionary. Backup copy at /home/weewx/weewx.conf.20161123124410
+        Saved configuration dictionary. Backup copy at /home/weewx/weewx.conf.20190101124410
         Finished installing extension '/var/tmp/rtgd-0.3.5.tar.gz'
 
 4. Start weeWX:
 
-    sudo /etc/init.d/weewx start
+    $ sudo /etc/init.d/weewx start
 
 	or
 
-    sudo service weewx start
+    $ sudo service weewx start
+
+    or
+
+    $ sudo systemctl start weewx
 
 This will result in the gauge-data.txt file being generated on receipt of each
 loop packet. A default installation will result in the generated gauge-data.txt
@@ -83,14 +106,14 @@ file being placed in the $HTML_ROOT directory. The Realtime gauge-data
 extension installation can be further customized (eg file locations, frequency
 of generation etc) by referring to the Realtime gauge-data extension wiki.
 
+
 Manual installation
 
 1.  Download the latest Realtime gauge-data extension from the Realtime
 gauge-data releases page (https://github.com/gjr80/weewx-realtime_gauge-data
-/releases) into
-a directory accessible from the weeWX machine.
+/releases) into a directory accessible from the weeWX machine.
 
-    wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
+    $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
 /releases/download/v0.3.5/rtgd-0.3.5.tar.gz
 
 	where $DOWNLOAD_ROOT is the path to the directory where the Realtime
@@ -98,18 +121,18 @@ a directory accessible from the weeWX machine.
 
 2.  Unpack the extension as follows:
 
-    tar xvfz rtgd-0.3.5.tar.gz
+    $ tar xvfz rtgd-0.3.5.tar.gz
 
 3.  Copy files from within the resulting folder as follows:
 
-    cp rtgd/bin/user/rtgd.py $BIN_ROOT/user
+    $ cp rtgd/bin/user/rtgd.py $BIN_ROOT/user
 
 	replacing the symbolic name $BIN_ROOT with the nominal locations for your
     installation.
 
 4.  Edit weewx.conf:
 
-    vi weewx.conf
+    $ vi weewx.conf
 
 5.  In weewx.conf, add a [RealtimeGaugeData] stanza as per the abbreviated 
 instructions for use in the comments at the start of $BIN_ROOT/user/rtgd.py.
@@ -122,13 +145,20 @@ RealtimeGaugeData service to the list of process services to be run:
 
             report_services = weewx.engine.StdPrint, weewx.engine.StdReport, user.rtgd.RealtimeGaugeData
 
-7. Start weeWX:
+7. Stop then start weeWX:
 
-    sudo /etc/init.d/weewx start
+    $ sudo /etc/init.d/weewx stop
+    $ sudo /etc/init.d/weewx start
 
 	or
 
-    sudo service weewx start
+    $ sudo service weewx stop
+    $ sudo service weewx start
+
+    or
+
+    $ sudo systemctl stop weewx
+    $ sudo systemctl start weewx
 
 This will result in the gauge-data.txt file being generated on receipt of each
 loop packet. A default installation will result in the generated gauge-data.txt
