@@ -17,9 +17,12 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.5                                      Date: 1 January 2019
+# Version: 0.3.6                                      Date: 19 January 2019
 #
 # Revision History
+#   19 January 2019     v0.3.6
+#       - added support for new weather.com based WU API
+#       - removed support for old api.wunderground.com based WU API
 #   1 January 2019      v0.3.5
 #       - added support for Darksky forecast API
 #       - added support for Zambretti forecast text (subject to weeWX
@@ -500,7 +503,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
 # version number of this script
-RTGD_VERSION = '0.3.5'
+RTGD_VERSION = '0.3.6'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '13'
 
@@ -2707,6 +2710,24 @@ class WUSource(ThreadedSource):
         parse_wu_response. Parse a WU API response and return selected data.
     """
 
+    VALID_FORECASTS = ('3day', '5day', '7day', '10day', '15day')
+    VALID_LOCATORS = ('geocode', 'iataCode', 'icaoCode', 'placeid', 'postalKey')
+    VALID_UNITS = ('e', 'm', 's', 'h')
+    VALID_LANGUAGES = ('ar-AE', 'az-AZ', 'bg-BG', 'bn-BD', 'bn-IN', 'bs-BA',
+                       'ca-ES', 'cs-CZ', 'da-DK', 'de-DE', 'el-GR', 'en-GB',
+                       'en-IN', 'en-US', 'es-AR', 'es-ES', 'es-LA', 'es-MX',
+                       'es-UN', 'es-US', 'et-EE', 'fa-IR', 'fi-FI', 'fr-CA',
+                       'fr-FR', 'gu-IN', 'he-IL', 'hi-IN', 'hr-HR', 'hu-HU',
+                       'in-ID', 'is-IS', 'it-IT', 'iw-IL', 'ja-JP', 'jv-ID',
+                       'ka-GE', 'kk-KZ', 'kn-IN', 'ko-KR', 'lt-LT', 'lv-LV',
+                       'mk-MK', 'mn-MN', 'ms-MY', 'nl-NL', 'no-NO', 'pl-PL',
+                       'pt-BR', 'pt-PT', 'ro-RO', 'ru-RU', 'si-LK', 'sk-SK',
+                       'sl-SI', 'sq-AL', 'sr-BA', 'sr-ME', 'sr-RS', 'sv-SE',
+                       'sw-KE', 'ta-IN', 'ta-LK', 'te-IN', 'tg-TJ', 'th-TH',
+                       'tk-TM', 'tl-PH', 'tr-TR', 'uk-UA', 'ur-PK', 'uz-UZ',
+                       'vi-VN', 'zh-CN', 'zh-HK', 'zh-TW')
+    VALID_FORMATS = ('json', )
+
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # initialize my base class
@@ -2720,8 +2741,6 @@ class WUSource(ThreadedSource):
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
         wu_config_dict = _rtgd_config_dict.get("WU", dict())
         
-        # the WU API 'feature' to be used for the forecast data
-        self.feature = 'forecast'
         # interval between API calls
         self.interval = to_int(wu_config_dict.get('interval', 1800))
         # max no of tries we will make in any one attempt to contact WU via API
@@ -2733,6 +2752,7 @@ class WUSource(ThreadedSource):
                                                         60))
         # initialise container for timestamp of last WU api call
         self.last_call_ts = None
+
         # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
         # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
         # try..except loop to catch exceptions (ie one or both don't exist.
@@ -2745,16 +2765,43 @@ class WUSource(ThreadedSource):
                 raise MissingApiKey("Cannot find valid Weather Underground API key")
         except KeyError:
             raise MissingApiKey("Cannot find Weather Underground API key")
-        # Get 'query' (ie the location) to be used for use in WU API calls.
-        # Refer weewx.conf for details.
-        # get lat and long
-        latitude = wu_config_dict.get("latitude", engine.stn_info.latitude_f)
-        longitude = wu_config_dict.get("longitude", engine.stn_info.longitude_f)
-        self.query = wu_config_dict.get('location', "%s,%s" % (latitude, longitude))
-        # get a WeatherUndergroundAPI object to handle the API calls
-        self.api = WeatherUndergroundAPI(api_key)
+
+        # get the forecast type
+        _forecast = wu_config_dict.get('forecast_type', '5day').lower()
+        # validate units
+        self.forecast = _forecast if _forecast in self.VALID_FORECASTS else '5day'
+
+        # FIXME, Not sure the logic is correct shoudl we get a delinquent location setting
+        # get the locator type and location argument to use for the forecast
+        # first get the
+        _location = wu_config_dict.get('location', 'geocode').split(',', 1)
+        _location_list = [a.strip() for a in _location]
+        # validate the locator type
+        self.locator = _location_list[0] if _location_list[0] in self.VALID_LOCATORS else 'geocode'
+        if len(_location_list) == 2:
+            self.location = _location_list[1]
+        else:
+            self.locator == 'geocode'
+            self.location = '%s,%s' % (engine.stn_info.latitude_f,
+                                       engine.stn_info.longitude_f)
+
         # get units to be used in forecast text
-        self.units = wu_config_dict.get('units', 'METRIC').upper()
+        _units = wu_config_dict.get('units', 'm').lower()
+        # validate units
+        self.units = _units if _units in self.VALID_UNITS else 'm'
+
+        # get language to be used in forecast text
+        _language = wu_config_dict.get('language', 'en-GB')
+        # validate language
+        self.language = _language if _language in self.VALID_LANGUAGES else 'en-GB'
+
+        # get format of the API response
+        _format = wu_config_dict.get('format', 'json').lower()
+        # validate format
+        self.format = _format if _format in self.VALID_FORMATS else 'json'
+
+        # get a WeatherUndergroundAPI object to handle the API calls
+        self.api = WeatherUndergroundAPIForecast(api_key)
 
         # log what we will do
         loginf("rtgd",
@@ -2786,12 +2833,15 @@ class WUSource(ThreadedSource):
             if (self.last_call_ts is None) or ((now + 1 - self.interval) >= self.last_call_ts):
                 # Make the call, wrap in a try..except just in case
                 try:
-                    _response = self.api.data_request(features=self.feature,
-                                                      query=self.query,
-                                                      resp_format='json',
-                                                      max_tries=self.max_WU_tries)
+                    _response = self.api.forecast_request(forecast=self.forecast,
+                                                          locator=self.locator,
+                                                          location=self.location,
+                                                          units=self.units,
+                                                          language=self.language,
+                                                          format=self.format,
+                                                          max_tries=self.max_WU_tries)
                     logdbg("rtgd",
-                           "Downloaded updated Weather Underground %s information" % self.feature)
+                           "Downloaded updated Weather Underground forecast information")
                 except Exception, e:
                     # Some unknown exception occurred. Set _response to None,
                     # log it and continue.
@@ -2802,7 +2852,7 @@ class WUSource(ThreadedSource):
                     loginf("rtgd",
                            "Unexpected exception of type %s" % (type(e), ))
                     loginf("rtgd",
-                           "Weather Underground '%s' API query failed" % self.feature)
+                           "Weather Underground API forecast query failed")
                 # if we got something back then reset our last call timestamp
                 if _response is not None:
                     self.last_call_ts = now
@@ -2815,11 +2865,11 @@ class WUSource(ThreadedSource):
                    "WU API call limit reached. API call skipped.")
         return None
 
-    def parse_response(self, response):
-        """ Validate/parse a WU response and return the required fields.
+    def parse_response(self, response, field='narrative'):
+        """ Parse a WU API forecast response and return the required field.
 
-        Take a WU API response, check for (WU defined) errors then extract and
-        return the forecast text and Metric forecast text fields for period 0.
+        Deserialise the WU API forecast response then extract and return the
+        narrative.
 
         Input:
             response: A WU API response in JSON format.
@@ -2830,34 +2880,29 @@ class WUSource(ThreadedSource):
         """
 
         # deserialize the response
-        _response_json = json.loads(response)
-        # check for recognised format
-        if 'response' not in _response_json:
+        try:
+            _response_json = json.loads(response)
+        except ValueError:
             loginf("rtgd",
-                   "Unknown format in Weather Underground '%s'" % (self.feature, ))
+                   "Unable to deserialise Weather Underground forecast response")
             return None
-        _response = _response_json['response']
-        # check for WU provided error else start pulling in the data we want
-        if 'error' in _response:
-            loginf("rtgd",
-                   "Error in Weather Underground '%s' response" % (self.feature, ))
-            return None
+
         # we have forecast data so return the data we want
-        _fcast = _response_json['forecast']['txt_forecast']['forecastday']
-        # select which forecast we want
-        if self.units == 'METRIC':
-            return _fcast[0]['fcttext_metric']
-        else:
-            return _fcast[0]['fcttext']
+        try:
+            return _response_json[field]
+        except KeyError:
+            loginf("rtgd",
+                   "Unable to locate field '%s' in Weather Underground forecast response" % (field,))
+            return None
 
 
 # ============================================================================
-#                        class WeatherUndergroundAPI
+#                    class WeatherUndergroundAPIForecast
 # ============================================================================
 
 
-class WeatherUndergroundAPI(object):
-    """Query the Weather Underground API and return the API response.
+class WeatherUndergroundAPIForecast(object):
+    """Obtain a forecast from the Weather Underground API.
 
     The WU API is accessed by calling one or more features. These features can
     be grouped into two groups, WunderMap layers and data features. This class
@@ -2873,76 +2918,74 @@ class WeatherUndergroundAPI(object):
                       API and return the response.
     """
 
-    BASE_URL = 'http://api.wunderground.com/api'
+    BASE_URL = 'https://api.weather.com/v3/wx/forecast/daily'
 
     def __init__(self, api_key):
-        # initialise a WeatherUndergroundAPI object
+        # initialise a WeatherUndergroundAPIForecast object
 
         # save the API key to be used
         self.api_key = api_key
 
-    def data_request(self, features, query, settings=None,
-                     resp_format='json', max_tries=3):
-        """Make a data feature request via the API and return the results.
+    def forecast_request(self, locator, location, forecast='5day', units='m',
+                         language='en-GB', format='json', max_tries=3):
+        """Make a forecast request via the API and return the results.
 
-        Construct an API call URL, make the call and return the response.
+        Construct an API forecast call URL, make the call and return the
+        response.
 
         Parameters:
-            features:    One or more WU API data features. String or list/tuple
-                         of strings.
-            query:       The location for which the information is sought.
-                         Refer usage comments at start of this file. String.
-            settings:    Optional settings to be included in the API call
-                         eg lang:FR for French, pws:1 to use PWS for
-                         conditions. String or list/tuple of strings. Default
-                         is 'pws:1'
-            resp_format: The output format of the data returned by the WU API.
-                         String, either 'json' or 'xml' for JSON or XML
-                         respectively. Default is JSON.
-            max_tries:   The maximum number of attempts to be made to obtain a
-                         response from the WU API. Default is 3.
+            forecast:  The type of forecast required. String, must be one of
+                       '3day', '5day', '7day', '10day' or '15day'.
+            locator:   Type of location used. String. Must be a WU API supported
+                       location type.
+                       Refer https://docs.google.com/document/d/1RY44O8ujbIA_tjlC4vYKHKzwSwEmNxuGw5sEJ9dYjG4/edit#
+            location:  Location argument. String.
+            units:     Units to use in the returned data. String, must be one
+                       of 'e', 'm', 's' or'h'.
+                       Refer https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.k9ghwen9fj7l
+            language:  Language to return the response in. String, must be one
+                       of the WU API supported language_setting codes
+                       (eg 'en-US', 'es-MX', 'fr-FR').
+                       Refer https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.9ph8uehobq12
+            format:    The output format_setting of the data returned by the WU
+                       API. String, must be 'json' (based on WU API
+                       documentation JSON is the only confirmed supported
+                       format_setting.
+            max_tries: The maximum number of attempts to be made to obtain a
+                       response from the WU API. Default is 3.
 
         Returns:
-            The WU API response in JSON or XML format.
+            The WU API forecast response in JSON format_setting.
         """
 
-        # there may be multiple features so if features is a list create a
-        # string delimiting the features with a solidus
-        if features is not None and hasattr(features, '__iter__'):
-            features_str = '/'.join(features)
-        else:
-            features_str = features
+        # construct the locator setting
+        location_setting = '='.join([locator, location])
+        # construct the units_setting string
+        units_setting = '='.join(['units', units])
+        # construct the language_setting string
+        language_setting = '='.join(['language', language])
+        # construct the format_setting string
+        format_setting = '='.join(['format', format])
+        # construct API key string
+        api_key = '='.join(['apiKey', self.api_key])
+        # construct the parameter string
+        parameters = '&'.join([location_setting, units_setting,
+                               language_setting, format_setting, api_key])
 
-        # Are there any settings parameters? If so construct a query string
-        if hasattr(settings, '__iter__'):
-            # we have more than one setting
-            settings_str = '/'.join(settings)
-        elif settings is not None:
-            # we have a single setting
-            settings_str = settings
-        else:
-            # we have no setting, use the default pws:1 to make life easier
-            # when assembling the URL to be used
-            settings_str = 'pws:1'
+        # construct the base forecast url
+        f_url = '/'.join([self.BASE_URL, forecast])
 
-        # construct the API call URL to be used
-        partial_url = '/'.join([self.BASE_URL,
-                                self.api_key,
-                                features_str,
-                                settings_str,
-                                'q',
-                                query])
-        url = '.'.join([partial_url, resp_format])
+        # finally construct the full URL to use
+        url = '?'.join([f_url, parameters])
+
         # if debug >=1 log the URL used but obfuscate the API key
         if weewx.debug >= 1:
-            _obf_api_key = '*'*(len(self.api_key) - 4) + self.api_key[-4:]
-            _obf = '/'.join([self.BASE_URL,
-                             _obf_api_key,
-                             features_str,
-                             settings_str,
-                             'q',
-                             query])
-            _obf_url = '.'.join([_obf, resp_format])
+            _obf_api_key = '='.join(['apiKey',
+                                     '*'*(len(self.api_key) - 4) + self.api_key[-4:]])
+            _obf_parameters = '&'.join([location_setting, units_setting,
+                                        language_setting, format_setting,
+                                        _obf_api_key])
+            _obf_url = '?'.join([f_url, _obf_parameters])
             logdbg("rtgd",
                    "Submitting Weather Underground API call using URL: %s" % (_obf_url, ))
         # we will attempt the call max_tries times
@@ -2955,11 +2998,10 @@ class WeatherUndergroundAPI(object):
                 return _response
             except (urllib2.URLError, socket.timeout), e:
                 logerr("rtgd",
-                       "Failed to get '%s' on attempt %d" % (query, count+1))
-                logerr("weatherundergroundapi", "   **** %s" % e)
+                       "Failed to get Weather Underground forecast on attempt %d" % (count+1, ))
+                logerr("weatherundergroundapiforecast", "   **** %s" % e)
         else:
-            logerr("rtgd",
-                   "Failed to get Weather Underground '%s'" % (query, ))
+            logerr("rtgd", "Failed to get Weather Underground forecast")
         return None
 
 
