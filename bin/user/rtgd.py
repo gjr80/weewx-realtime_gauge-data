@@ -20,9 +20,7 @@
 # Version: 0.3.7                                      Date: 7 March 2019
 #
 # Revision History
-#   7 March 2019        v0.3.7
-#       - added support for new Weather Company based WeatherUnderground API
-#   19 January 2019     v0.3.6
+#   7 March 2019        v0.3.6
 #       - added support for new weather.com based WU API
 #       - removed support for old api.wunderground.com based WU API
 #   1 January 2019      v0.3.5
@@ -148,7 +146,7 @@
 
 Used to update the SteelSeries Weather Gauges in near real time.
 
-Inspired by crt.py v0.5 by Matthew Wall, a weeWX service to emit loop data to
+Inspired by crt.py v0.5 by Matthew Wall, a WeeWX service to emit loop data to
 file in Cumulus realtime format. Refer http://wiki.sandaysoft.com/a/Realtime.txt
 
 Use of HTTP POST to send gauge-data.txt content to a remote URL inspired by
