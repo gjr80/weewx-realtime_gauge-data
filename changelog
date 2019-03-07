@@ -1,3 +1,6 @@
+v0.3.6
+*   added support for new weather.com based WU API
+*   removed support for old api.wunderground.com based WU API
 v0.3.5
 *   added support for Darksky forecast API
 *   added support for Zambretti forecast text (subject to weeWX forecasting
