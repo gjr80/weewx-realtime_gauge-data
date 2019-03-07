@@ -2,7 +2,7 @@
 #
 # A weeWX service to generate a loop based gauge-data.txt.
 #
-# Copyright (C) 2017-2018 Gary Roderick             gjroderick<at>gmail.com
+# Copyright (C) 2017-2019 Gary Roderick             gjroderick<at>gmail.com
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free
