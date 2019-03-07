@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see http://www.gnu.org/licenses/.
 #
-# Version: 0.3.6                                      Date: 19 January 2019
+# Version: 0.3.7                                      Date: 7 March 2019
 #
 # Revision History
+#   7 March 2019        v0.3.7
+#       - added support for new Weather Company based WeatherUnderground API
 #   19 January 2019     v0.3.6
 #       - added support for new weather.com based WU API
 #       - removed support for old api.wunderground.com based WU API
@@ -337,20 +339,54 @@ sources are:
             # Maximum number attempts to obtain an API response. Default is 3.
             max_tries = 3
 
-            # The location for the forecast and current conditions can be one
-            # of the following:
-            #   CA/San_Francisco     - US state/city
-            #   60290                - US zip code
-            #   Australia/Sydney     - Country/City
-            #   37.8,-122.4          - latitude,longitude
-            #   KJFK                 - airport code
-            #   pws:KCASANFR70       - PWS id
-            #   autoip               - AutoIP address location
-            #   autoip.json?geo_ip=38.102.136.138 - specific IP address
-            #                                       location
-            # If no location is specified, station latitude and longitude are
-            # used
-            location = enter location here
+            # Forecast type to be used. Must be one of the following:
+            #   3day - 3 day forecast
+            #   5day - 5 day forecast
+            #   7day - 7 day forecast
+            #   10day - 10 day forecast
+            #   15day - 15 day forecast
+            # A user's content licensing agreement with The Weather Company
+            # will determine which forecasts are available for a given API
+            # key. The 5 day forecast is commonly available as a free service
+            # for PWS owners. Default is 5day.
+            forecast_type = 3day|5day|7day|10day|15day
+
+            # The location to be used for the forecast. Must be one of:
+            #   geocode - uses latitude/longitude to source the forecast
+            #   iataCode - uses and IATA code to source the forecast
+            #   icaoCode - uses an ICAO code to source the forecast
+            #   placeid - uses a Place ID to source the forecast
+            #   postalKey - uses a post code to source the forecast. Only
+            #               supported in US, UK, France, Germany and Italy.
+            # The format used for each of the location settings is:
+            #   gecode
+            #   iataCode, <code>
+            #   icaoCode, <code>
+            #   placeid, <place ID>
+            #   postalKey, <country code>, <postal code>
+            # Where:
+            #   <code> is the code concerned
+            #   <place ID> is the place ID
+            #   <country code> is the two letter country code (refer https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.d5imu8qa7ywg)
+            #   <postal code> is the postal code
+            # The default is geocode, If gecode is used then the station
+            # latitude and longtitude are used.
+            location = enter location
+
+            # Units to be used in the forecast text. Must be one of the following:
+            #   e - English units
+            #   m - Metric units
+            #   s - SI units
+            #   h - Hybrid(UK) units
+            # Refer to https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.ek9jds3g3p9i
+            # Default is m.
+            units = e|m|s|h
+
+            # Language to be used in the forecast text. Refer to
+            # https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.9ph8uehobq12
+            # for available languages and the corresponding language code.
+            # Default is en-GB
+            language = language code
 
     -   Darksky forecast
 
@@ -502,6 +538,8 @@ from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
+# name of this service
+RTGD_NAME = 'Realtime Gauge Data'
 # version number of this script
 RTGD_VERSION = '0.3.6'
 # version number (format) of the generated gauge-data.txt
@@ -2685,9 +2723,9 @@ class Source(object):
 
 
 class WUSource(ThreadedSource):
-    """Thread that obtains WU API forecast data and places it in a queue.
+    """Thread that obtains WU API forecast text and places it in a queue.
 
-    The WUThread class queries the WU API and places selected forecast data in
+    The WUThread class queries the WU API and places selected forecast text in
     JSON format in a queue used by the data consumer. The WU API is called at a
     user selectable frequency. The thread listens for a shutdown signal from
     its parent.
@@ -2711,6 +2749,7 @@ class WUSource(ThreadedSource):
     """
 
     VALID_FORECASTS = ('3day', '5day', '7day', '10day', '15day')
+    VALID_NARRATIVES = ('day', 'day-night')
     VALID_LOCATORS = ('geocode', 'iataCode', 'icaoCode', 'placeid', 'postalKey')
     VALID_UNITS = ('e', 'm', 's', 'h')
     VALID_LANGUAGES = ('ar-AE', 'az-AZ', 'bg-BG', 'bn-BD', 'bn-IN', 'bs-BA',
@@ -2744,7 +2783,7 @@ class WUSource(ThreadedSource):
         # interval between API calls
         self.interval = to_int(wu_config_dict.get('interval', 1800))
         # max no of tries we will make in any one attempt to contact WU via API
-        self.max_WU_tries = to_int(wu_config_dict.get('max_WU_tries', 3))
+        self.max_tries = to_int(wu_config_dict.get('max_tries', 3))
         # Get API call lockout period. This is the minimum period between API
         # calls for the same feature. This prevents an error condition making
         # multiple rapid API calls and thus breac the API usage conditions.
@@ -2771,7 +2810,11 @@ class WUSource(ThreadedSource):
         # validate units
         self.forecast = _forecast if _forecast in self.VALID_FORECASTS else '5day'
 
-        # FIXME, Not sure the logic is correct shoudl we get a delinquent location setting
+        # get the forecast text to display
+        _narrative = wu_config_dict.get('forecast_text', 'day-night').lower()
+        self.forecast_text = _narrative if _narrative in self.VALID_NARRATIVES else 'day-night'
+
+        # FIXME, Not sure the logic is correct should we get a delinquent location setting
         # get the locator type and location argument to use for the forecast
         # first get the
         _location = wu_config_dict.get('location', 'geocode').split(',', 1)
@@ -2826,6 +2869,7 @@ class WUSource(ThreadedSource):
         now = time.time()
         logdbg2("rtgd",
                 "Last Weather Underground API call at %s" % self.last_call_ts)
+
         # has the lockout period passed since the last call
         if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
             # If we haven't made an API call previously or if its been too long
@@ -2839,7 +2883,7 @@ class WUSource(ThreadedSource):
                                                           units=self.units,
                                                           language=self.language,
                                                           format=self.format,
-                                                          max_tries=self.max_WU_tries)
+                                                          max_tries=self.max_tries)
                     logdbg("rtgd",
                            "Downloaded updated Weather Underground forecast information")
                 except Exception, e:
@@ -2865,34 +2909,68 @@ class WUSource(ThreadedSource):
                    "WU API call limit reached. API call skipped.")
         return None
 
-    def parse_response(self, response, field='narrative'):
-        """ Parse a WU API forecast response and return the required field.
+    def parse_response(self, response):
+        """ Parse a WU API forecast response and return the forecast text.
 
-        Deserialise the WU API forecast response then extract and return the
-        narrative.
+        The WU API forecast response contains a number of forecast texts, the
+        three main ones are:
+
+        - the full day narrative
+        - the day time narrative, and
+        - the night time narrative.
+
+        WU claims that night time is for 7pm to 7am and day time is for 7am to
+        7pm. We will vary that slightly and use daytime for all times up until
+        7pm and thence night time - expect the night time forecast applies to
+        the end of the day not the start of the day (ie after 7pm and up until
+        7am the next day so it does not cover say 1am today - that is in
+        yesterday's forecast which is no longer available).
 
         Input:
             response: A WU API response in JSON format.
 
         Returns:
-            A dictionary containing the fields of interest from the WU API
-            response.
+            The selected forecast text if it exists otherwise None.
         """
 
-        # deserialize the response
+        # deserialize the response but be prepared to catch an exception if the
+        # response can't be parsed
         try:
             _response_json = json.loads(response)
         except ValueError:
+            # can't deserialize the response so log it and return None
             loginf("rtgd",
                    "Unable to deserialise Weather Underground forecast response")
             return None
 
-        # we have forecast data so return the data we want
+        # We have deserialized forecast data so return the data we want. Wrap
+        # in a try..except so we can catch any errors if the data is malformed.
         try:
-            return _response_json[field]
+            # Check which forecast narrative we are after and locate the
+            # appropriate field.
+            if self.forecast_text == 'day':
+                # we want the full day narrative
+                return _response_json['narrative'][0]
+            else:
+                # we want the day time or night time narrative, but which, use
+                # day time for 7am to 7pm otherwise use night time
+                _hour = datetime.datetime.now().hour
+                if _hour < 19:
+                    # it's before 7pm so use day time
+                    _index = _response_json['daypart'][0]['daypartName'].index('Today')
+                else:
+                    # otherwise night time
+                    _index = _response_json['daypart'][0]['daypartName'].index('Tonight')
+                return _response_json['daypart'][0]['narrative'][_index]
         except KeyError:
+            # if we can'f find a field log the error and return None
             loginf("rtgd",
-                   "Unable to locate field '%s' in Weather Underground forecast response" % (field,))
+                   "Unable to locate field for '%s' forecast narrative" % self.forecast_text)
+            return None
+        except ValueError:
+            # if we can'f find an index log the error and return None
+            loginf("rtgd",
+                   "Unable to locate index '%d' for '%s' forecast narrative" % (_index, self.forecast_text))
             return None
 
 
@@ -3643,3 +3721,4 @@ SCROLLER_SOURCES = {'text': TextSource,
                     'weatherunderground': WUSource,
                     'darksky': DarkskySource,
                     'zambretti': ZambrettiSource}
+
