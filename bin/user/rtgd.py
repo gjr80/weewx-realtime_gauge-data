@@ -1,148 +1,154 @@
-# rtgd.py
-#
-# A weeWX service to generate a loop based gauge-data.txt.
-#
-# Copyright (C) 2017-2019 Gary Roderick             gjroderick<at>gmail.com
-#
-# This program is free software: you can redistribute it and/or modify it under
-# the terms of the GNU General Public License as published by the Free
-# Software Foundation, either version 3 of the License, or (at your option) any
-# later version.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program.  If not, see http://www.gnu.org/licenses/.
-#
-# Version: 0.3.7                                      Date: 7 March 2019
-#
-# Revision History
-#   7 March 2019        v0.3.6
-#       - added support for new weather.com based WU API
-#       - removed support for old api.wunderground.com based WU API
-#   1 January 2019      v0.3.5
-#       - added support for Darksky forecast API
-#       - added support for Zambretti forecast text (subject to weeWX
-#         forecasting extension being installed)
-#       - refactored code for obtaining scroller text
-#       - each scroller text block now uses its own 2nd level (ie [[ ]]) config
-#         with the scroller block specified under [RealtimeGaugeData]
-#   26 April 2018       v0.3.4 (not released)
-#       - Added support for optional fields mrfall and yrfall that provide 
-#         month and year to date rainfall respectively. Optional fields are 
-#         calculated/added to output if config options mtd_rain and/or ytd_rain 
-#         are set True.
-#   26 April 2018       v0.3.3
-#       - implemented atomic write when writing gauge-data.txt to file
-#   20 January 2018     v0.3.2
-#       - modified rtgdthread queue management to fix 100% CPU usage issue
-#   3 December 2017     v0.3.1
-#       - added ignore_lost_contact config option to ignore the sensor contact
-#         check result
-#       - refactored lost contact flag check code, now uses a dedicated method
-#         to determine whether sensor contact has been lost
-#       - changed a syslog entry to indicate 'rtgd' as the block not 'engine'
-#   4 September 2017    v0.3.0
-#       - added ability to include Weather Underground forecast text
-#   8 July 2017         v0.2.14
-#       - changed default decimal places for foot, inHg, km_per_hour and
-#         mile_per_hour
-#       - reformatted change summary
-#       - minor refactoring of RtgdBuffer class
-#   6 May 2017          v0.2.13
-#       - unnecessary whitespace removed from JSON output(issue #2)
-#       - JSON output now sorted alphabetically by key (issue #2)
-#       - Revised debug logging. Now supports debug=0,1,2 and 3: (issue #7)
-#         0 - standard weeWX output, no debug info
-#         1 - as per debug=0, advises whether Zambretti is available, logs
-#             minor non-fatal errors (eg posting)
-#         2 - as per debug=1, logs events that occur, eg packets queued,
-#             packets processed, output generated
-#         3   as per debug=2, logs packet/record contents
-#       - gauge-data.txt destination directory tree is created if it does not
-#         exist(issue #8)
-#   27 March 2017       v0.2.12(never released)
-#       - fixed empty sequence ValueError associated with BearingRangeFrom10
-#         and BearingRangeTo10
-#       - fixed division by zero error in windrun calculations for first
-#         archive period of the day
-#   22 March 2017       v0.2.11
-#       - can now include local date/time in scroller text by including
-#         strftime() format directives in the scroller text
-#       - gauge-data.txt content can now be sent to a remote URL via HTTP POST.
-#         Thanks to Alec Bennett for his idea.
-#   17 March 2017       v0.2.10
-#       - now supports reading scroller text from a text file specified by the
-#         scroller_text config option in [RealtimeGaugeData]
-#   7 March 2017        v0.2.9
-#       - reworked ten minute gust calculation to fix problem where red gust
-#         'wedge' would occasionally temporarily disappear from wind speed
-#         gauge
-#   28 February 2017    v0.2.8
-#       - reworked day max/min calculations to better handle missing historical
-#         data. If historical max/min data is missing day max/min will default
-#         to the current value for the obs concerned.
-#   26 February 2017    v0.2.7
-#       - loop packets are now cached to support stations that emit partial
-#         packets
-#       - windSpeed obtained from archive is now only handled as a ValueTuple
-#         to avoid units issues
-#   22 February 2017    v0.2.6
-#       - updated docstring config options to reflect current library of
-#         available options
-#       - 'latest' and 'avgbearing' wind directions now return the last
-#         non-None wind direction respectively when their feeder direction is
-#         None
-#       - implemented optional scroller_text config option allowing fixed
-#         scroller text to be specified in lieu of Zambretti forecast text
-#       - renamed rtgd thread and queue variables
-#       - no longer reads unit group config options that have only one possible
-#         unit
-#       - use of mmHg, knot or cm units reverts to hPa, mile_per_hour and mm
-#         respectively due to weeWX or SteelSeries Gauges not understanding the
-#         unit (or derived unit)
-#       - made gauge-data.txt unit code determination more robust
-#       - reworked code that formats gauge-data.txt field data to better handle
-#         None values
-#   21 February 2017    v0.2.5
-#       - fixed error where altitude units could not be changed from meter
-#       - rainrate and windrun unit groups are now derived from rain and speed
-#         units groups respectively
-#       - solar calc config options no longer searched for in [StdWXCalculate]
-#   20 February 2017    v0.2.4
-#       - fixed error where rain units could not be changed from mm
-#       - pressures now formats to correct number of decimal places
-#       - reworked temp and pressure trend formatting
-#   20 February 2017    v0.2.3
-#       - Fixed logic error in windrose calculations. Minor tweaking of
-#         windrose processing.
-#   19 February 2017    v0.2.2
-#       - Added config option apptemp_binding specifying a binding containing
-#         appTemp data. apptempTL and apptempTH default to apptemp if binding
-#         not specified or it does not contain appTemp data.
-#   15 February 2017    v0.2.1
-#       - fixed error that resulted in incorrect pressL and pressH values
-#   24 January 2017     v0.2.0
-#       - now runs in a thread to eliminate blocking impact on weeWX
-#       - now calculates WindRoseData
-#       - now calculates pressL and pressH
-#       - frequency of generation is now specified by a single config option
-#         min_interval
-#       - gauge-data.txt output path is now specified by rtgd_path config
-#         option
-#       - added config options for windrose period and number of compass points
-#         to be generated
-#   19 January 2017     v0.1.2
-#       - fix error that occurred when stations do not emit radiation
-#   18 January 2017     v0.1.1
-#       - better handles loop observations that are None
-#   3 January 2017      v0.1.0
-#       - initial release
-#
-"""A weeWX service to generate a loop based gauge-data.txt.
+"""
+rtgd.py
+
+A weeWX service to generate a loop based gauge-data.txt.
+
+Copyright (C) 2017-2019 Gary Roderick             gjroderick<at>gmail.com
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see http://www.gnu.org/licenses/.
+
+  Version: 0.3.6                                      Date: 28 March 2019
+
+  Revision History
+    7 March 2019        v0.3.6
+        - added support for new weather.com based WU API
+        - removed support for old api.wunderground.com based WU API
+        - updated to gauge-data.txt version 14 through addition of inTemp
+          max/min and times fields (intempTH, intempTL, TintempTH and TintempTL)
+        - minor reformatting of some RealtimeGaugeDataThread __init__ logging
+        - reformatted up front comments
+        - fixed incorrect rtgd.py version number
+    1 January 2019      v0.3.5
+        - added support for Darksky forecast API
+        - added support for Zambretti forecast text (subject to weeWX
+          forecasting extension being installed)
+        - refactored code for obtaining scroller text
+        - each scroller text block now uses its own 2nd level (ie [[ ]]) config
+          with the scroller block specified under [RealtimeGaugeData]
+    26 April 2018       v0.3.4 (not released)
+        - Added support for optional fields mrfall and yrfall that provide 
+          month and year to date rainfall respectively. Optional fields are 
+          calculated/added to output if config options mtd_rain and/or ytd_rain 
+          are set True.
+    26 April 2018       v0.3.3
+        - implemented atomic write when writing gauge-data.txt to file
+    20 January 2018     v0.3.2
+        - modified rtgdthread queue management to fix 100% CPU usage issue
+    3 December 2017     v0.3.1
+        - added ignore_lost_contact config option to ignore the sensor contact
+          check result
+        - refactored lost contact flag check code, now uses a dedicated method
+          to determine whether sensor contact has been lost
+        - changed a syslog entry to indicate 'rtgd' as the block not 'engine'
+    4 September 2017    v0.3.0
+        - added ability to include Weather Underground forecast text
+    8 July 2017         v0.2.14
+        - changed default decimal places for foot, inHg, km_per_hour and
+          mile_per_hour
+        - reformatted change summary
+        - minor refactoring of RtgdBuffer class
+    6 May 2017          v0.2.13
+        - unnecessary whitespace removed from JSON output(issue #2)
+        - JSON output now sorted alphabetically by key (issue #2)
+        - Revised debug logging. Now supports debug=0,1,2 and 3: (issue #7)
+          0 - standard weeWX output, no debug info
+          1 - as per debug=0, advises whether Zambretti is available, logs
+              minor non-fatal errors (eg posting)
+          2 - as per debug=1, logs events that occur, eg packets queued,
+              packets processed, output generated
+          3   as per debug=2, logs packet/record contents
+        - gauge-data.txt destination directory tree is created if it does not
+          exist(issue #8)
+    27 March 2017       v0.2.12(never released)
+        - fixed empty sequence ValueError associated with BearingRangeFrom10
+          and BearingRangeTo10
+        - fixed division by zero error in windrun calculations for first
+          archive period of the day
+    22 March 2017       v0.2.11
+        - can now include local date/time in scroller text by including
+          strftime() format directives in the scroller text
+        - gauge-data.txt content can now be sent to a remote URL via HTTP POST.
+          Thanks to Alec Bennett for his idea.
+    17 March 2017       v0.2.10
+        - now supports reading scroller text from a text file specified by the
+          scroller_text config option in [RealtimeGaugeData]
+    7 March 2017        v0.2.9
+        - reworked ten minute gust calculation to fix problem where red gust
+          'wedge' would occasionally temporarily disappear from wind speed
+          gauge
+    28 February 2017    v0.2.8
+        - reworked day max/min calculations to better handle missing historical
+          data. If historical max/min data is missing day max/min will default
+          to the current value for the obs concerned.
+    26 February 2017    v0.2.7
+        - loop packets are now cached to support stations that emit partial
+          packets
+        - windSpeed obtained from archive is now only handled as a ValueTuple
+          to avoid units issues
+    22 February 2017    v0.2.6
+        - updated docstring config options to reflect current library of
+          available options
+        - 'latest' and 'avgbearing' wind directions now return the last
+          non-None wind direction respectively when their feeder direction is
+          None
+        - implemented optional scroller_text config option allowing fixed
+          scroller text to be specified in lieu of Zambretti forecast text
+        - renamed rtgd thread and queue variables
+        - no longer reads unit group config options that have only one possible
+          unit
+        - use of mmHg, knot or cm units reverts to hPa, mile_per_hour and mm
+          respectively due to weeWX or SteelSeries Gauges not understanding the
+          unit (or derived unit)
+        - made gauge-data.txt unit code determination more robust
+        - reworked code that formats gauge-data.txt field data to better handle
+          None values
+    21 February 2017    v0.2.5
+        - fixed error where altitude units could not be changed from meter
+        - rainrate and windrun unit groups are now derived from rain and speed
+          units groups respectively
+        - solar calc config options no longer searched for in [StdWXCalculate]
+    20 February 2017    v0.2.4
+        - fixed error where rain units could not be changed from mm
+        - pressures now formats to correct number of decimal places
+        - reworked temp and pressure trend formatting
+    20 February 2017    v0.2.3
+        - Fixed logic error in windrose calculations. Minor tweaking of
+          windrose processing.
+    19 February 2017    v0.2.2
+        - Added config option apptemp_binding specifying a binding containing
+          appTemp data. apptempTL and apptempTH default to apptemp if binding
+          not specified or it does not contain appTemp data.
+    15 February 2017    v0.2.1
+        - fixed error that resulted in incorrect pressL and pressH values
+    24 January 2017     v0.2.0
+        - now runs in a thread to eliminate blocking impact on weeWX
+        - now calculates WindRoseData
+        - now calculates pressL and pressH
+        - frequency of generation is now specified by a single config option
+          min_interval
+        - gauge-data.txt output path is now specified by rtgd_path config
+          option
+        - added config options for windrose period and number of compass points
+          to be generated
+    19 January 2017     v0.1.2
+        - fix error that occurred when stations do not emit radiation
+    18 January 2017     v0.1.1
+        - better handles loop observations that are None
+    3 January 2017      v0.1.0
+        - initial release
+
+
+A weeWX service to generate a loop based gauge-data.txt.
 
 Used to update the SteelSeries Weather Gauges in near real time.
 
@@ -357,7 +363,7 @@ sources are:
             #   postalKey - uses a post code to source the forecast. Only
             #               supported in US, UK, France, Germany and Italy.
             # The format used for each of the location settings is:
-            #   gecode
+            #   geocode
             #   iataCode, <code>
             #   icaoCode, <code>
             #   placeid, <place ID>
@@ -368,7 +374,7 @@ sources are:
             #   <country code> is the two letter country code (refer https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.d5imu8qa7ywg)
             #   <postal code> is the postal code
             # The default is geocode, If gecode is used then the station
-            # latitude and longtitude are used.
+            # latitude and longitude are used.
             location = enter location
 
             # Units to be used in the forecast text. Must be one of the following:
@@ -536,12 +542,10 @@ from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
-# name of this service
-RTGD_NAME = 'Realtime Gauge Data'
 # version number of this script
 RTGD_VERSION = '0.3.6'
 # version number (format) of the generated gauge-data.txt
-GAUGE_DATA_VERSION = '13'
+GAUGE_DATA_VERSION = '14'
 
 # ordinal compass points supported
 COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
@@ -577,7 +581,8 @@ STATION_LOST_CONTACT = {'Vantage': {'field': 'rxCheckPercent', 'value': 0},
                         'WS28xx': {'field': 'rxCheckPercent', 'value': 0},
                         'TE923': {'field': 'rxCheckPercent', 'value': 0},
                         'WS1': {'field': 'rxCheckPercent', 'value': 0},
-                        'CC3000': {'field': 'rxCheckPercent', 'value': 0}}
+                        'CC3000': {'field': 'rxCheckPercent', 'value': 0}
+                        }
 # stations supporting lost contact reporting through their archive record
 ARCHIVE_STATIONS = ['Vantage']
 # stations supporting lost contact reporting through their loop packet
@@ -1078,17 +1083,19 @@ class RealtimeGaugeDataThread(threading.Thread):
         # notify the user of a couple of things that we will do
         # frequency of generation
         if self.min_interval is None:
-            _msg = "RealTimeGaugeData will generate gauge-data.txt. "\
-                       "min_interval is None"
+            _msg = "'%s' wil be generated. "\
+                       "min_interval is None" % self.rtgd_path_file
         elif self.min_interval == 1:
-            _msg = "RealTimeGaugeData will generate gauge-data.txt. "\
-                       "min_interval is 1 second"
+            _msg = "'%s' will be generated. "\
+                       "min_interval is 1 second" % self.rtgd_path_file
         else:
-            _msg = "RealTimeGaugeData will generate gauge-data.txt. min_interval is %s seconds" % self.min_interval
-        loginf("rtgd", _msg)
+            _msg = "'%s' will be generated. "\
+                       "min_interval is %s seconds" % (self.rtgd_path_file,
+                                                       self.min_interval)
+        loginf("rtgdthread", _msg)
         # lost contact
         if self.ignore_lost_contact:
-            loginf("rtgd", "RealTimeGaugeData will ignore sensor contact state")
+            loginf("rtgdthread", "Sensor contact state will be ignored")
 
     def run(self):
         """Collect packets from the rtgd queue and manage their processing.
@@ -1253,6 +1260,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # generate if we have no minimum interval setting or if minimum
         # interval seconds have elapsed since our last generation
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
+            # TODO. Could this try..except be reduced in scope
             try:
                 # get a cached packet
                 cached_packet = self.packet_cache.get_packet(packet['dateTime'],
@@ -1324,10 +1332,14 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # we get self.response back in a return message? Check for
                 # self.response, if its there then we can return. If it's
                 # not there then log it and return.
-                if self.response is not None and self.response not in response:
-                    # didn't get 'success' so log it and continue
-                    logdbg("rtgdthread",
-                           "Failed to post data: Unexpected response")
+                if self.response is not None:
+                    if self.response in response:
+                        # did get 'success' so log it and continue
+                        logdbg2("rtgdthread", "Successfully posted data")
+                    else:
+                        # didn't get 'success' so log it and continue
+                        logdbg("rtgdthread",
+                               "Failed to post data: Unexpected response")
                 return
             # we received a bad response code, log it and continue
             logdbg("rtgdthread",
@@ -1485,6 +1497,38 @@ class RealtimeGaugeDataThread(threading.Thread):
         intemp = convert(intemp_vt, self.temp_group).value
         intemp = intemp if intemp is not None else 0.0
         data['intemp'] = self.temp_format % intemp
+        # intempTL - today's low inside temperature
+        intemp_tl_vt = ValueTuple(self.day_stats['inTemp'].min,
+                                  self.p_temp_type,
+                                  self.p_temp_group)
+        intemp_tl = convert(intemp_tl_vt, self.temp_group).value
+        intemp_tl_loop_vt = ValueTuple(self.buffer.tempL_loop[0],
+                                       self.p_temp_type,
+                                       self.p_temp_group)
+        intemp_l_loop = convert(intemp_tl_loop_vt, self.temp_group).value
+        intemp_tl = weeutil.weeutil.min_with_none([intemp_l_loop, intemp_tl])
+        intemp_tl = intemp_tl if intemp_tl is not None else temp
+        data['intempTL'] = self.temp_format % intemp_tl
+        # intempTH - today's high inside temperature
+        intemp_th_vt = ValueTuple(self.day_stats['inTemp'].max,
+                                  self.p_temp_type,
+                                  self.p_temp_group)
+        intemp_th = convert(intemp_th_vt, self.temp_group).value
+        intemp_th_loop_vt = ValueTuple(self.buffer.intempH_loop[0],
+                                       self.p_temp_type,
+                                       self.p_temp_group)
+        intemp_h_loop = convert(intemp_th_loop_vt, self.temp_group).value
+        intemp_th = max(intemp_h_loop, intemp_th)
+        intemp_th = intemp_th if intemp_th is not None else temp
+        data['tempTH'] = self.temp_format % intemp_th
+        # TintempTL - time of today's low inside temp (hh:mm)
+        tintemp_tl = time.localtime(self.day_stats['inTemp'].mintime) if intemp_l_loop >= intemp_tl else \
+            time.localtime(self.buffer.intempL_loop[1])
+        data['TintempTL'] = time.strftime(self.time_format, tintemp_tl)
+        # TintempTH - time of today's high inside temp (hh:mm)
+        tintemp_th = time.localtime(self.day_stats['inTemp'].maxtime) if intemp_h_loop <= intemp_th else \
+            time.localtime(self.buffer.intempH_loop[1])
+        data['TtempTH'] = time.strftime(self.time_format, tintemp_th)
         # hum - relative humidity
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
@@ -2088,6 +2132,8 @@ class RtgdBuffer(object):
         # initialise loop period low/high/max stats
         self.tempL_loop = [None, None]
         self.tempH_loop = [None, None]
+        self.intempL_loop = [None, None]
+        self.intempH_loop = [None, None]
         self.dewpointL_loop = [None, None]
         self.dewpointH_loop = [None, None]
         self.apptempL_loop = [None, None]
@@ -2126,6 +2172,8 @@ class RtgdBuffer(object):
         # reset loop period low/high/max stats
         self.tempL_loop = [None, None]
         self.tempH_loop = [None, None]
+        self.intempL_loop = [None, None]
+        self.intempH_loop = [None, None]
         self.dewpointL_loop = [None, None]
         self.dewpointH_loop = [None, None]
         self.apptempL_loop = [None, None]
@@ -2235,12 +2283,19 @@ class RtgdBuffer(object):
         packet_d = dict(packet)
         ts = packet_d['dateTime']
 
-        # process temp
+        # process outside temp
         out_temp = packet_d.get('outTemp', None)
         if out_temp is not None:
             self.tempL_loop = [out_temp, ts] if (out_temp < self.tempL_loop[0] or self.tempL_loop[0] is None) else \
                 self.tempL_loop
             self.tempH_loop = [out_temp, ts] if out_temp > self.tempH_loop[0] else self.tempH_loop
+
+        # process inside temp
+        in_temp = packet_d.get('inTemp', None)
+        if in_temp is not None:
+            self.intempL_loop = [in_temp, ts] if (in_temp < self.intempL_loop[0] or self.intempL_loop[0] is None) else \
+                self.intempL_loop
+            self.intempH_loop = [in_temp, ts] if in_temp > self.intempH_loop[0] else self.intempH_loop
 
         # process dewpoint
         dewpoint = packet_d.get('dewpoint', None)
