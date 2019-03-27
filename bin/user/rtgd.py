@@ -20,7 +20,7 @@ this program.  If not, see http://www.gnu.org/licenses/.
   Version: 0.3.6                                      Date: 28 March 2019
 
   Revision History
-    7 March 2019        v0.3.6
+    28 March 2019       v0.3.6
         - added support for new weather.com based WU API
         - removed support for old api.wunderground.com based WU API
         - updated to gauge-data.txt version 14 through addition of inTemp
