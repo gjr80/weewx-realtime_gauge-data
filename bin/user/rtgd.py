@@ -1502,12 +1502,12 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.p_temp_type,
                                   self.p_temp_group)
         intemp_tl = convert(intemp_tl_vt, self.temp_group).value
-        intemp_tl_loop_vt = ValueTuple(self.buffer.tempL_loop[0],
+        intemp_tl_loop_vt = ValueTuple(self.buffer.intempL_loop[0],
                                        self.p_temp_type,
                                        self.p_temp_group)
         intemp_l_loop = convert(intemp_tl_loop_vt, self.temp_group).value
         intemp_tl = weeutil.weeutil.min_with_none([intemp_l_loop, intemp_tl])
-        intemp_tl = intemp_tl if intemp_tl is not None else temp
+        intemp_tl = intemp_tl if intemp_tl is not None else intemp
         data['intempTL'] = self.temp_format % intemp_tl
         # intempTH - today's high inside temperature
         intemp_th_vt = ValueTuple(self.day_stats['inTemp'].max,
@@ -1519,8 +1519,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                        self.p_temp_group)
         intemp_h_loop = convert(intemp_th_loop_vt, self.temp_group).value
         intemp_th = max(intemp_h_loop, intemp_th)
-        intemp_th = intemp_th if intemp_th is not None else temp
-        data['tempTH'] = self.temp_format % intemp_th
+        intemp_th = intemp_th if intemp_th is not None else intemp
+        data['intempTH'] = self.temp_format % intemp_th
         # TintempTL - time of today's low inside temp (hh:mm)
         tintemp_tl = time.localtime(self.day_stats['inTemp'].mintime) if intemp_l_loop >= intemp_tl else \
             time.localtime(self.buffer.intempL_loop[1])
@@ -1528,7 +1528,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # TintempTH - time of today's high inside temp (hh:mm)
         tintemp_th = time.localtime(self.day_stats['inTemp'].maxtime) if intemp_h_loop <= intemp_th else \
             time.localtime(self.buffer.intempH_loop[1])
-        data['TtempTH'] = time.strftime(self.time_format, tintemp_th)
+        data['TintempTH'] = time.strftime(self.time_format, tintemp_th)
         # hum - relative humidity
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
         data['hum'] = self.hum_format % hum
