@@ -1,6 +1,12 @@
 v0.3.6
 *   added support for new weather.com based WU API
 *   removed support for old api.wunderground.com based WU API
+*   updated to gauge-data.txt version 14 through addition of inTemp max/min and
+    times fields (intempTH, intempTL, TintempTH and TintempTL)
+*   minor reformatting of some RealtimeGaugeDataThread __init__ logging
+*   reformatted up front comments in rtgd.py
+*   changed the install instructions to restart rather than stopping then
+    starting the WeeWX service
 v0.3.5
 *   added support for Darksky forecast API
 *   added support for Zambretti forecast text (subject to weeWX forecasting

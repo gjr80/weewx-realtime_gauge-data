@@ -11,10 +11,10 @@
 #
 #                     Installer for Realtime gauge-data
 #
-# Version: 0.3.6                                        Date: 7 March 2019
+# Version: 0.3.6                                        Date: 28 March 2019
 #
 # Revision History
-#   7 March 2019        v0.3.6
+#   28 March 2019       v0.3.6
 #       - bumped version only
 #   1 January 2019      v0.3.5
 #       - reworked default install [RealtimeGaugeData] config stanza as per
