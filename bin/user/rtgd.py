@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-  Version: 0.3.6                                      Date: 28 March 2019
+  Version: 0.3.7                                      Date: 4 April 2019
 
   Revision History
+    4 April 2019        v0.3.7
+        - revised WU API response parsing to eliminate occasional errors where
+          no forecast text was found
     28 March 2019       v0.3.6
         - added support for new weather.com based WU API
         - removed support for old api.wunderground.com based WU API
@@ -543,7 +546,7 @@ from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
 # version number of this script
-RTGD_VERSION = '0.3.6'
+RTGD_VERSION = '0.3.7'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -2973,11 +2976,12 @@ class WUSource(ThreadedSource):
         - the night time narrative.
 
         WU claims that night time is for 7pm to 7am and day time is for 7am to
-        7pm. We will vary that slightly and use daytime for all times up until
-        7pm and thence night time - expect the night time forecast applies to
-        the end of the day not the start of the day (ie after 7pm and up until
-        7am the next day so it does not cover say 1am today - that is in
-        yesterday's forecast which is no longer available).
+        7pm though anecdotally it appears that the day time forecast disappears
+        late afternoon and reappears early morning. If day-night forecast text
+        is selected we will look for a day time forecast up until 7pm with a
+        fallback to the night time forecast. From 7pm to midnight the nighttime
+        forecast will be used. If day forecast text is selected then we will
+        use the higher level full day forecast text.
 
         Input:
             response: A WU API response in JSON format.
@@ -2987,7 +2991,7 @@ class WUSource(ThreadedSource):
         """
 
         # deserialize the response but be prepared to catch an exception if the
-        # response can't be parsed
+        # response can't be deserialized
         try:
             _response_json = json.loads(response)
         except ValueError:
@@ -2996,34 +3000,89 @@ class WUSource(ThreadedSource):
                    "Unable to deserialise Weather Underground forecast response")
             return None
 
-        # We have deserialized forecast data so return the data we want. Wrap
-        # in a try..except so we can catch any errors if the data is malformed.
-        try:
-            # Check which forecast narrative we are after and locate the
-            # appropriate field.
-            if self.forecast_text == 'day':
-                # we want the full day narrative
+        # forecast data has been deserialized so check which forecast narrative
+        # we are after and locate the appropriate field.
+        if self.forecast_text == 'day':
+            # we want the full day narrative, use a try..except in case the
+            # response is malformed
+            try:
                 return _response_json['narrative'][0]
+            except KeyError:
+                # could not find the narrative so log and return None
+                logdbg("rtgd", "Unable to locate 'narrative' field for "
+                               "'%s' forecast narrative" % self.forecast_text)
+                return None
+        else:
+            # we want the day time or night time narrative, but which, WU
+            # starts dropping the day narrative late in the afternoon and it
+            # does not return until the early hours of the morning. If possible
+            # use day time up until 7pm but be prepared to fall back to night
+            # if the day narrative has disappeared. Use night narrative for 7pm
+            # to 7am but start looking for day again after midnight.
+            # get the current local hour
+            _hour = datetime.datetime.now().hour
+            # helper string for later logging
+            if 7 <= _hour < 19:
+                _period_str = 'daytime'
             else:
-                # we want the day time or night time narrative, but which, use
-                # day time for 7am to 7pm otherwise use night time
-                _hour = datetime.datetime.now().hour
-                if _hour < 19:
-                    # it's before 7pm so use day time
-                    _index = _response_json['daypart'][0]['daypartName'].index('Today')
-                else:
-                    # otherwise night time
-                    _index = _response_json['daypart'][0]['daypartName'].index('Tonight')
+                _period_str = 'nighttime'
+            # day_index is the index of the day time forecast for today, it
+            # will either be 0 (ie the first entry) or None if today's day
+            # forecast is not present. If it is None then the night time
+            # forecast is used. Start by assuming there is no day forecast.
+            day_index = None
+            if _hour < 19:
+                # it's before 7pm so use day time, first check if it exists
+                try:
+                    day_index = _response_json['daypart'][0]['dayOrNight'].index('D')
+                except KeyError:
+                    # couldn't find a key for one of the fields, log it and
+                    # force use of night index
+                    loginf("rtgd",
+                           "Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
+                                                                                                   self.forecast_text))
+                    day_index = None
+                except ValueError:
+                    # could not get an index for 'D', log it and force use of
+                    # night index
+                    loginf("rtgd",
+                           "Unable to locate 'D' index for %s '%s' forecast narrative" % (_period_str,
+                                                                                          self.forecast_text))
+                    day_index = None
+            # we have a day_index but is it for today or some later day
+            if day_index is not None and day_index <= 1:
+                # we have a suitable day index so use it
+                _index = day_index
+            else:
+                # no day index for today so try the night index
+                try:
+                    _index = _response_json['daypart'][0]['dayOrNight'].index('N')
+                except KeyError:
+                    # couldn't find a key for one of the fields, log it and
+                    # return None
+                    loginf("rtgd",
+                           "Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
+                                                                                                   self.forecast_text))
+                    return None
+                except ValueError:
+                    # could not get an index for 'N', log it and return None
+                    loginf("rtgd",
+                           "Unable to locate 'N' index for %s '%s' forecast narrative" % (_period_str,
+                                                                                          self.forecast_text))
+                    return None
+            # if we made it here we have an index to use so get the required
+            # narrative
+            try:
                 return _response_json['daypart'][0]['narrative'][_index]
-        except KeyError:
-            # if we can'f find a field log the error and return None
-            loginf("rtgd",
-                   "Unable to locate field for '%s' forecast narrative" % self.forecast_text)
-            return None
-        except ValueError:
-            # if we can'f find an index log the error and return None
-            loginf("rtgd",
-                   "Unable to locate index '%d' for '%s' forecast narrative" % (_index, self.forecast_text))
+            except KeyError:
+                # if we can'f find a field log the error and return None
+                loginf("rtgd",
+                       "Unable to locate 'narrative' field for '%s' forecast narrative" % self.forecast_text)
+            except ValueError:
+                # if we can'f find an index log the error and return None
+                loginf("rtgd",
+                       "Unable to locate 'narrative' index for '%s' forecast narrative" % self.forecast_text)
+
             return None
 
 
@@ -3774,4 +3833,3 @@ SCROLLER_SOURCES = {'text': TextSource,
                     'weatherunderground': WUSource,
                     'darksky': DarkskySource,
                     'zambretti': ZambrettiSource}
-
