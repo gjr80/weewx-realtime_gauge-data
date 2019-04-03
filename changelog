@@ -1,3 +1,6 @@
+v0.3.7
+*   revised WU API response parsing to eliminate occasional errors where no
+    forecast text was found
 v0.3.6
 *   added support for new weather.com based WU API
 *   removed support for old api.wunderground.com based WU API
