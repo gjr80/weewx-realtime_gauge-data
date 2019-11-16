@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-  Version: 0.3.7                                      Date: 4 April 2019
+  Version: 0.4.0                                      Date: 16 November 2019
 
   Revision History
+    16 November 2019    v0.4.0
+        - now python 2 and 3 compatible
+        - works under WeeWX v4.0 (largely just changed to new logging)
     4 April 2019        v0.3.7
         - revised WU API response parsing to eliminate occasional errors where
           no forecast text was found
@@ -52,7 +55,7 @@ this program.  If not, see http://www.gnu.org/licenses/.
           check result
         - refactored lost contact flag check code, now uses a dedicated method
           to determine whether sensor contact has been lost
-        - changed a syslog entry to indicate 'rtgd' as the block not 'engine'
+        - changed a log entry to indicate 'rtgd' as the block not 'engine'
     4 September 2017    v0.3.0
         - added ability to include Weather Underground forecast text
     8 July 2017         v0.2.14
@@ -527,17 +530,18 @@ import datetime
 import errno
 import httplib
 import json
+import logging
 import math
 import os
 import os.path
 import socket
-import syslog
 import threading
 import time
 import urllib2
 
 # weeWX imports
 import weewx
+import weeutil.logger
 import weeutil.weeutil
 import weewx.units
 import weewx.wxformulas
@@ -545,8 +549,11 @@ from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
 from weeutil.weeutil import to_bool, to_int, startOfDay
 
+# get a logger object
+log = logging.getLogger(__name__)
+
 # version number of this script
-RTGD_VERSION = '0.3.7'
+RTGD_VERSION = '0.4.0'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -590,36 +597,6 @@ STATION_LOST_CONTACT = {'Vantage': {'field': 'rxCheckPercent', 'value': 0},
 ARCHIVE_STATIONS = ['Vantage']
 # stations supporting lost contact reporting through their loop packet
 LOOP_STATIONS = ['FineOffsetUSB']
-
-
-def logmsg(level, msg):
-    syslog.syslog(level, msg)
-
-
-def logcrit(sid, msg):
-    logmsg(syslog.LOG_CRIT, '%s: %s' % (sid, msg))
-
-
-def logdbg(sid, msg):
-    logmsg(syslog.LOG_DEBUG, '%s: %s' % (sid, msg))
-
-
-def logdbg2(sid, msg):
-    if weewx.debug >= 2:
-        logmsg(syslog.LOG_DEBUG, '%s: %s' % (sid, msg))
-
-
-def logdbg3(sid, msg):
-    if weewx.debug >= 3:
-        logmsg(syslog.LOG_DEBUG, '%s: %s' % (sid, msg))
-
-
-def loginf(sid, msg):
-    logmsg(syslog.LOG_INFO, '%s: %s' % (sid, msg))
-
-
-def logerr(sid, msg):
-    logmsg(syslog.LOG_ERR, '%s: %s' % (sid, msg))
 
 
 # ============================================================================
@@ -698,7 +675,7 @@ class RealtimeGaugeData(StdService):
             # We have an invalid block specified. Log this and use the default
             # class Source which will provide a zero length string for the 
             # scroller text.
-            loginf("rtgd", "Unknown block specified for scroller_text")
+            log.info("Unknown block specified for scroller_text")
             source_class = Source
         # create queues for passing data and controlling our block object
         self.source_ctl_queue = Queue.Queue()
@@ -719,10 +696,9 @@ class RealtimeGaugeData(StdService):
                     'payload': event.packet}
         self.rtgd_ctl_queue.put(_package)
         if weewx.debug == 2:
-            logdbg("rtgd",
-                   "queued loop packet (%s)" % _package['payload']['dateTime'])
+            log.debug("queued loop packet (%s)" % _package['payload']['dateTime'])
         elif weewx.debug >= 3:
-            logdbg("rtgd", "queued loop packet: %s" % _package['payload'])
+            log.debug("queued loop packet: %s" % _package['payload'])
 
     def new_archive_record(self, event):
         """Puts archive records in the rtgd queue."""
@@ -733,10 +709,9 @@ class RealtimeGaugeData(StdService):
                     'payload': event.record}
         self.rtgd_ctl_queue.put(_package)
         if weewx.debug == 2:
-            logdbg("rtgd",
-                   "queued archive record (%s)" % _package['payload']['dateTime'])
+            log.debug("queued archive record (%s)" % _package['payload']['dateTime'])
         elif weewx.debug >= 3:
-            logdbg("rtgd", "queued archive record: %s" % _package['payload'])
+            log.debug("queued archive record: %s" % _package['payload'])
         # get alltime min max baro and put in the queue
         # get the min and max values (incl usUnits)
         _minmax_baro = self.get_minmax_obs('barometer')
@@ -747,10 +722,9 @@ class RealtimeGaugeData(StdService):
                         'payload': _minmax_baro}
             self.rtgd_ctl_queue.put(_package)
             if weewx.debug == 2:
-                logdbg("rtgd", "queued min/max barometer values")
+                log.debug("queued min/max barometer values")
             elif weewx.debug >= 3:
-                logdbg("rtgd",
-                       "queued min/max barometer values: %s" % _package['payload'])
+                log.debug("queued min/max barometer values: %s" % _package['payload'])
         # if required get updated month to date rainfall and put in the queue
         if self.mtd_rain:
             _tspan = weeutil.weeutil.archiveMonthSpan(event.record['dateTime']) 
@@ -763,10 +737,9 @@ class RealtimeGaugeData(StdService):
                             'payload': _payload}
                 self.rtgd_ctl_queue.put(_package)
                 if weewx.debug == 2:
-                    logdbg("rtgd", "queued month to date rain")
+                    log.debug("queued month to date rain")
                 elif weewx.debug >= 3:
-                    logdbg("rtgd",
-                           "queued month to date rain: %s" % _package['payload'])
+                    log.debug("queued month to date rain: %s" % _package['payload'])
         # if required get updated year to date rainfall and put in the queue
         if self.ytd_rain:
             _tspan = weeutil.weeutil.archiveYearSpan(event.record['dateTime']) 
@@ -779,10 +752,9 @@ class RealtimeGaugeData(StdService):
                             'payload': _payload}
                 self.rtgd_ctl_queue.put(_package)
                 if weewx.debug == 2:
-                    logdbg("rtgd", "queued year to date rain")
+                    log.debug("queued year to date rain")
                 elif weewx.debug >= 3:
-                    logdbg("rtgd",
-                           "queued year to date rain: %s" % _package['payload'])
+                    log.debug("queued year to date rain: %s" % _package['payload'])
     
     def end_archive_period(self, event):
         """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
@@ -792,7 +764,8 @@ class RealtimeGaugeData(StdService):
         _package = {'type': 'event',
                     'payload': weewx.END_ARCHIVE_PERIOD}
         self.rtgd_ctl_queue.put(_package)
-        logdbg2("rtgd", "queued weewx.END_ARCHIVE_PERIOD event")
+        if weewx.debug == 2:
+            log.debug("queued weewx.END_ARCHIVE_PERIOD event")
 
     def shutDown(self):
         """Shut down any threads.
@@ -817,18 +790,16 @@ class RealtimeGaugeData(StdService):
             # Wait up to 15 seconds for the thread to exit:
             self.rtgd_thread.join(15.0)
             if self.rtgd_thread.isAlive():
-                logerr("rtgd",
-                       "Unable to shut down %s thread" % self.rtgd_thread.name)
+                log.error("Unable to shut down %s thread" % self.rtgd_thread.name)
             else:
-                logdbg("rtgd", "Shut down %s thread." % self.rtgd_thread.name)
+                log.debug("Shut down %s thread." % self.rtgd_thread.name)
         if hasattr(self, 'source_thread') and self.source_thread.isAlive():
             # Wait up to 15 seconds for the thread to exit:
             self.source_thread.join(15.0)
             if self.source_thread.isAlive():
-                logerr("rtgd",
-                       "Unable to shut down %s thread" % self.source_thread.name)
+                log.error("Unable to shut down %s thread" % self.source_thread.name)
             else:
-                logdbg("rtgd", "Shut down %s thread." % self.source_thread.name)
+                log.debug("Shut down %s thread." % self.source_thread.name)
 
     def get_minmax_obs(self, obs_type):
         """Obtain the alltime max/min values for an observation."""
@@ -1095,10 +1066,10 @@ class RealtimeGaugeDataThread(threading.Thread):
             _msg = "'%s' will be generated. "\
                        "min_interval is %s seconds" % (self.rtgd_path_file,
                                                        self.min_interval)
-        loginf("rtgdthread", _msg)
+        log.info(_msg)
         # lost contact
         if self.ignore_lost_contact:
-            loginf("rtgdthread", "Sensor contact state will be ignored")
+            log.info("Sensor contact state will be ignored")
 
     def run(self):
         """Collect packets from the rtgd queue and manage their processing.
@@ -1128,9 +1099,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.wr_period,
                                   self.wr_points)
         if weewx.debug == 2:
-            logdbg("rtgdthread", "windrose data calculated")
+            log.debug("windrose data calculated")
         elif weewx.debug >= 3:
-            logdbg("rtgdthread", "windrose data calculated: %s" % (self.rose,))
+            log.debug("windrose data calculated: %s" % (self.rose,))
         # setup our loop cache and set some starting wind values
         _ts = self.db_manager.lastGoodStamp()
         if _ts is not None:
@@ -1140,7 +1111,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get a CachedPacket object as our loop packet cache and prime it with
         # values from the last good archive record if available
         self.packet_cache = CachedPacket(_rec)
-        logdbg2("rtgdthread", "loop packet cache initialised")
+        if weewx.debug == 2:
+            log.debug("loop packet cache initialised")
         # save the windSpeed value to use as our archive period average, this
         # needs to be a ValueTuple since we may need to convert units
         if 'windSpeed' in _rec:
@@ -1171,8 +1143,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                         if isinstance(_package, dict):
                             if 'type' in _package and _package['type'] == 'forecast':
                                 # we have forecast text so log and save it
-                                logdbg2("rtgdthread",
-                                        "received forecast text: %s" % _package['payload'])
+                                if weewx.debug == 2:
+                                    log.debug("received forecast text: %s" % _package['payload'])
                                 self.scroller_text = _package['payload']
                 # now deal with the control queue
                 try:
@@ -1188,35 +1160,30 @@ class RealtimeGaugeDataThread(threading.Thread):
                         return
                     elif _package['type'] == 'archive':
                         if weewx.debug == 2:
-                            logdbg("rtgdthread",
-                                   "received archive record (%s)" % _package['payload']['dateTime'])
+                            log.debug("received archive record (%s)" % _package['payload']['dateTime'])
                         elif weewx.debug >= 3:
-                            logdbg("rtgdthread",
-                                   "received archive record: %s" % _package['payload'])
+                            log.debug("received archive record: %s" % _package['payload'])
                         self.new_archive_record(_package['payload'])
                         self.rose = calc_windrose(_package['payload']['dateTime'],
                                                   self.db_manager,
                                                   self.wr_period,
                                                   self.wr_points)
                         if weewx.debug == 2:
-                            logdbg("rtgdthread", "windrose data calculated")
+                            log.debug("windrose data calculated")
                         elif weewx.debug >= 3:
-                            logdbg("rtgdthread",
-                                   "windrose data calculated: %s" % (self.rose,))
+                            log.debug("windrose data calculated: %s" % (self.rose,))
                         continue
                     elif _package['type'] == 'event':
                         if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
-                            logdbg2("rtgdthread",
-                                    "received event - END_ARCHIVE_PERIOD")
+                            if weewx.debug == 2:
+                                log.debug("received event - END_ARCHIVE_PERIOD")
                             self.end_archive_period()
                         continue
                     elif _package['type'] == 'stats':
                         if weewx.debug == 2:
-                            logdbg("rtgdthread",
-                                   "received stats package")
+                            log.debug("received stats package")
                         elif weewx.debug >= 3:
-                            logdbg("rtgdthread",
-                                   "received stats package: %s" % _package['payload'])
+                            log.debug("received stats package: %s" % _package['payload'])
                         self.process_stats(_package['payload'])
                         continue
                     elif _package['type'] == 'loop':
@@ -1224,22 +1191,17 @@ class RealtimeGaugeDataThread(threading.Thread):
                         # try..except so we can catch any errors
                         try:
                             if weewx.debug == 2:
-                                logdbg("rtgdthread",
-                                       "received loop packet (%s)" % _package['payload']['dateTime'])
+                                log.debug("received loop packet (%s)" % _package['payload']['dateTime'])
                             elif weewx.debug >= 3:
-                                logdbg("rtgdthread",
-                                       "received loop packet: %s" % _package['payload'])
+                                log.debug("received loop packet: %s" % _package['payload'])
                             self.process_packet(_package['payload'])
                             continue
                         except Exception, e:
                             # Some unknown exception occurred. This is probably
                             # a serious problem. Exit.
-                            logcrit("rtgdthread",
-                                    "Unexpected exception of type %s" % (type(e), ))
-                            weeutil.weeutil.log_traceback('*** ',
-                                                          syslog.LOG_DEBUG)
-                            logcrit("rtgdthread",
-                                    "Thread exiting. Reason: %s" % (e, ))
+                            log.critical("Unexpected exception of type %s" % (type(e), ))
+                            weeutil.logger.log_traceback(log.debug, "    ****  ")
+                            log.critical("Thread exiting. Reason: %s" % (e, ))
                             return
                 # if packets have backed up in the control queue, trim it until
                 # it's no bigger than the max allowed backlog
@@ -1269,11 +1231,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                 cached_packet = self.packet_cache.get_packet(packet['dateTime'],
                                                              self.max_cache_age)
                 if weewx.debug == 2:
-                    logdbg("rtgdthread",
-                           "created cached loop packet (%s)" % cached_packet['dateTime'])
+                    log.debug("created cached loop packet (%s)" % cached_packet['dateTime'])
                 elif weewx.debug >= 3:
-                    logdbg("rtgdthread",
-                           "created cached loop packet: %s" % (cached_packet,))
+                    log.debug("created cached loop packet: %s" % (cached_packet,))
                 # set our lost contact flag if applicable
                 self.lost_contact_flag = self.get_lost_contact(cached_packet, 'loop')
                 # get a data dict from which to construct our file
@@ -1287,14 +1247,15 @@ class RealtimeGaugeDataThread(threading.Thread):
                     # post the data
                     self.post_data(data)
                 # log the generation
-                logdbg2("rtgdthread",
-                        "gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
+                if weewx.debug == 2:
+                    log.debug("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
                                                                            (self.last_write-t1)))
             except Exception, e:
                 weeutil.weeutil.log_traceback('rtgdthread: **** ')
         else:
             # we skipped this packet so log it
-            logdbg2("rtgdthread", "packet (%s) skipped" % packet['dateTime'])
+            if weewx.debug == 2:
+                log.debug("packet (%s) skipped" % packet['dateTime'])
 
     def process_stats(self, package):
         """Process a stats package.
@@ -1338,19 +1299,18 @@ class RealtimeGaugeDataThread(threading.Thread):
                 if self.response is not None:
                     if self.response in response:
                         # did get 'success' so log it and continue
-                        logdbg2("rtgdthread", "Successfully posted data")
+                        if weewx.debug == 2:
+                            log.debug("Successfully posted data")
                     else:
                         # didn't get 'success' so log it and continue
-                        logdbg("rtgdthread",
-                               "Failed to post data: Unexpected response")
+                        log.debug("Failed to post data: Unexpected response")
                 return
             # we received a bad response code, log it and continue
-            logdbg("rtgdthread",
-                   "Failed to post data: Code %s" % response.code())
+            log.debug("Failed to post data: Code %s" % response.code())
         except (urllib2.URLError, socket.error,
                 httplib.BadStatusLine, httplib.IncompleteRead), e:
             # an exception was thrown, log it and continue
-            logdbg("rtgdthread", "Failed to post data: %s" % e)
+            log.debug("Failed to post data: %s" % e)
 
     def post_request(self, request, payload):
         """Post a Request object.
@@ -2100,8 +2060,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                 try:
                     result = rec[STATION_LOST_CONTACT[self.station_type]['field']] == _v
                 except KeyError:
-                    logdbg("rtgd",
-                           "KeyError: Could not determine sensor contact state")
+                    log.debug("KeyError: Could not determine sensor contact state")
                     result = True
         return result
 
@@ -2702,9 +2661,9 @@ class ThreadedSource(threading.Thread):
         except Exception, e:
             # Some unknown exception occurred. This is probably a serious
             # problem. Exit with some notification.
-            logcrit("rtgd", "Unexpected exception of type %s" % (type(e), ))
+            log.critical("Unexpected exception of type %s" % (type(e), ))
             weeutil.weeutil.log_traceback('rtgd: **** ')
-            logcrit("rtgd", "Thread exiting. Reason: %s" % (e, ))
+            log.critical("Thread exiting. Reason: %s" % (e, ))
     
     def setup(self):
         """Perform any post post-__init__() setup.
@@ -2903,8 +2862,7 @@ class WUSource(ThreadedSource):
         self.api = WeatherUndergroundAPIForecast(api_key)
 
         # log what we will do
-        loginf("rtgd",
-               "RealTimeGaugeData scroller text will use Weather Underground forecast data")
+        log.info("RealTimeGaugeData scroller text will use Weather Underground forecast data")
 
     def get_response(self):
         """If required query the WU API and return the response.
@@ -2923,8 +2881,8 @@ class WUSource(ThreadedSource):
 
         # get the current time
         now = time.time()
-        logdbg2("rtgd",
-                "Last Weather Underground API call at %s" % self.last_call_ts)
+        if weewx.debug == 2:
+            log.debug("Last Weather Underground API call at %s" % self.last_call_ts)
 
         # has the lockout period passed since the last call
         if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
@@ -2940,29 +2898,23 @@ class WUSource(ThreadedSource):
                                                           language=self.language,
                                                           format=self.format,
                                                           max_tries=self.max_tries)
-                    logdbg("rtgd",
-                           "Downloaded updated Weather Underground forecast information")
+                    log.debug("Downloaded updated Weather Underground forecast information")
                 except Exception, e:
                     # Some unknown exception occurred. Set _response to None,
                     # log it and continue.
                     _response = None
-                    loginf("rtgd",
-                           "Unexpected exception of type %s" % (type(e), ))
+                    log.info("Unexpected exception of type %s" % (type(e), ))
                     weeutil.weeutil.log_traceback('WUThread: **** ')
-                    loginf("rtgd",
-                           "Unexpected exception of type %s" % (type(e), ))
-                    loginf("rtgd",
-                           "Weather Underground API forecast query failed")
+                    log.info("Unexpected exception of type %s" % (type(e), ))
+                    log.info("Weather Underground API forecast query failed")
                 # if we got something back then reset our last call timestamp
                 if _response is not None:
                     self.last_call_ts = now
                 return _response
         else:
             # API call limiter kicked in so say so
-            loginf("rtgd",
-                   "Tried to make a WU API call within %d sec of the previous call." % (self.lockout_period, ))
-            loginf("        ",
-                   "WU API call limit reached. API call skipped.")
+            log.info("Tried to make a WU API call within %d sec of the previous call." % (self.lockout_period, ))
+            log.info("        WU API call limit reached. API call skipped.")
         return None
 
     def parse_response(self, response):
@@ -2996,8 +2948,7 @@ class WUSource(ThreadedSource):
             _response_json = json.loads(response)
         except ValueError:
             # can't deserialize the response so log it and return None
-            loginf("rtgd",
-                   "Unable to deserialise Weather Underground forecast response")
+            log.info("Unable to deserialise Weather Underground forecast response")
             return None
 
         # forecast data has been deserialized so check which forecast narrative
@@ -3009,8 +2960,8 @@ class WUSource(ThreadedSource):
                 return _response_json['narrative'][0]
             except KeyError:
                 # could not find the narrative so log and return None
-                logdbg("rtgd", "Unable to locate 'narrative' field for "
-                               "'%s' forecast narrative" % self.forecast_text)
+                log.debug("Unable to locate 'narrative' field for "
+                          "'%s' forecast narrative" % self.forecast_text)
                 return None
         else:
             # we want the day time or night time narrative, but which, WU
@@ -3038,15 +2989,13 @@ class WUSource(ThreadedSource):
                 except KeyError:
                     # couldn't find a key for one of the fields, log it and
                     # force use of night index
-                    loginf("rtgd",
-                           "Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
+                    log.info("Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
                                                                                                    self.forecast_text))
                     day_index = None
                 except ValueError:
                     # could not get an index for 'D', log it and force use of
                     # night index
-                    loginf("rtgd",
-                           "Unable to locate 'D' index for %s '%s' forecast narrative" % (_period_str,
+                    log.info("Unable to locate 'D' index for %s '%s' forecast narrative" % (_period_str,
                                                                                           self.forecast_text))
                     day_index = None
             # we have a day_index but is it for today or some later day
@@ -3060,14 +3009,12 @@ class WUSource(ThreadedSource):
                 except KeyError:
                     # couldn't find a key for one of the fields, log it and
                     # return None
-                    loginf("rtgd",
-                           "Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
+                    log.info("Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
                                                                                                    self.forecast_text))
                     return None
                 except ValueError:
                     # could not get an index for 'N', log it and return None
-                    loginf("rtgd",
-                           "Unable to locate 'N' index for %s '%s' forecast narrative" % (_period_str,
+                    log.info("Unable to locate 'N' index for %s '%s' forecast narrative" % (_period_str,
                                                                                           self.forecast_text))
                     return None
             # if we made it here we have an index to use so get the required
@@ -3076,12 +3023,10 @@ class WUSource(ThreadedSource):
                 return _response_json['daypart'][0]['narrative'][_index]
             except KeyError:
                 # if we can'f find a field log the error and return None
-                loginf("rtgd",
-                       "Unable to locate 'narrative' field for '%s' forecast narrative" % self.forecast_text)
+                log.info("Unable to locate 'narrative' field for '%s' forecast narrative" % self.forecast_text)
             except ValueError:
                 # if we can'f find an index log the error and return None
-                loginf("rtgd",
-                       "Unable to locate 'narrative' index for '%s' forecast narrative" % self.forecast_text)
+                log.info("Unable to locate 'narrative' index for '%s' forecast narrative" % self.forecast_text)
 
             return None
 
@@ -3176,8 +3121,7 @@ class WeatherUndergroundAPIForecast(object):
                                         language_setting, format_setting,
                                         _obf_api_key])
             _obf_url = '?'.join([f_url, _obf_parameters])
-            logdbg("rtgd",
-                   "Submitting Weather Underground API call using URL: %s" % (_obf_url, ))
+            log.debug("Submitting Weather Underground API call using URL: %s" % (_obf_url, ))
         # we will attempt the call max_tries times
         for count in range(max_tries):
             # attempt the call
@@ -3187,11 +3131,10 @@ class WeatherUndergroundAPIForecast(object):
                 w.close()
                 return _response
             except (urllib2.URLError, socket.timeout), e:
-                logerr("rtgd",
-                       "Failed to get Weather Underground forecast on attempt %d" % (count+1, ))
-                logerr("weatherundergroundapiforecast", "   **** %s" % e)
+                log.error("Failed to get Weather Underground forecast on attempt %d" % (count+1, ))
+                log.error("   **** %s" % e)
         else:
-            logerr("rtgd", "Failed to get Weather Underground forecast")
+            log.error("Failed to get Weather Underground forecast")
         return None
 
 
@@ -3238,8 +3181,7 @@ class ZambrettiSource(ThreadedSource):
         self.zambretti = None
 
         # log what we will do
-        loginf("rtgd",
-               "RealTimeGaugeData scroller text will use Zambretti forecast data")
+        log.info("RealTimeGaugeData scroller text will use Zambretti forecast data")
     
     def setup(self):
         """Get a Zambretti object.
@@ -3313,12 +3255,9 @@ class Zambretti(object):
             # Something went wrong so log the error. Our forecasting_installed 
             # flag will not have been set so it is safe to continue but there 
             # will be no Zambretti text
-            logdbg('rtgd',
-                   'Error initialising Zambretti forecast, is the forecast extension installed.')
-            logdbg('rtgd',
-                   'Unexpected exception of type %s' % (type(e), ))
-            weeutil.weeutil.log_traceback('rtgd: **** ',
-                                          loglevel=syslog.LOG_DEBUG)
+            log.debug('Error initialising Zambretti forecast, is the forecast extension installed.')
+            log.debug('Unexpected exception of type %s' % (type(e), ))
+            weeutil.logger.log_traceback(log.debug, "    ****  ")
 
     def get_data(self):
         """Get scroller user specified scroller text string.
@@ -3329,8 +3268,8 @@ class Zambretti(object):
 
         # get the current time
         now = time.time()
-        logdbg2("rtgd",
-                "Last Zambretti forecast obtained at %s" % self.last_query_ts)
+        if weewx.debug ==2:
+            log.debug("Last Zambretti forecast obtained at %s" % self.last_query_ts)
         # If we haven't made a db query previously or if its been too long 
         # since the last query then make the query
         if (self.last_query_ts is None) or ((now + 1 - self.interval) >= self.last_query_ts):
@@ -3351,10 +3290,9 @@ class Zambretti(object):
                         self.last_query_ts = now
                         return self.zambretti_label_dict[record[1]]
                 except Exception, e:
-                    logerr('rtgd', 'get zambretti failed (attempt %d of %d): %s' %
-                           ((count + 1), self.max_tries, e))
-                    logdbg('rtgd', 'waiting %d seconds before retry' %
-                           self.retry_wait)
+                    log.error('get zambretti failed (attempt %d of %d): %s' %
+                              ((count + 1), self.max_tries, e))
+                    log.debug('waiting %d seconds before retry' % self.retry_wait)
                     time.sleep(self.retry_wait)
             # if we made it here we have been unable to get a response from the
             # forecast db so return a suitable message
@@ -3460,8 +3398,7 @@ class DarkskySource(ThreadedSource):
         self.block = darksky_config_dict.get('block', self.DEFAULT_BLOCK).lower()
 
         # log what we will do
-        loginf("rtgd",
-               "RealTimeGaugeData scroller text will use Darksky forecast data")
+        log.info("RealTimeGaugeData scroller text will use Darksky forecast data")
 
     def get_response(self):
         """If required query the Darksky API and return the JSON response.
@@ -3481,8 +3418,8 @@ class DarkskySource(ThreadedSource):
 
         # get the current time
         now = time.time()
-        logdbg2("rtgd",
-                "Last Darksky API call at %s" % self.last_call_ts)
+        if weewx.debug == 2:
+            log.debug("Last Darksky API call at %s" % self.last_call_ts)
         # has the lockout period passed since the last call
         if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
             # If we haven't made an API call previously or if its been too long
@@ -3494,28 +3431,23 @@ class DarkskySource(ThreadedSource):
                                                   language=self.language,
                                                   units=self.units,
                                                   max_tries=self.max_tries)
-                    logdbg("rtgd",
-                           "Downloaded updated Darksky forecast")
+                    log.debug("Downloaded updated Darksky forecast")
                 except Exception, e:
                     # Some unknown exception occurred. Set _response to None,
                     # log it and continue.
                     _response = None
-                    loginf("rtgd",
-                           "Unexpected exception of type %s" % (type(e), ))
+                    log.info("Unexpected exception of type %s" % (type(e), ))
                     weeutil.weeutil.log_traceback('rtgd: **** ')
-                    loginf("rtgd",
-                           "Unexpected exception of type %s" % (type(e), ))
-                    loginf("rtgd", "Darksky forecast API query failed")
+                    log.info("Unexpected exception of type %s" % (type(e), ))
+                    log.info("Darksky forecast API query failed")
                 # if we got something back then reset our last call timestamp
                 if _response is not None:
                     self.last_call_ts = now
                 return _response
         else:
             # API call limiter kicked in so say so
-            loginf("rtgd",
-                   "Tried to make an Darksky API call within %d sec of the previous call." % (self.lockout_period, ))
-            loginf("        ",
-                   "Darksky API call limit reached. API call skipped.")
+            log.info("Tried to make an Darksky API call within %d sec of the previous call." % (self.lockout_period, ))
+            log.info("Darksky API call limit reached. API call skipped.")
         return None
 
     def parse_response(self, response):
@@ -3535,11 +3467,10 @@ class DarkskySource(ThreadedSource):
         # looking at the 'flags' object
         if 'flags' in response:
             if 'darksky-unavailable' in response['flags']:
-                loginf("rtgd",
-                       "Darksky data for this location temporarily unavailable")
+                log.info("Darksky data for this location temporarily unavailable")
                 return None
         else:
-            logdbg("rtgd", "No flag object in Darksky API response.")
+            log.debug("No flag object in Darksky API response.")
 
         # get the summary data to be used
         # is our block available, can't assume it is
@@ -3551,11 +3482,10 @@ class DarkskySource(ThreadedSource):
                 return summary
             else:
                 # we have no summary field, so log it and return None
-                logdbg("rtgd",
-                       "Summary data not available for '%s' forecast" % (self.block,))
+                log.debug("Summary data not available for '%s' forecast" % (self.block,))
                 return None
         else:
-            logdbg("rtgd", 'Dark Sky %s block not available' % self.block)
+            log.debug('Dark Sky %s block not available' % self.block)
             return 'Dark Sky %s block not available' % self.block
 
 
@@ -3641,8 +3571,7 @@ class DarkskyForecastAPI(object):
                                         self.obfuscated_key,
                                         '%s,%s' % (self.latitude, self.longitude)])
             _obfuscated_url = '?'.join([_obfuscated_url, optional_string])
-            logdbg("darkskyapi",
-                   "Submitting API call using URL: %s" % (_obfuscated_url, ))
+            log.debug("Submitting API call using URL: %s" % (_obfuscated_url, ))
         # make the API call
         _response = self._hit_api(url, max_tries)
         # if we have a response we need to deserialise it
@@ -3683,11 +3612,10 @@ class DarkskyForecastAPI(object):
                 w.close()
                 return response
             except (urllib2.URLError, socket.timeout), e:
-                logerr("darkskyapi",
-                       "Failed to get API response on attempt %d" % (count+1, ))
-                logerr("darkskyapi", "   **** %s" % e)
+                log.error("Failed to get API response on attempt %d" % (count+1, ))
+                log.error("   **** %s" % e)
         else:
-            logerr("darkskyapi", "Failed to get API response")
+            log.error("Failed to get API response")
         return None
 
     @property
@@ -3740,7 +3668,7 @@ class FileSource(ThreadedSource):
         # get block file, check it refers to a file
         self.scroller_file = file_config_dict.get('file')
         if self.scroller_file is None or not os.path.isfile(self.scroller_file):
-            logdbg("rtgd", "File block not specified or not a valid path/file")
+            log.debug("File block not specified or not a valid path/file")
             self.scroller_file = None
 
         # initialise the time of last file read
@@ -3748,8 +3676,7 @@ class FileSource(ThreadedSource):
         
         # log what we will do
         if self.scroller_file is not None:
-            loginf("rtgd",
-                   "RealTimeGaugeData scroller text will use text from file '%s'" % self.scroller_file)
+            log.info("RealTimeGaugeData scroller text will use text from file '%s'" % self.scroller_file)
     
     def get_response(self):
         """Get a single line of text from a file.
@@ -3766,7 +3693,8 @@ class FileSource(ThreadedSource):
 
         # get the current time
         now = time.time()
-        logdbg2("rtgd", "Last File read at %s" % self.last_read_ts)
+        if weewx.debug == 2:
+            log.debug("Last File read at %s" % self.last_read_ts)
         if (self.last_read_ts is None) or ((now + 1 - self.interval) >= self.last_read_ts):
             # read the file, wrap in a try..except just in case
             _data = None
@@ -3774,17 +3702,15 @@ class FileSource(ThreadedSource):
                 if self.scroller_file is not None:
                     with open(self.scroller_file, 'r') as f:
                         _data = f.readline().strip()
-                logdbg("rtgd", "File read")
+                log.debug("File read")
             except Exception, e:
                 # Some unknown exception occurred. Set _data to None,
                 # log it and continue.
                 _data = None
-                loginf("rtgd",
-                       "Unexpected exception of type %s" % (type(e), ))
+                log.info("Unexpected exception of type %s" % (type(e), ))
                 weeutil.weeutil.log_traceback('rtgd: **** ')
-                loginf("rtgd",
-                       "Unexpected exception of type %s" % (type(e), ))
-                loginf("rtgd", "File read failed")
+                log.info("Unexpected exception of type %s" % (type(e), ))
+                log.info("File read failed")
             # we got something so reset our last read timestamp
             if _data is not None:
                 self.last_read_ts = now
@@ -3813,8 +3739,7 @@ class TextSource(Source):
         self.text_config_dict = _rtgd_config_dict.get("Text", dict())
 
         # log what we will do
-        loginf("rtgd",
-               "RealTimeGaugeData scroller text will use a fixed string")
+        log.info("RealTimeGaugeData scroller text will use a fixed string")
 
     def get_data(self):
         """Get scroller user specified scroller text string.
