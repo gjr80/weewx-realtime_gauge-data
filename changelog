@@ -1,3 +1,6 @@
+v0.4.0
+*   WeeWX 4.0 compatible
+*   python 2 and python 3 compatible
 v0.3.7
 *   revised WU API response parsing to eliminate occasional errors where no
     forecast text was found

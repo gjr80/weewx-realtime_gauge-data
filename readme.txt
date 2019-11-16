@@ -6,7 +6,7 @@ Gauges.
 
 Pre-Requisites
 
-The Realtime gauge-data extension requires WeeWX v3.4.0 or greater.
+The Realtime gauge-data extension requires WeeWX v4.0.0 or greater.
 
 A number of fields have additional pre-requisites:
 
@@ -57,7 +57,7 @@ gauge-data releases page (https://github.com/gjr80/weewx-realtime_gauge-data
 /releases) into a directory accessible from the WeeWX machine.
 
     $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
-/releases/download/v0.3.7/rtgd-0.3.7.tar.gz
+/releases/download/v0.4.0/rtgd-0.4.0.tar.gz
 
 	where $DOWNLOAD_ROOT is the path to the directory where the Realtime
     gauge-data extension is to be downloaded.
@@ -65,15 +65,15 @@ gauge-data releases page (https://github.com/gjr80/weewx-realtime_gauge-data
 2.  Install the Realtime gauge-data extension downloaded at step 1 using the
 wee_extension utility:
 
-    $ wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.3.7.tar.gz
+    $ wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.4.0.tar.gz
 
     This will result in output similar to the following:
 
-        Request to install '/var/tmp/rtgd-0.3.7.tar.gz'
-        Extracting from tar archive /var/tmp/rtgd-0.3.7.tar.gz
+        Request to install '/var/tmp/rtgd-0.4.0.tar.gz'
+        Extracting from tar archive /var/tmp/rtgd-0.4.0.tar.gz
         Saving installer file to /home/weewx/bin/user/installer/Rtgd
         Saved configuration dictionary. Backup copy at /home/weewx/weewx.conf.20190101124410
-        Finished installing extension '/var/tmp/rtgd-0.3.7.tar.gz'
+        Finished installing extension '/var/tmp/rtgd-0.4.0.tar.gz'
 
 3. Restart WeeWX:
 
@@ -101,14 +101,14 @@ gauge-data releases page (https://github.com/gjr80/weewx-realtime_gauge-data
 /releases) into a directory accessible from the WeeWX machine.
 
     $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data
-/releases/download/v0.3.7/rtgd-0.3.7.tar.gz
+/releases/download/v0.4.0/rtgd-0.4.0.tar.gz
 
 	where $DOWNLOAD_ROOT is the path to the directory where the Realtime
     gauge-data extension is to be downloaded.
 
 2.  Unpack the extension as follows:
 
-    $ tar xvfz rtgd-0.3.7.tar.gz
+    $ tar xvfz rtgd-0.4.0.tar.gz
 
 3.  Copy files from within the resulting directory as follows:
 

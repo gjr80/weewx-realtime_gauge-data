@@ -1,79 +1,79 @@
-#
-# This program is free software; you can redistribute it and/or modify it under
-# the terms of the GNU General Public License as published by the Free Software
-# Foundation; either version 2 of the License, or (at your option) any later
-# version.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
-#
-#                     Installer for Realtime gauge-data
-#
-# Version: 0.3.7                                        Date: 4 April 2019
-#
-# Revision History
-#   4 April 2019        v0.3.7
-#       - bumped version only
-#   28 March 2019       v0.3.6
-#       - bumped version only
-#   1 January 2019      v0.3.5
-#       - reworked default install [RealtimeGaugeData] config stanza as per
-#         changes to rtgd.py
-#       - installation now includes a blank [[DS]] config stanza
-#   26 April 2018       v0.3.4 (not released)
-#       - bumped version only
-#   26 April 2018       v0.3.3
-#       - bumped version only
-#   20 January 2018     v0.3.2
-#       - bumped version only
-#   3 December 2017     v0.3.1
-#       - bumped version only
-#   4 September 2017    v0.3.0
-#       - added [[WU]] config stanza to support WU forecast text
-#   8 July 2017         v0.2.14
-#       - changed default decimal places for foot, inHg, km_per_hour and
-#         mile_per_hour
-#   6 May 2017          v0.2.13
-#       - bumped version only
-#   29 March 2017       v0.2.12
-#       - never released
-#   22 March 2017       v0.2.11
-#       - added foot StringFormat config option
-#   17 March 2017       v0.2.10
-#       - bumped version only
-#   7 March 2017        v0.2.9
-#       - bumped version number only
-#   27 February 2017    v0.2.8
-#       - bumped version number only
-#   26 February 2017    v0.2.7
-#       - bumped version number only
-#   22 February 2017    v0.2.6
-#       - reworked Groups
-#   21 February 2017    v0.2.5
-#       - trimmed a number of config options
-#   20 February 2017    v0.2.4
-#       - bumped version number only
-#   20 February 2017    v0.2.3
-#       - removed min_interval config option
-#   19 February 2017    v0.2.2
-#       - added mile to string formats
-#   15 February 2017    v0.2.1
-#       - minor formatting changes
-#   24 January 2017      v0.2
-#       - updated weewx.conf options
-#   10 January 2017      v0.1
-#       - initial implementation
-#
+"""
+This program is free software; you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+                     Installer for Realtime gauge-data
+
+Version: 0.4.0                                        Date: 16 November 2019
+
+Revision History
+
+    4 April 2019        v0.3.7
+        - bumped version only
+    28 March 2019       v0.3.6
+        - bumped version only
+    1 January 2019      v0.3.5
+        - reworked default install [RealtimeGaugeData] config stanza as per
+          changes to rtgd.py
+        - installation now includes a blank [[DS]] config stanza
+    26 April 2018       v0.3.4 (not released)
+        - bumped version only
+    26 April 2018       v0.3.3
+        - bumped version only
+    20 January 2018     v0.3.2
+        - bumped version only
+     3 December 2017     v0.3.1
+        - bumped version only
+    4 September 2017    v0.3.0
+        - added [[WU]] config stanza to support WU forecast text
+    8 July 2017         v0.2.14
+        - changed default decimal places for foot, inHg, km_per_hour and
+          mile_per_hour
+    6 May 2017          v0.2.13
+        - bumped version only
+    29 March 2017       v0.2.12
+        - never released
+    22 March 2017       v0.2.11
+        - added foot StringFormat config option
+    17 March 2017       v0.2.10
+        - bumped version only
+    7 March 2017        v0.2.9
+        - bumped version number only
+    27 February 2017    v0.2.8
+        - bumped version number only
+    26 February 2017    v0.2.7
+        - bumped version number only
+    22 February 2017    v0.2.6
+        - reworked Groups
+    21 February 2017    v0.2.5
+        - trimmed a number of config options
+    20 February 2017    v0.2.4
+        - bumped version number only
+    20 February 2017    v0.2.3
+         - removed min_interval config option
+    19 February 2017    v0.2.2
+         - added mile to string formats
+    15 February 2017    v0.2.1
+         - minor formatting changes
+    24 January 2017      v0.2
+        - updated weewx.conf options
+    10 January 2017      v0.1
+        - initial implementation
+"""
 
 import weewx
 
 from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
-REQUIRED_VERSION = "3.4.0"
-RTGD_VERSION = "0.3.7"
+REQUIRED_VERSION = "400.0b1"
+RTGD_VERSION = "0.4.0"
 
 
 def loader():
@@ -90,7 +90,7 @@ class RtgdInstaller(ExtensionInstaller):
         super(RtgdInstaller, self).__init__(
             version=RTGD_VERSION,
             name='Rtgd',
-            description='weeWX support for near realtime updating of the SteelSeries Weather Gauges.',
+            description='WeeWX support for near realtime updating of the SteelSeries Weather Gauges.',
             author="Gary Roderick",
             author_email="gjroderick<@>gmail.com",
             report_services=['user.rtgd.RealtimeGaugeData'],
