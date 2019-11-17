@@ -21,8 +21,7 @@ this program.  If not, see http://www.gnu.org/licenses/.
 
   Revision History
     16 November 2019    v0.4.0
-        - now python 2 and 3 compatible
-        - works under WeeWX v4.0 (largely just changed to new logging)
+        - works under WeeWX v4.0 under both python 2 and 3
     4 April 2019        v0.3.7
         - revised WU API response parsing to eliminate occasional errors where
           no forecast text was found
@@ -527,7 +526,6 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
 # python imports
 import datetime
 import errno
-import http.client
 import json
 import logging
 import math
@@ -536,8 +534,6 @@ import os.path
 import socket
 import threading
 import time
-#TODO. Delete following line?
-# import urllib.request, urllib.error, urllib.parse
 
 # Python 2/3 compatibility shims
 import six
@@ -1992,7 +1988,12 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['cloudbasevalue'] = self.alt_format % cloudbase
         # forecast - forecast text
         _text = self.scroller_text if self.scroller_text is not None else ''
-        data['forecast'] = time.strftime(_text, time.localtime(ts))
+        # format the forecast string, we might get a UnicodeDecode error, be
+        # prepared to catch it
+        try:
+            data['forecast'] = time.strftime(_text, time.localtime(ts))
+        except UnicodeEncodeError:
+            data['forecast'] = time.strftime(_text.encode('ascii', 'ignore'), time.localtime(ts))
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
         # build -
@@ -3151,9 +3152,19 @@ class WeatherUndergroundAPIForecast(object):
             # attempt the call
             try:
                 w = urllib.request.urlopen(url)
-                _response = w.read()
+                # Get charset used so we can decode the stream correctly.
+                # Unfortunately the way to get the charset depends on whether
+                # we are running under python2 or python3. Assume python3 but be
+                # prepared to catch the error if python2.
+                try:
+                    char_set = w.headers.get_content_charset()
+                except AttributeError:
+                    # must be python2
+                    char_set = w.headers.getparam('charset')
+                # now get the response decoding it appropriately
+                response = w.read().decode(char_set)
                 w.close()
-                return _response
+                return response
             except (urllib.error.URLError, socket.timeout) as e:
                 log.error("Failed to get Weather Underground forecast on attempt %d" % (count+1, ))
                 log.error("   **** %s" % e)
