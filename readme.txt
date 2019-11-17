@@ -6,7 +6,8 @@ Gauges.
 
 Pre-Requisites
 
-The Realtime gauge-data extension requires WeeWX v4.0.0 or greater.
+The Realtime gauge-data extension requires WeeWX v4.0.0 or greater using either
+Python 2 or Python 3.
 
 A number of fields have additional pre-requisites:
 

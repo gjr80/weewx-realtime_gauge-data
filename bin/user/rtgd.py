@@ -21,7 +21,7 @@ this program.  If not, see http://www.gnu.org/licenses/.
 
   Revision History
     16 November 2019    v0.4.0
-        - works under WeeWX v4.0 under both python 2 and 3
+        - updated to work under WeeWX v4.0 using either python 2 or 3
     4 April 2019        v0.3.7
         - revised WU API response parsing to eliminate occasional errors where
           no forecast text was found

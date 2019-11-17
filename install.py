@@ -14,6 +14,8 @@ Version: 0.4.0                                        Date: 16 November 2019
 
 Revision History
 
+    17 November 2019    v0.4.0
+        - bumped version only
     4 April 2019        v0.3.7
         - bumped version only
     28 March 2019       v0.3.6

@@ -6,7 +6,7 @@ The *Realtime gauge-data* extension generates a loop data based *gauge-data.txt*
 
 ## Pre-requisites ##
 
-The *Realtime gauge-data* extension requires WeeWX v4.0.0 or greater. Use of the *Realtime gauge-data* extension with the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub") requires the installation and configuration for use with WeeWX of the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub").
+The *Realtime gauge-data* extension requires WeeWX v4.0.0 or greater using either Python 2 or Python 3. Use of the *Realtime gauge-data* extension with the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub") requires the installation and configuration for use with WeeWX of the [SteelSeries Weather Gauges](https://github.com/mcrossley/SteelSeries-Weather-Gauges "SteelSeries Weather Gauges on GitHub").
 
 A number of fields have additional pre-requisites:
 
