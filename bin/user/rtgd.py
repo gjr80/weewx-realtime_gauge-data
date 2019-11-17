@@ -525,10 +525,9 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
 """
 
 # python imports
-import Queue
 import datetime
 import errno
-import httplib
+import http.client
 import json
 import logging
 import math
@@ -537,7 +536,14 @@ import os.path
 import socket
 import threading
 import time
-import urllib2
+#TODO. Delete following line?
+# import urllib.request, urllib.error, urllib.parse
+
+# Python 2/3 compatibility shims
+import six
+from six.moves import http_client
+from six.moves import queue
+from six.moves import urllib
 
 # weeWX imports
 import weewx
@@ -619,14 +625,14 @@ class RealtimeGaugeData(StdService):
     The RealtimeGaugeData class creates and controls a threaded object of class
     RealtimeGaugeDataThread that generates gauge-data.txt. Class
     RealtimeGaugeData feeds the RealtimeGaugeDataThread object with data via an
-    instance of Queue.Queue.
+    instance of queue.Queue.
     """
 
     def __init__(self, engine, config_dict):
         # initialize my superclass
         super(RealtimeGaugeData, self).__init__(engine, config_dict)
 
-        self.rtgd_ctl_queue = Queue.Queue()
+        self.rtgd_ctl_queue = queue.Queue()
         # get our RealtimeGaugeData config dictionary
         rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
         manager_dict = weewx.manager.get_manager_dict_from_config(config_dict,
@@ -678,8 +684,8 @@ class RealtimeGaugeData(StdService):
             log.info("Unknown block specified for scroller_text")
             source_class = Source
         # create queues for passing data and controlling our block object
-        self.source_ctl_queue = Queue.Queue()
-        self.result_queue = Queue.Queue()
+        self.source_ctl_queue = queue.Queue()
+        self.result_queue = queue.Queue()
         # get the block object
         source_object = source_class(self.source_ctl_queue,
                                      self.result_queue,
@@ -1134,7 +1140,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                     try:
                         # use nowait() so we don't block
                         _package = self.result_queue.get_nowait()
-                    except Queue.Empty:
+                    except queue.Empty:
                         # nothing in the queue so continue
                         pass
                     else:
@@ -1149,9 +1155,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # now deal with the control queue
                 try:
                     # block for one second waiting for package, if nothing
-                    # received throw Queue.Empty
+                    # received throw queue.Empty
                     _package = self.control_queue.get(True, 1.0)
-                except Queue.Empty:
+                except queue.Empty:
                     # nothing in the queue so continue
                     pass
                 else:
@@ -1196,11 +1202,11 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 log.debug("received loop packet: %s" % _package['payload'])
                             self.process_packet(_package['payload'])
                             continue
-                        except Exception, e:
+                        except Exception as e:
                             # Some unknown exception occurred. This is probably
                             # a serious problem. Exit.
                             log.critical("Unexpected exception of type %s" % (type(e), ))
-                            weeutil.logger.log_traceback(log.debug, "    ****  ")
+                            weeutil.logger.log_traceback(log.critical, "    ****  ")
                             log.critical("Thread exiting. Reason: %s" % (e, ))
                             return
                 # if packets have backed up in the control queue, trim it until
@@ -1250,8 +1256,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                 if weewx.debug == 2:
                     log.debug("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
                                                                            (self.last_write-t1)))
-            except Exception, e:
-                weeutil.weeutil.log_traceback('rtgdthread: **** ')
+            except Exception as e:
+                weeutil.logger.log_traceback(log.info, 'rtgdthread: **** ')
         else:
             # we skipped this packet so log it
             if weewx.debug == 2:
@@ -1265,7 +1271,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         """
 
         if package is not None:
-            for key, value in package.iteritems():
+            for key, value in package.items():
                 setattr(self, key, value)
 
     def post_data(self, data):
@@ -1283,7 +1289,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         """
 
         # get a Request object
-        req = urllib2.Request(self.remote_server_url)
+        req = urllib.request.Request(self.remote_server_url)
         # set our content type to json
         req.add_header('Content-Type', 'application/json')
         # POST the data but wrap in a try..except so we can trap any errors
@@ -1307,8 +1313,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                 return
             # we received a bad response code, log it and continue
             log.debug("Failed to post data: Code %s" % response.code())
-        except (urllib2.URLError, socket.error,
-                httplib.BadStatusLine, httplib.IncompleteRead), e:
+        except (urllib.error.URLError, socket.error,
+                http.client.BadStatusLine, http.client.IncompleteRead) as e:
             # an exception was thrown, log it and continue
             log.debug("Failed to post data: %s" % e)
 
@@ -1327,12 +1333,12 @@ class RealtimeGaugeDataThread(threading.Thread):
             # Python 2.5 and earlier do not have a "timeout" parameter.
             # Including one could cause a TypeError exception. Be prepared
             # to catch it.
-            _response = urllib2.urlopen(request,
+            _response = urllib.request.urlopen(request,
                                         data=payload,
                                         timeout=self.timeout)
         except TypeError:
             # Must be Python 2.5 or early. Use a simple, unadorned request
-            _response = urllib2.urlopen(request, data=payload)
+            _response = urllib.request.urlopen(request, data=payload)
         return _response
 
     def write_data(self, data):
@@ -2248,52 +2254,62 @@ class RtgdBuffer(object):
         # process outside temp
         out_temp = packet_d.get('outTemp', None)
         if out_temp is not None:
-            self.tempL_loop = [out_temp, ts] if (out_temp < self.tempL_loop[0] or self.tempL_loop[0] is None) else \
+            self.tempL_loop = [out_temp, ts] if (self.tempL_loop[0] is None or out_temp < self.tempL_loop[0]) else \
                 self.tempL_loop
-            self.tempH_loop = [out_temp, ts] if out_temp > self.tempH_loop[0] else self.tempH_loop
+            self.tempH_loop = [out_temp, ts] if (self.tempH_loop[0] is None or out_temp > self.tempH_loop[0]) else \
+                self.tempH_loop
 
         # process inside temp
         in_temp = packet_d.get('inTemp', None)
         if in_temp is not None:
-            self.intempL_loop = [in_temp, ts] if (in_temp < self.intempL_loop[0] or self.intempL_loop[0] is None) else \
+            self.intempL_loop = [in_temp, ts] if (self.intempL_loop[0] is None or in_temp < self.intempL_loop[0]) else \
                 self.intempL_loop
-            self.intempH_loop = [in_temp, ts] if in_temp > self.intempH_loop[0] else self.intempH_loop
+            self.intempH_loop = [in_temp, ts] if (self.intempH_loop[0] is None or in_temp > self.intempH_loop[0]) else \
+                self.intempH_loop
 
         # process dewpoint
         dewpoint = packet_d.get('dewpoint', None)
         if dewpoint is not None:
             self.dewpointL_loop = [dewpoint, ts] if \
-                (dewpoint < self.dewpointL_loop[0] or self.dewpointL_loop[0] is None) else \
+                self.dewpointL_loop[0] is None or (dewpoint < self.dewpointL_loop[0]) else \
                 self.dewpointL_loop
-            self.dewpointH_loop = [dewpoint, ts] if dewpoint > self.dewpointH_loop[0] else self.dewpointH_loop
+            self.dewpointH_loop = [dewpoint, ts] if \
+                (self.dewpointH_loop[0] is None or dewpoint > self.dewpointH_loop[0]) else \
+                self.dewpointH_loop
 
         # process appTemp
         app_temp = packet_d.get('appTemp', None)
         if app_temp is not None:
             self.apptempL_loop = [app_temp, ts] if \
-                (app_temp < self.apptempL_loop[0] or self.apptempL_loop[0] is None) else \
+                (self.apptempL_loop[0] is None or app_temp < self.apptempL_loop[0]) else \
                 self.apptempL_loop
-            self.apptempH_loop = [app_temp, ts] if app_temp > self.apptempH_loop[0] else self.apptempH_loop
+            self.apptempH_loop = [app_temp, ts] if \
+                (self.apptempH_loop[0] is None or app_temp > self.apptempH_loop[0]) else \
+                self.apptempH_loop
 
         # process windchill
         windchill = packet_d.get('windchill', None)
         if windchill is not None:
             self.wchillL_loop = [windchill, ts] if \
-                (windchill < self.wchillL_loop[0] or self.wchillL_loop[0] is None) else \
+                (self.wchillL_loop[0] is None or windchill < self.wchillL_loop[0]) else \
                 self.wchillL_loop
 
         # process heatindex
         heatindex = packet_d.get('heatindex', None)
         if heatindex is not None:
-            self.heatindexH_loop = [heatindex, ts] if heatindex > self.heatindexH_loop[0] else self.heatindexH_loop
+            self.heatindexH_loop = [heatindex, ts] if \
+                (self.heatindexH_loop[0] is None or heatindex > self.heatindexH_loop[0]) else \
+                self.heatindexH_loop
 
         # process barometer
         barometer = packet_d.get('barometer', None)
         if barometer is not None:
             self.pressL_loop = [barometer, ts] if \
-                (barometer < self.pressL_loop[0] or self.pressL_loop[0] is None) else \
+                (self.pressL_loop[0] is None or barometer < self.pressL_loop[0]) else \
                 self.pressL_loop
-            self.pressH_loop = [barometer, ts] if barometer > self.pressH_loop[0] else self.pressH_loop
+            self.pressH_loop = [barometer, ts] if \
+                (self.pressH_loop[0] is None or barometer > self.pressH_loop[0]) else \
+                self.pressH_loop
 
         # process rain
         rain = packet_d.get('rain', None)
@@ -2302,25 +2318,32 @@ class RtgdBuffer(object):
         # process rainRate
         rain_rate = packet_d.get('rainRate', None)
         if rain_rate is not None:
-            self.rrateH_loop = [rain_rate, ts] if rain_rate > self.rrateH_loop[0] else self.rrateH_loop
+            self.rrateH_loop = [rain_rate, ts] if \
+                (self.rrateH_loop[0] is None or rain_rate > self.rrateH_loop[0]) else \
+                self.rrateH_loop
 
         # process humidity
         out_humidity = packet_d.get('outHumidity', None)
         if out_humidity is not None:
             self.humL_loop = [out_humidity, ts] if \
-                (out_humidity < self.humL_loop[0] or self.humL_loop[0] is None) else \
+                (self.humL_loop[0] is None or out_humidity < self.humL_loop[0]) else \
                 self.humL_loop
-            self.humH_loop = [out_humidity, ts] if out_humidity > self.humH_loop[0] else self.humH_loop
+            self.humH_loop = [out_humidity, ts] if \
+                (self.humH_loop[0] is None or out_humidity > self.humH_loop[0]) else \
+                self.humH_loop
 
         # process UV
         uv = packet_d.get('UV', None)
         if uv is not None:
-            self.UVH_loop = [uv, ts] if uv > self.UVH_loop[0] else self.UVH_loop
+            self.UVH_loop = [uv, ts] if (self.UVH_loop[0] is None or uv > self.UVH_loop[0]) else \
+                self.UVH_loop
 
         # process radiation
         radiation = packet_d.get('radiation', None)
         if radiation is not None:
-            self.SolarH_loop = [radiation, ts] if radiation > self.SolarH_loop[0] else self.SolarH_loop
+            self.SolarH_loop = [radiation, ts] if \
+                (self.SolarH_loop[0] is None or radiation > self.SolarH_loop[0]) else \
+                self.SolarH_loop
 
         # process windSpeed/windDir
         # if windDir exists then get it, if it does not exist get None
@@ -2333,7 +2356,7 @@ class RtgdBuffer(object):
         self.windcount += 1
         # Have we seen a new high gust? If so update self.wgustM_loop but only
         # if we have a corresponding wind direction
-        if wind_speed > self.wgustM_loop[0] and wind_dir is not None:
+        if (self.wgustM_loop[0] is None or wind_speed > self.wgustM_loop[0]) and wind_dir is not None:
             self.wgustM_loop = [wind_speed, wind_dir, ts]
         # average wind speed
         self.wind_list.append([wind_speed, ts])
@@ -2347,7 +2370,9 @@ class RtgdBuffer(object):
         wind_m_loop = self.average_wind()
         # have we seen a new high (archive_interval) avg wind? if so update
         # self.windM_loop
-        self.windM_loop = [wind_m_loop, ts] if wind_m_loop > self.windM_loop[0] else self.windM_loop
+        self.windM_loop = [wind_m_loop, ts] if \
+            (self.windM_loop[0] is None or wind_m_loop > self.windM_loop[0]) else \
+            self.windM_loop
         # Update the 10 minute wind direction list, but only if windDir is not
         # None
         if wind_dir is not None:
@@ -2360,7 +2385,6 @@ class RtgdBuffer(object):
             old_ts = ts - self.wind_period
             # Remove any samples older than 10 minutes
             self.wind_dir_list = [s for s in self.wind_dir_list if s[4] > old_ts]
-
 
 # ============================================================================
 #                            Class CachedPacket
@@ -2649,7 +2673,7 @@ class ThreadedSource(threading.Thread):
                     # seconds. If nothing is there an empty queue exception
                     # will be thrown after 60 seconds
                     _package = self.control_queue.get(block=True, timeout=60)
-                except Queue.Empty:
+                except queue.Empty:
                     # nothing in the queue so continue
                     pass
                 else:
@@ -2658,11 +2682,11 @@ class ThreadedSource(threading.Thread):
                     if _package is None:
                         # we have a shutdown signal so return to exit
                         return
-        except Exception, e:
+        except Exception as e:
             # Some unknown exception occurred. This is probably a serious
             # problem. Exit with some notification.
             log.critical("Unexpected exception of type %s" % (type(e), ))
-            weeutil.weeutil.log_traceback('rtgd: **** ')
+            weeutil.logger.log_traceback(log.critical, 'rtgd: **** ')
             log.critical("Thread exiting. Reason: %s" % (e, ))
     
     def setup(self):
@@ -2899,12 +2923,12 @@ class WUSource(ThreadedSource):
                                                           format=self.format,
                                                           max_tries=self.max_tries)
                     log.debug("Downloaded updated Weather Underground forecast information")
-                except Exception, e:
+                except Exception as e:
                     # Some unknown exception occurred. Set _response to None,
                     # log it and continue.
                     _response = None
                     log.info("Unexpected exception of type %s" % (type(e), ))
-                    weeutil.weeutil.log_traceback('WUThread: **** ')
+                    weeutil.logger.log_traceback(log.info, 'WUThread: **** ')
                     log.info("Unexpected exception of type %s" % (type(e), ))
                     log.info("Weather Underground API forecast query failed")
                 # if we got something back then reset our last call timestamp
@@ -3126,11 +3150,11 @@ class WeatherUndergroundAPIForecast(object):
         for count in range(max_tries):
             # attempt the call
             try:
-                w = urllib2.urlopen(url)
+                w = urllib.request.urlopen(url)
                 _response = w.read()
                 w.close()
                 return _response
-            except (urllib2.URLError, socket.timeout), e:
+            except (urllib.error.URLError, socket.timeout) as e:
                 log.error("Failed to get Weather Underground forecast on attempt %d" % (count+1, ))
                 log.error("   **** %s" % e)
         else:
@@ -3251,7 +3275,7 @@ class Zambretti(object):
             # if we made it this far the forecast extension is installed and we
             # can do business
             self.forecasting_installed = True
-        except Exception, e:
+        except Exception as e:
             # Something went wrong so log the error. Our forecasting_installed 
             # flag will not have been set so it is safe to continue but there 
             # will be no Zambretti text
@@ -3289,7 +3313,7 @@ class Zambretti(object):
                         # query and return the decoded forecast text
                         self.last_query_ts = now
                         return self.zambretti_label_dict[record[1]]
-                except Exception, e:
+                except Exception as e:
                     log.error('get zambretti failed (attempt %d of %d): %s' %
                               ((count + 1), self.max_tries, e))
                     log.debug('waiting %d seconds before retry' % self.retry_wait)
@@ -3432,12 +3456,12 @@ class DarkskySource(ThreadedSource):
                                                   units=self.units,
                                                   max_tries=self.max_tries)
                     log.debug("Downloaded updated Darksky forecast")
-                except Exception, e:
+                except Exception as e:
                     # Some unknown exception occurred. Set _response to None,
                     # log it and continue.
                     _response = None
                     log.info("Unexpected exception of type %s" % (type(e), ))
-                    weeutil.weeutil.log_traceback('rtgd: **** ')
+                    weeutil.logger.log_traceback(log.info, 'rtgd: **** ')
                     log.info("Unexpected exception of type %s" % (type(e), ))
                     log.info("Darksky forecast API query failed")
                 # if we got something back then reset our last call timestamp
@@ -3478,7 +3502,7 @@ class DarkskySource(ThreadedSource):
             # we have our block, but is the summary there
             if 'summary' in response[self.block]:
                 # we have a summary field
-                summary = response[self.block]['summary'].encode('ascii', 'ignore')
+                summary = response[self.block]['summary']
                 return summary
             else:
                 # we have no summary field, so log it and return None
@@ -3607,11 +3631,21 @@ class DarkskyForecastAPI(object):
         for count in range(max_tries):
             # attempt the call
             try:
-                w = urllib2.urlopen(url)
-                response = w.read()
+                w = urllib.request.urlopen(url)
+                # Get charset used so we can decode the stream correctly.
+                # Unfortunately the way to get the charset depends on whether
+                # we are running under python2 or python3. Assume python3 but be
+                # prepared to catch the error if python2.
+                try:
+                    char_set = w.headers.get_content_charset()
+                except AttributeError:
+                    # must be python2
+                    char_set = w.headers.getparam('charset')
+                # now get the response decoding it appropriately
+                response = w.read().decode(char_set)
                 w.close()
                 return response
-            except (urllib2.URLError, socket.timeout), e:
+            except (urllib.error.URLError, socket.timeout) as e:
                 log.error("Failed to get API response on attempt %d" % (count+1, ))
                 log.error("   **** %s" % e)
         else:
@@ -3703,12 +3737,12 @@ class FileSource(ThreadedSource):
                     with open(self.scroller_file, 'r') as f:
                         _data = f.readline().strip()
                 log.debug("File read")
-            except Exception, e:
+            except Exception as e:
                 # Some unknown exception occurred. Set _data to None,
                 # log it and continue.
                 _data = None
                 log.info("Unexpected exception of type %s" % (type(e), ))
-                weeutil.weeutil.log_traceback('rtgd: **** ')
+                weeutil.logger.log_traceback(log.info, 'rtgd: **** ')
                 log.info("Unexpected exception of type %s" % (type(e), ))
                 log.info("File read failed")
             # we got something so reset our last read timestamp
