@@ -17,9 +17,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-  Version: 0.4.0                                      Date: 16 November 2019
+  Version: 0.4.1                                      Date: 20 November 2019
 
   Revision History
+    19 November 2019    v0.4.1
+        - fix max() error under python3
+        - implemented kludgy work around for lack of response message when
+          using HTTP POST under python 3
     16 November 2019    v0.4.0
         - updated to work under WeeWX v4.0 using either python 2 or 3
     4 April 2019        v0.3.7
@@ -549,13 +553,13 @@ import weewx.units
 import weewx.wxformulas
 from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
-from weeutil.weeutil import to_bool, to_int, startOfDay
+from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with_none
 
 # get a logger object
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.4.0'
+RTGD_VERSION = '0.4.1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1304,13 +1308,20 @@ class RealtimeGaugeDataThread(threading.Thread):
                         if weewx.debug == 2:
                             log.debug("Successfully posted data")
                     else:
-                        # didn't get 'success' so log it and continue
-                        log.debug("Failed to post data: Unexpected response")
+                        # it's possible the POST was successful if a response
+                        # code of 200 was received if under python3, check
+                        # response code and give it the benefit of the doubt
+                        # but log it anyway
+                        if response.code == 200:
+                            log.debug("Data may have been posted successfully. "
+                                      "Response message was not received but a valid response code was received.")
+                        else:
+                            log.debug("Failed to post data: Unexpected response")
                 return
             # we received a bad response code, log it and continue
             log.debug("Failed to post data: Code %s" % response.code())
         except (urllib.error.URLError, socket.error,
-                http.client.BadStatusLine, http.client.IncompleteRead) as e:
+                http_client.BadStatusLine, http_client.IncompleteRead) as e:
             # an exception was thrown, log it and continue
             log.debug("Failed to post data: %s" % e)
 
@@ -1325,16 +1336,21 @@ class RealtimeGaugeDataThread(threading.Thread):
             The urllib2.urlopen() response
         """
 
+        # Under python 3 POST data should be bytes or an iterable of bytes and
+        # not of type str. So attempt to convert the POST data to bytes, if it
+        # already is of type bytes an error will be thrown under python 3, be
+        # prepared to catch this error.
         try:
-            # Python 2.5 and earlier do not have a "timeout" parameter.
-            # Including one could cause a TypeError exception. Be prepared
-            # to catch it.
-            _response = urllib.request.urlopen(request,
-                                        data=payload,
-                                        timeout=self.timeout)
+            payload_b = payload.encode('utf-8')
         except TypeError:
-            # Must be Python 2.5 or early. Use a simple, unadorned request
-            _response = urllib.request.urlopen(request, data=payload)
+            payload_b = payload
+
+        # Do the POST. Python 2.5 and earlier do not have a "timeout" parameter
+        # so we used to be prepared to catch the TypeError, but we no longer
+        # support python 2.5 so we can omit the exception.
+        _response = urllib.request.urlopen(request,
+                                           data=payload_b,
+                                           timeout=self.timeout)
         return _response
 
     def write_data(self, data):
@@ -1439,7 +1455,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_temp_type,
                                      self.p_temp_group)
         temp_h_loop = convert(temp_th_loop_vt, self.temp_group).value
-        temp_th = max(temp_h_loop, temp_th)
+        temp_th = weeutil.weeutil.max_with_none([temp_h_loop, temp_th])
         temp_th = temp_th if temp_th is not None else temp
         data['tempTH'] = self.temp_format % temp_th
         # TtempTL - time of today's low temp (hh:mm)
@@ -1483,7 +1499,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                        self.p_temp_type,
                                        self.p_temp_group)
         intemp_h_loop = convert(intemp_th_loop_vt, self.temp_group).value
-        intemp_th = max(intemp_h_loop, intemp_th)
+        intemp_th = weeutil.weeutil.max_with_none([intemp_h_loop, intemp_th])
         intemp_th = intemp_th if intemp_th is not None else intemp
         data['intempTH'] = self.temp_format % intemp_th
         # TintempTL - time of today's low inside temp (hh:mm)
@@ -1503,7 +1519,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         hum_tl = hum_tl if hum_tl is not None else hum
         data['humTL'] = self.hum_format % hum_tl
         # humTH - today's high relative humidity
-        hum_th = max(self.buffer.humH_loop[0], self.day_stats['outHumidity'].max, 0.0)
+        hum_th = weeutil.weeutil.max_with_none([self.buffer.humH_loop[0], self.day_stats['outHumidity'].max, 0.0])
         hum_th = hum_th if hum_th is not None else hum
         data['humTH'] = self.hum_format % hum_th
         # ThumTL - time of today's low relative humidity (hh:mm)
@@ -1549,7 +1565,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                          self.p_temp_type,
                                          self.p_temp_group)
         dewpoint_h_loop = convert(dewpoint_th_loop_vt, self.temp_group).value
-        dewpoint_th = max(dewpoint_h_loop, dewpoint_th)
+        dewpoint_th = weeutil.weeutil.max_with_none([dewpoint_h_loop, dewpoint_th])
         dewpoint_th = dewpoint_th if dewpoint_th is not None else dew
         data['dewpointTH'] = self.temp_format % dewpoint_th
         # TdewpointTL - time of today's low dew point (hh:mm)
@@ -1601,7 +1617,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                           self.p_temp_type,
                                           self.p_temp_group)
         heatindex_h_loop = convert(heatindex_th_loop_vt, self.temp_group).value
-        heatindex_th = max(heatindex_h_loop, heatindex_th)
+        heatindex_th = weeutil.weeutil.max_with_none([heatindex_h_loop, heatindex_th])
         heatindex_th = heatindex_th if heatindex_th is not None else heatindex
         data['heatindexTH'] = self.temp_format % heatindex_th
         # TheatindexTH - time of today's high heat index (hh:mm)
@@ -1654,7 +1670,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                             self.p_temp_type,
                                             self.p_temp_group)
             apptemp_h_loop = convert(apptemp_th_loop_vt, self.temp_group).value
-            apptemp_th = max(apptemp_h_loop, apptemp_th)
+            apptemp_th = weeutil.weeutil.max_with_none([apptemp_h_loop, apptemp_th])
             tapptemp_tl = time.localtime(self.apptemp_day_stats['appTemp'].mintime) if \
                 apptemp_l_loop >= apptemp_tl else \
                 time.localtime(self.buffer.apptempL_loop[1])
@@ -1727,7 +1743,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                          self.p_baro_type,
                                          self.p_baro_group)
             press_h_loop = convert(press_h_loop_vt, self.pres_group).value
-            press_th = max(press_h_loop, press_th, 0.0)
+            press_th = weeutil.weeutil.max_with_none([press_h_loop, press_th, 0.0])
             data['pressTH'] = self.pres_format % press_th
             tpress_tl = time.localtime(self.day_stats['barometer'].mintime) if press_l_loop >= press_tl else \
                 time.localtime(self.buffer.pressL_loop[1])
@@ -1788,7 +1804,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             rrate_tm = 0
         rrate_tm_loop_vt = ValueTuple(self.buffer.rrateH_loop[0], self.p_rainr_type, self.p_rainr_group)
         rrate_h_loop = convert(rrate_tm_loop_vt, self.rainrate_group).value
-        rrate_tm = max(rrate_h_loop, rrate_tm, rrate, 0.0)
+        rrate_tm = weeutil.weeutil.max_with_none([rrate_h_loop, rrate_tm, rrate, 0.0])
         data['rrateTM'] = self.rainrate_format % rrate_tm
         # TrrateTM - time of today's maximum rain rate (per hour)
         if 'rainRate' not in self.day_stats:
@@ -1825,7 +1841,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_wind_type,
                                      self.p_wind_group)
         wind_m_loop = convert(wind_tm_loop_vt, self.wind_group).value
-        wind_tm = max(wind_m_loop, wind_tm, 0.0)
+        wind_tm = weeutil.weeutil.max_with_none([wind_m_loop, wind_tm, 0.0])
         data['windTM'] = self.wind_format % wind_tm
         # wgust - 10 minute high gust
         wgust = self.buffer.ten_minute_wind_gust()
@@ -1842,7 +1858,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.p_wind_type,
                                      self.p_wind_group)
         wgust_m_loop = convert(wgust_m_loop_vt, self.wind_group).value
-        wgust_tm = max(wgust_m_loop, wgust_tm, 0.0)
+        wgust_tm = weeutil.weeutil.max_with_none([wgust_m_loop, wgust_tm, 0.0])
         data['wgustTM'] = self.wind_format % wgust_tm
         # TwgustTM - time of today's high wind gust (hh:mm)
         twgust_tm = time.localtime(self.day_stats['wind'].maxtime) if wgust_m_loop <= wgust_tm else \
@@ -1868,8 +1884,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # down to nearest 10 degrees
         if self.windDirAvg is not None:
             try:
-                from_bearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else
-                                   None for x, y, s, d, t in self.buffer.wind_dir_list)
+                from_bearing = weeutil.weeutil.max_with_none([self.windDirAvg-d if ((d-self.windDirAvg) < 0 < s) else
+                                   None for x, y, s, d, t in self.buffer.wind_dir_list])
             except (TypeError, ValueError):
                 from_bearing = None
             bearing_range_from10 = self.windDirAvg - from_bearing if from_bearing is not None else 0.0
@@ -1885,8 +1901,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # up to the nearest 10 degrees
         if self.windDirAvg is not None:
             try:
-                to_bearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else
-                                 None for x, y, s, d, t in self.buffer.wind_dir_list)
+                to_bearing = weeutil.weeutil.max_with_none([d-self.windDirAvg if ((d-self.windDirAvg) > 0 and s > 0) else
+                                 None for x, y, s, d, t in self.buffer.wind_dir_list])
             except (TypeError, ValueError):
                 to_bearing = None
             bearing_range_to10 = self.windDirAvg + to_bearing if to_bearing is not None else 0.0
@@ -1943,7 +1959,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             uv_th = uv
         else:
             uv_th = self.day_stats['UV'].max
-        uv_th = max(self.buffer.UVH_loop[0], uv_th, uv, 0.0)
+        uv_th = weeutil.weeutil.max_with_none([self.buffer.UVH_loop[0], uv_th, uv, 0.0])
         data['UVTH'] = self.uv_format % uv_th
         # SolarRad - solar radiation W/m2
         if 'radiation' not in packet_d:
@@ -1957,7 +1973,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             solar_tm = 0.0
         else:
             solar_tm = self.day_stats['radiation'].max
-        solar_tm = max(self.buffer.SolarH_loop[0], solar_tm, solar_rad, 0.0)
+        solar_tm = weeutil.weeutil.max_with_none([self.buffer.SolarH_loop[0], solar_tm, solar_rad, 0.0])
         data['SolarTM'] = self.rad_format % solar_tm
         # CurrentSolarMax - Current theoretical maximum solar radiation
         if self.solar_algorithm == 'Bras':
@@ -2227,7 +2243,7 @@ class RtgdBuffer(object):
 
         gust = None
         if len(self.wind_list) > 0:
-            gust = max(s for s, t in self.wind_list)
+            gust = weeutil.weeutil.max_with_none([s for s, t in self.wind_list])
         return gust
 
     def set_lows_and_highs(self, packet):
