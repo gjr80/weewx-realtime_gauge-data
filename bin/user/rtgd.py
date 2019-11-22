@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-  Version: 0.4.1                                      Date: 20 November 2019
+  Version: 0.4.2b1                                    Date: 23 November 2019
 
   Revision History
+    23 November 2019    v0.4.2
+        - fix error in some expressions including > and < where operands could
+          be None
     19 November 2019    v0.4.1
         - fix max() error under python3
         - implemented kludgy work around for lack of response message when
@@ -559,7 +562,7 @@ from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.4.1'
+RTGD_VERSION = '0.4.2b1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
