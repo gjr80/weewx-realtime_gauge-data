@@ -1474,7 +1474,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if temp_h_loop is not None and temp_th is not None and temp_h_loop <= temp_th:
             ttemp_th = time.localtime(self.day_stats['outTemp'].maxtime)
         else:
-            time.localtime(self.buffer.tempH_loop[1])
+            ttemp_th = time.localtime(self.buffer.tempH_loop[1])
         # TODO. Remove following two lines
         # ttemp_th = time.localtime(self.day_stats['outTemp'].maxtime) if temp_h_loop <= temp_th else \
         #     time.localtime(self.buffer.tempH_loop[1])
@@ -1523,7 +1523,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if intemp_h_loop is not None and intemp_th is not None and intemp_h_loop <= intemp_th:
             tintemp_th = time.localtime(self.day_stats['inTemp'].maxtime)
         else:
-            time.localtime(self.buffer.intempH_loop[1])
+            tintemp_th = time.localtime(self.buffer.intempH_loop[1])
         # TODO. Remove following two lines
         # tintemp_th = time.localtime(self.day_stats['inTemp'].maxtime) if intemp_h_loop <= intemp_th else \
         #     time.localtime(self.buffer.intempH_loop[1])
@@ -1544,7 +1544,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.buffer.humL_loop[0] is not None and hum_tl is not None and self.buffer.humL_loop[0] >= hum_tl:
             thum_tl = time.localtime(self.day_stats['outHumidity'].mintime)
         else:
-            time.localtime(self.buffer.humL_loop[1])
+            thum_tl = time.localtime(self.buffer.humL_loop[1])
         # TODO. Remove following two lines
         # thum_tl = time.localtime(self.day_stats['outHumidity'].mintime) if self.buffer.humL_loop[0] >= hum_tl else \
         #    time.localtime(self.buffer.humL_loop[1])
@@ -1553,7 +1553,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.buffer.humH_loop[0] is not None and hum_th is not None and self.buffer.humH_loop[0] <= hum_th:
             thum_th = time.localtime(self.day_stats['outHumidity'].maxtime)
         else:
-            time.localtime(self.buffer.humH_loop[1])
+            thum_th = time.localtime(self.buffer.humH_loop[1])
         # TODO. Remove following two lines
         # thum_th = time.localtime(self.day_stats['outHumidity'].maxtime) if self.buffer.humH_loop[0] <= hum_th else \
         #    time.localtime(self.buffer.humH_loop[1])
@@ -1600,7 +1600,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if dewpoint_l_loop is not None and dewpoint_tl is not None and dewpoint_l_loop >= dewpoint_tl:
             tdewpoint_tl = time.localtime(self.day_stats['dewpoint'].mintime)
         else:
-            time.localtime(self.buffer.dewpointL_loop[1])
+            tdewpoint_tl = time.localtime(self.buffer.dewpointL_loop[1])
         # TODO. Remove following two lines
         # tdewpoint_tl = time.localtime(self.day_stats['dewpoint'].mintime) if dewpoint_l_loop >= dewpoint_tl else \
         #     time.localtime(self.buffer.dewpointL_loop[1])
@@ -1609,7 +1609,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if dewpoint_h_loop is not None and  dewpoint_th is not None and dewpoint_h_loop <= dewpoint_th:
             tdewpoint_th = time.localtime(self.day_stats['dewpoint'].maxtime)
         else:
-            time.localtime(self.buffer.dewpointH_loop[1])
+            tdewpoint_th = time.localtime(self.buffer.dewpointH_loop[1])
         # TODO. Remove following two lines
         # tdewpoint_th = time.localtime(self.day_stats['dewpoint'].maxtime) if dewpoint_h_loop <= dewpoint_th else \
         #     time.localtime(self.buffer.dewpointH_loop[1])
@@ -1638,7 +1638,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if wchill_l_loop is not None and wchill_tl is not None and wchill_l_loop >= wchill_tl:
             twchill_tl = time.localtime(self.day_stats['windchill'].mintime)
         else:
-            time.localtime(self.buffer.wchillL_loop[1])
+            twchill_tl = time.localtime(self.buffer.wchillL_loop[1])
         # TODO. Remove following two lines
         # twchill_tl = time.localtime(self.day_stats['windchill'].mintime) if wchill_l_loop >= wchill_tl else \
         #     time.localtime(self.buffer.wchillL_loop[1])
@@ -1667,7 +1667,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if heatindex_h_loop is not None and heatindex_th is not None and heatindex_h_loop >= heatindex_th:
             theatindex_th = time.localtime(self.day_stats['heatindex'].maxtime)
         else:
-            time.localtime(self.buffer.heatindexH_loop[1])
+            theatindex_th = time.localtime(self.buffer.heatindexH_loop[1])
         # TODO. Remove following two lines
         # theatindex_th = time.localtime(self.day_stats['heatindex'].maxtime) if heatindex_h_loop >= heatindex_th else \
         #     time.localtime(self.buffer.heatindexH_loop[1])
@@ -1722,7 +1722,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             if apptemp_l_loop is not None and apptemp_tl is not None and apptemp_l_loop >= apptemp_tl:
                 tapptemp_tl = time.localtime(self.apptemp_day_stats['appTemp'].mintime)
             else:
-                time.localtime(self.buffer.apptempL_loop[1])
+                tapptemp_tl = time.localtime(self.buffer.apptempL_loop[1])
             # TODO. Remove following three lines
             # tapptemp_tl = time.localtime(self.apptemp_day_stats['appTemp'].mintime) if \
             #    apptemp_l_loop >= apptemp_tl else \
@@ -1730,7 +1730,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             if apptemp_h_loop is not None and apptemp_th is not None and apptemp_h_loop <= apptemp_th:
                 tapptemp_th = time.localtime(self.apptemp_day_stats['appTemp'].maxtime)
             else:
-                time.localtime(self.buffer.apptempH_loop[1])
+                tapptemp_th = time.localtime(self.buffer.apptempH_loop[1])
             # TODO. Remove following three lines
             # tapptemp_th = time.localtime(self.apptemp_day_stats['appTemp'].maxtime) if \
             #     apptemp_h_loop <= apptemp_th else \
@@ -1806,7 +1806,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             if press_l_loop is not None and press_tl is not None and press_l_loop >= press_tl:
                 tpress_tl = time.localtime(self.day_stats['barometer'].mintime)
             else:
-                time.localtime(self.buffer.pressL_loop[1])
+                tpress_tl = time.localtime(self.buffer.pressL_loop[1])
             # TODO. Remove following two lines
             # tpress_tl = time.localtime(self.day_stats['barometer'].mintime) if press_l_loop >= press_tl else \
             #     time.localtime(self.buffer.pressL_loop[1])
@@ -1814,7 +1814,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             if press_h_loop is not None and press_th is not None and press_h_loop <= press_th:
                 tpress_th = time.localtime(self.day_stats['barometer'].maxtime)
             else:
-                time.localtime(self.buffer.pressH_loop[1])
+                tpress_th = time.localtime(self.buffer.pressH_loop[1])
             # TODO. Remove following two lines
             # tpress_th = time.localtime(self.day_stats['barometer'].maxtime) if press_h_loop <= press_th else \
             #     time.localtime(self.buffer.pressH_loop[1])
@@ -1881,7 +1881,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             if rrate_h_loop is not None and rrate_tm is not None and rrate_h_loop <= rrate_tm:
                 trrate_tm = time.localtime(self.day_stats['rainRate'].maxtime)
             else:
-                time.localtime(self.buffer.rrateH_loop[1])
+                trrate_tm = time.localtime(self.buffer.rrateH_loop[1])
             # TODO. Remove following two lines
             # trrate_tm = time.localtime(self.day_stats['rainRate'].maxtime) if rrate_h_loop <= rrate_tm else \
             #     time.localtime(self.buffer.rrateH_loop[1])
@@ -1937,7 +1937,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         if wgust_m_loop is not None and wgust_tm is not None and wgust_m_loop <= wgust_tm:
             twgust_tm = time.localtime(self.day_stats['wind'].maxtime)
         else:
-            time.localtime(self.buffer.wgustM_loop[2])
+            twgust_tm = time.localtime(self.buffer.wgustM_loop[2])
         # TODO. Remove following two lines
         # twgust_tm = time.localtime(self.day_stats['wind'].maxtime) if wgust_m_loop <= wgust_tm else \
         #     time.localtime(self.buffer.wgustM_loop[2])
