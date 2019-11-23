@@ -17,7 +17,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-  Version: 0.4.2b1                                    Date: 23 November 2019
+Version: 0.4.2                                        Date: 23 November 2019
 
   Revision History
     23 November 2019    v0.4.2
@@ -562,7 +562,7 @@ from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.4.2b1'
+RTGD_VERSION = '0.4.2'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 

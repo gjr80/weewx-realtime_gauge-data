@@ -1,3 +1,6 @@
+v0.4.2
+- fix error in some expressions that include > and < where operands could be
+  None
 v0.4.1
 - fix max() error under python3
 - implemented kludgy work around for lack of response message when using HTTP
