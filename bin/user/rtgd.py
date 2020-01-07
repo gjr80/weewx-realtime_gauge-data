@@ -195,6 +195,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
 
     # Remote URL to which the gauge-data.txt data will be posted via HTTP POST.
     # Optional, omit to disable HTTP POST.
+    # If remote_server_url is specified, do not specify an rsync server.
     remote_server_url = http://remote/address
 
     # timeout in seconds for remote URL posts. Optional, default is 2
@@ -203,6 +204,60 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # Text returned from remote URL indicating success. Optional, default is no
     # response text.
     response_text = success
+
+    # Remote host to which the gauge-data.txt data will be synced via rsync.
+    # Optional, omit to disable rsync to remote host.
+    # If rsync_server is specified, do not specify a remote_server_url.
+    #
+    # Note: The rsync feature will only work in WeeWX v.4 and above.  In earlier
+    # versions, rsyncing of single files is not supported by WeeWX's rsync
+    # help function.
+    #
+    # To use rysnc, passwordless ssh using public/private key must be
+    # configured for authentication from the user account that weewx runs under on
+    # this computer to the user account on the remote machine with write access to
+    # the destination directory (rsync_remote_rtgd_dir).
+    #
+    # If you run logwatch on your system, the following lines will show in the
+    # weewx section when they are non-zero.  The first line includes any
+    # reporting files rsynced (if that is configured).  The others report timeouts
+    # and write errors.  Small numbers are expected here as timeouts are purposely
+    # defaulted to 1 second.  If taking to long to send, it's better to skip it
+    # and send the next (as in fresher) gauge-data.txt file.
+    #
+    #    rsync: files uploaded                          27206
+    #    rsync: gauge-data: IO timeout-data                 7
+    #    rsync: gauge-data: connection timeouts            11
+    #    rsync: gauge-data: write errors                    1
+    #
+    #
+    # Fill out the following fields:
+    #   rsync_server             : The server to which gauge-data.txt will be copied.
+    #   rsync_user               : The userid on rsync_server with write
+    #                              permission to rsync_remote_rtgd_dir.
+    #   rsync_remote_rtgd_dir    : The directory on rsync_server where
+    #                              gauge-data.txt will be copied.
+    #   rsync_compress           : True to compress the file before sending.
+    #                              Default is False.
+    #   rsync_log_success        : True to write success with timing messages to
+    #                              the log (for debugging).  Default is False.
+    #   rsync_ssh_options        : ssh options Default is '-o ConnectTimeout=1'
+    #                              (When connecting, time out in 1 second.)
+    #   rsync_timeout            : I/O timeout. Default is 1.  (When sending,
+    #                              timeout in 1 second.)
+    #   rsync_skip_if_older_than : Don't bother to rsync if greater than this
+    #                              number of seconds.  Default is 4.  (Skip this
+    #                              and move on to the next if this data is older
+    #                              than 4 seconds.
+    # Use either the post method or the rsync method, not both.
+    #rsync_server = emerald.johnkline.com
+    #rsync_user = root
+    #rsync_remote_rtgd_dir = /home/weewx/gauge-data
+    #rsync_compress = False
+    #rsync_log_success = False
+    #rsync_ssh_options = "-o ConnectTimeout=1"
+    #rsync_timeout = 1
+    #rsync_skip_if_older_than = 4
 
     # Minimum interval (seconds) between file generation. Ideally
     # gauge-data.txt would be generated on receipt of every loop packet (there
@@ -556,6 +611,7 @@ import weewx.units
 import weewx.wxformulas
 from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
+import weeutil.rsyncupload
 from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with_none
 
 # get a logger object
@@ -883,6 +939,28 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.timeout = to_int(rtgd_config_dict.get('timeout', 2))
         # response text from remote URL if post was successful
         self.response = rtgd_config_dict.get('response_text', None)
+
+        # get server/user/remote_rtgd_path for rsync if they exist;
+        # else set to None.
+        # Consider rsync only if remote_server_url is None
+        if self.remote_server_url is None:
+            self.rsync_server = rtgd_config_dict.get('rsync_server', None)
+            if self.rsync_server is not None:
+                self.rsync_port = rtgd_config_dict.get('rsync_port')
+                self.rsync_user = rtgd_config_dict.get('rsync_user', None)
+                self.rsync_ssh_options = rtgd_config_dict.get(
+                    'rsync_ssh_options', '-o ConnectTimeout=1')
+                self.rsync_remote_rtgd_dir = rtgd_config_dict.get(
+                    'rsync_remote_rtgd_dir', None)
+                self.rsync_dest_path_file = os.path.join(self.rsync_remote_rtgd_dir,
+                    rtgd_config_dict.get('rtgd_file_name', 'gauge-data.txt'))
+                self.rsync_compress = to_bool(rtgd_config_dict.get(
+                    'rsync_compress', False))
+                self.rsync_log_success = to_bool(rtgd_config_dict.get(
+                    'rsync_log_success', False))
+                self.rsync_timeout = rtgd_config_dict.get('rsync_timeout', None)
+                self.rsync_skip_if_older_than = to_int(rtgd_config_dict.get(
+                    'rsync_skip_if_older_than', 4))
 
         # get windrose settings
         try:
@@ -1255,6 +1333,12 @@ class RealtimeGaugeDataThread(threading.Thread):
                 if self.remote_server_url is not None:
                     # post the data
                     self.post_data(data)
+                # If an rsync_server is specified, rsync the data.
+                if self.rsync_server is not None:
+                    # rsync the data
+                    ts = cached_packet['dateTime']
+                    packetTime = datetime.datetime.fromtimestamp(ts)
+                    self.rsync_data(packetTime)
                 # log the generation
                 if weewx.debug == 2:
                     log.debug("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
@@ -1276,6 +1360,32 @@ class RealtimeGaugeDataThread(threading.Thread):
         if package is not None:
             for key, value in package.items():
                 setattr(self, key, value)
+
+    def rsync_data(self, packetTime):
+        # Don't upload if more than rsync_skip_if_older_than seconds behind.
+        if self.rsync_skip_if_older_than != 0:
+            now = datetime.datetime.now()
+            age = now - packetTime
+            if age.total_seconds() > self.rsync_skip_if_older_than:
+                loginf("rsync_data",
+                    "skipping packet (%s) with age: %d" % (packetTime, age.total_seconds()))
+                return
+        rsync_upload = weeutil.rsyncupload.RsyncUpload(
+            local_root=self.rtgd_path_file,
+            remote_root=self.rsync_dest_path_file,
+            server=self.rsync_server,
+            user=self.rsync_user,
+            port=self.rsync_port,
+            ssh_options=self.rsync_ssh_options,
+            compress=self.rsync_compress,
+            delete=False,
+            log_success=self.rsync_log_success,
+            timeout=self.rsync_timeout)
+        try:
+            rsync_upload.run()
+        except IOError as e:
+            (cl, unused_ob, unused_tr) = sys.exc_info()
+            log.error("rtgd.rsync_data: Caught exception %s: %s" % (cl, e))
 
     def post_data(self, data):
         """Post data to a remote URL via HTTP POST.
@@ -1777,6 +1887,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         press = convert(press_vt, self.pres_group).value
         press = press if press is not None else 0.0
         data['press'] = self.pres_format % press
+        # Also include pressure with extra precision.
+        data['pressPRECISE'] = "%.4f" % press
         # pressTL - today's low barometer
         # pressTH - today's high barometer
         # TpressTL - time of today's low barometer (hh:mm)
@@ -1847,6 +1959,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.db_manager, ts - 3600, 300)
         presstrendval = _p_trend_val if _p_trend_val is not None else 0.0
         data['presstrendval'] = self.pres_format % presstrendval
+        # Also include a pressure trend with extra precision.
+        data['presstrendvalPRECISE'] = "%.6f" % presstrendval
         # rfall - rain today
         rain_day = self.day_stats['rain'].sum + self.buffer.rainsum
         rain_t_vt = ValueTuple(rain_day, self.p_rain_type, self.p_rain_group)
