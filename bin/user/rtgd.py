@@ -1887,8 +1887,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         press = convert(press_vt, self.pres_group).value
         press = press if press is not None else 0.0
         data['press'] = self.pres_format % press
-        # Also include pressure with extra precision.
-        data['pressPRECISE'] = "%.4f" % press
         # pressTL - today's low barometer
         # pressTH - today's high barometer
         # TpressTL - time of today's low barometer (hh:mm)
@@ -1959,8 +1957,6 @@ class RealtimeGaugeDataThread(threading.Thread):
                                   self.db_manager, ts - 3600, 300)
         presstrendval = _p_trend_val if _p_trend_val is not None else 0.0
         data['presstrendval'] = self.pres_format % presstrendval
-        # Also include a pressure trend with extra precision.
-        data['presstrendvalPRECISE'] = "%.6f" % presstrendval
         # rfall - rain today
         rain_day = self.day_stats['rain'].sum + self.buffer.rainsum
         rain_t_vt = ValueTuple(rain_day, self.p_rain_type, self.p_rain_group)
