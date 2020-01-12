@@ -1,3 +1,6 @@
+v0.?.?
+- added ability to rsync gauge-data.txt to an rsync capable server, thanks to
+  John Kline
 v0.4.2
 - fix error in some expressions that include > and < where operands could be
   None
