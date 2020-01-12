@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-Version: 0.4.2                                        Date: 23 November 2019
+Version: 0.?.?                                        Date: 13 January 2020
 
   Revision History
+    13 January 2020     v0.?.?
+        - added ability to rsync gauge-data.txt to an rsync capable server,
+          thanks to John Kline
     23 November 2019    v0.4.2
         - fix error in some expressions including > and < where operands could
           be None
