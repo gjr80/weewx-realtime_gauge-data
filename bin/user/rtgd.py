@@ -2176,6 +2176,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         try:
             data['forecast'] = time.strftime(_text, time.localtime(ts))
         except UnicodeEncodeError:
+            # FIXME. Possible unicode/bytes issue
             data['forecast'] = time.strftime(_text.encode('ascii', 'ignore'), time.localtime(ts))
         # version - weather software version
         data['version'] = '%s' % weewx.__version__
@@ -2855,7 +2856,8 @@ class Buffer(dict):
                                                                units=stats.unit_system,
                                                                history=history)
 
-    def seed_windrun(self, day_stats):
+    @staticmethod
+    def seed_windrun(day_stats):
         """Seed day windrun."""
 
         if 'windSpeed' in day_stats:
@@ -3463,7 +3465,7 @@ class WUSource(ThreadedSource):
         if len(_location_list) == 2:
             self.location = _location_list[1]
         else:
-            self.locator == 'geocode'
+            self.locator = 'geocode'
             self.location = '%s,%s' % (engine.stn_info.latitude_f,
                                        engine.stn_info.longitude_f)
 
@@ -3614,13 +3616,13 @@ class WUSource(ThreadedSource):
                     # couldn't find a key for one of the fields, log it and
                     # force use of night index
                     log.info("Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
-                                                                                                   self.forecast_text))
+                                                                                                     self.forecast_text))
                     day_index = None
                 except ValueError:
                     # could not get an index for 'D', log it and force use of
                     # night index
                     log.info("Unable to locate 'D' index for %s '%s' forecast narrative" % (_period_str,
-                                                                                          self.forecast_text))
+                                                                                            self.forecast_text))
                     day_index = None
             # we have a day_index but is it for today or some later day
             if day_index is not None and day_index <= 1:
@@ -3634,12 +3636,12 @@ class WUSource(ThreadedSource):
                     # couldn't find a key for one of the fields, log it and
                     # return None
                     log.info("Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
-                                                                                                   self.forecast_text))
+                                                                                                     self.forecast_text))
                     return None
                 except ValueError:
                     # could not get an index for 'N', log it and return None
                     log.info("Unable to locate 'N' index for %s '%s' forecast narrative" % (_period_str,
-                                                                                          self.forecast_text))
+                                                                                            self.forecast_text))
                     return None
             # if we made it here we have an index to use so get the required
             # narrative
@@ -3902,7 +3904,7 @@ class Zambretti(object):
 
         # get the current time
         now = time.time()
-        if weewx.debug ==2:
+        if weewx.debug == 2:
             log.debug("Last Zambretti forecast obtained at %s" % self.last_query_ts)
         # If we haven't made a db query previously or if its been too long 
         # since the last query then make the query
