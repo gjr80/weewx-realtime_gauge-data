@@ -80,7 +80,7 @@ import weewx
 from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
-REQUIRED_VERSION = "400.0b1"
+REQUIRED_VERSION = "4.0.0b1"
 RTGD_VERSION = "0.4.0"
 
 
