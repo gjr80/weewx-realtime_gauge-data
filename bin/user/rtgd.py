@@ -1990,7 +1990,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         wlatest_vt = ValueTuple(packet['windSpeed'],
                                 self.p_wind_type,
                                 self.p_wind_group)
-        wlatest = convert(wlatest_vt, self.wind_group).value if wlatest_vt.value is not None else 0.0
+        wlatest = convert(wlatest_vt, self.wind_group).value
+        wlatest = wlatest if wlatest is not None else 0.0
         data['wlatest'] = self.wind_format % wlatest
         # wspeed - wind speed (average)
         wspeed = convert(self.windSpeedAvg_vt, self.wind_group).value
@@ -2001,14 +2002,15 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 self.p_wind_type,
                                 self.p_wind_group)
         wind_tm = convert(wind_tm_vt, self.wind_group).value
-        wind_tm_loop_vt = ValueTuple(self.buffer.windM_loop[0],
-                                     self.p_wind_type,
-                                     self.p_wind_group)
-        wind_m_loop = convert(wind_tm_loop_vt, self.wind_group).value
-        wind_tm = weeutil.weeutil.max_with_none([wind_m_loop, wind_tm, 0.0])
+        wind_tm = wind_tm if wind_tm is not None else 0.0
         data['windTM'] = self.wind_format % wind_tm
         # wgust - 10 minute high gust
-        wgust = self.buffer.ten_minute_wind_gust()
+        if 'windGust' in self.buffer:
+            wgust = self.buffer['windGust'].history_max(ts).value
+        elif 'windSpeed' in self.buffer:
+            wgust = self.buffer['windSpeed'].history_max(ts).value
+        else:
+            wgust = None
         wgust_vt = ValueTuple(wgust, self.p_wind_type, self.p_wind_group)
         wgust = convert(wgust_vt, self.wind_group).value
         wgust = wgust if wgust is not None else 0.0
@@ -2018,24 +2020,18 @@ class RealtimeGaugeDataThread(threading.Thread):
                                  self.p_wind_type,
                                  self.p_wind_group)
         wgust_tm = convert(wgust_tm_vt, self.wind_group).value
-        wgust_m_loop_vt = ValueTuple(self.buffer.wgustM_loop[0],
-                                     self.p_wind_type,
-                                     self.p_wind_group)
-        wgust_m_loop = convert(wgust_m_loop_vt, self.wind_group).value
-        wgust_tm = weeutil.weeutil.max_with_none([wgust_m_loop, wgust_tm, 0.0])
+        wgust_tm = wgust_tm if wgust_tm is not None else 0.0
         data['wgustTM'] = self.wind_format % wgust_tm
         # TwgustTM - time of today's high wind gust (hh:mm)
-        if wgust_m_loop is not None and wgust_tm is not None and wgust_m_loop <= wgust_tm:
-            twgust_tm = time.localtime(self.buffer['wind'].maxtime)
-        else:
-            twgust_tm = time.localtime(self.buffer.wgustM_loop[2])
-        # TODO. Remove following two lines
-        # twgust_tm = time.localtime(self.buffer['wind'].maxtime) if wgust_m_loop <= wgust_tm else \
-        #     time.localtime(self.buffer.wgustM_loop[2])
+        twgust_tm = time.localtime(self.buffer['wind'].maxtime)
         data['TwgustTM'] = time.strftime(self.time_format, twgust_tm)
         # bearing - wind bearing (degrees)
-        bearing = packet['windDir'] if packet['windDir'] is not None else self.last_latest_dir
-        self.last_latest_dir = bearing
+        bearing = packet['windDir']
+        bearing = bearing if bearing is not None else self.last_dir
+        # save this bearing to use next time if there is no windDir, this way
+        # our wind dir needle will always hsow the last non-None windDir rather
+        # than return to 0
+        self.last_dir = bearing
         data['bearing'] = self.dir_format % bearing
         # avgbearing - 10-minute average wind bearing (degrees)
         avg_bearing = self.windDirAvg if self.windDirAvg is not None else self.last_average_dir
@@ -2045,43 +2041,43 @@ class RealtimeGaugeDataThread(threading.Thread):
         # As our self.buffer is really a weeWX accumulator filled with the
         # relevant days stats we need to use .max_dir rather than .gustdir
         # to get the gust direction for the day.
-        bearing_tm = self.buffer['wind'].max_dir if self.buffer['wind'].max_dir is not None else 0
-        bearing_tm = self.buffer.wgustM_loop[1] if wgust_tm == wgust_m_loop else bearing_tm
+        bearing_tm = self.buffer['wind'].max_dir
+        bearing_tm = bearing_tm if bearing_tm is not None else 0
         data['bearingTM'] = self.dir_format % bearing_tm
-        # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
-        # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
-        # down to nearest 10 degrees
-        if self.windDirAvg is not None:
-            try:
-                from_bearing = weeutil.weeutil.max_with_none([self.windDirAvg-d if ((d-self.windDirAvg) < 0 < s) else
-                                   None for x, y, s, d, t in self.buffer.wind_dir_list])
-            except (TypeError, ValueError):
-                from_bearing = None
-            bearing_range_from10 = self.windDirAvg - from_bearing if from_bearing is not None else 0.0
-            if bearing_range_from10 < 0:
-                bearing_range_from10 += 360
-            elif bearing_range_from10 > 360:
-                bearing_range_from10 -= 360
-        else:
-            bearing_range_from10 = 0.0
-        data['BearingRangeFrom10'] = self.dir_format % bearing_range_from10
-        # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
-        # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
-        # up to the nearest 10 degrees
-        if self.windDirAvg is not None:
-            try:
-                to_bearing = weeutil.weeutil.max_with_none([d-self.windDirAvg if ((d-self.windDirAvg) > 0 and s > 0) else
-                                 None for x, y, s, d, t in self.buffer.wind_dir_list])
-            except (TypeError, ValueError):
-                to_bearing = None
-            bearing_range_to10 = self.windDirAvg + to_bearing if to_bearing is not None else 0.0
-            if bearing_range_to10 < 0:
-                bearing_range_to10 += 360
-            elif bearing_range_to10 > 360:
-                bearing_range_to10 -= 360
-        else:
-            bearing_range_to10 = 0.0
-        data['BearingRangeTo10'] = self.dir_format % bearing_range_to10
+        # FIXME.
+        # # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
+        # # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
+        # # down to nearest 10 degrees
+        # if self.windDirAvg is not None:
+        #     try:
+        #         fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else None for x, y, s, d, t in self.buffer.wind_dir_list)
+        #     except (TypeError, ValueError):
+        #         fromBearing = None
+        #     BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
+        #     if BearingRangeFrom10 < 0:
+        #         BearingRangeFrom10 += 360
+        #     elif BearingRangeFrom10 > 360:
+        #         BearingRangeFrom10 -= 360
+        # else:
+        #     BearingRangeFrom10 = 0.0
+        # data['BearingRangeFrom10'] = self.dir_format % BearingRangeFrom10
+        # FIXME.
+        # # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
+        # # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
+        # # up to the nearest 10 degrees
+        # if self.windDirAvg is not None:
+        #     try:
+        #         toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x, y, s, d, t in self.buffer.wind_dir_list)
+        #     except (TypeError, ValueError):
+        #         toBearing = None
+        #     BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
+        #     if BearingRangeTo10 < 0:
+        #         BearingRangeTo10 += 360
+        #     elif BearingRangeTo10 > 360:
+        #         BearingRangeTo10 -= 360
+        # else:
+        #     BearingRangeTo10 = 0.0
+        # data['BearingRangeTo10'] = self.dir_format % BearingRangeTo10
         # domwinddir - Today's dominant wind direction as compass point
         deg = 90.0 - math.degrees(math.atan2(self.buffer['wind'].ysum,
                                   self.buffer['wind'].xsum))
@@ -2089,28 +2085,29 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['domwinddir'] = degree_to_compass(dom_dir)
         # WindRoseData -
         data['WindRoseData'] = self.rose
-        # windrun - wind run (today)
-        last_ts = self.db_manager.lastGoodStamp()
-        try:
-            wind_sum_vt = ValueTuple(self.buffer['wind'].sum,
-                                     self.p_wind_type,
-                                     self.p_wind_group)
-            windrun_day_average = (last_ts - startOfDay(ts))/3600.0 * \
-                convert(wind_sum_vt, self.wind_group).value/self.buffer['wind'].count
-        except (ValueError, TypeError, ZeroDivisionError):
-            windrun_day_average = 0.0
-        if self.windrun_loop:   # is loop/realtime estimate
-            loop_hours = (ts - last_ts)/3600.0
-            try:
-                windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum,
-                                                                      self.p_wind_type,
-                                                                      self.p_wind_group),
-                                                                     self.wind_group).value/self.buffer.windcount
-            except (ValueError, TypeError):
-                windrun = windrun_day_average
-        else:
-            windrun = windrun_day_average
-        data['windrun'] = self.dist_format % windrun
+        # FIXME.
+        # # windrun - wind run (today)
+        # last_ts = self.db_manager.lastGoodStamp()
+        # try:
+        #     wind_sum_vt = ValueTuple(self.buffer['wind'].sum,
+        #                              self.p_wind_type,
+        #                              self.p_wind_group)
+        #     windrun_day_average = (last_ts - startOfDay(ts))/3600.0 * convert(wind_sum_vt,
+        #                                                                       self.wind_group).value/self.buffer['wind'].count
+        # except (ValueError, TypeError, ZeroDivisionError):
+        #     windrun_day_average = 0.0
+        # if self.windrun_loop:   # is loop/realtime estimate
+        #     loop_hours = (ts - last_ts)/3600.0
+        #     try:
+        #         windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum,
+        #                                                               self.p_wind_type,
+        #                                                               self.p_wind_group),
+        #                                                              self.wind_group).value/self.buffer.windcount
+        #     except (ValueError, TypeError):
+        #         windrun = windrun_day_average
+        # else:
+        #     windrun = windrun_day_average
+        # data['windrun'] = self.dist_format % windrun
         # Tbeaufort - wind speed (Beaufort)
         if packet['windSpeed'] is not None:
             data['Tbeaufort'] = str(weewx.wxformulas.beaufort(convert(wlatest_vt,
@@ -2128,7 +2125,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             uv_th = uv
         else:
             uv_th = self.buffer['UV'].max
-        uv_th = weeutil.weeutil.max_with_none([self.buffer.UVH_loop[0], uv_th, uv, 0.0])
+        uv_th = uv_th if uv_th is not None else 0.0
         data['UVTH'] = self.uv_format % uv_th
         # SolarRad - solar radiation W/m2
         if 'radiation' not in packet:
@@ -2142,7 +2139,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             solar_tm = 0.0
         else:
             solar_tm = self.buffer['radiation'].max
-        solar_tm = weeutil.weeutil.max_with_none([self.buffer.SolarH_loop[0], solar_tm, solar_rad, 0.0])
+        solar_tm = solar_tm if solar_tm is not None else 0.0
         data['SolarTM'] = self.rad_format % solar_tm
         # CurrentSolarMax - Current theoretical maximum solar radiation
         if self.solar_algorithm == 'Bras':
@@ -2159,6 +2156,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                            self.atc)
         curr_solar_max = curr_solar_max if curr_solar_max is not None else 0.0
         data['CurrentSolarMax'] = self.rad_format % curr_solar_max
+        # cloudbasevalue - current cloudbase
         if 'cloudbase' in packet:
             cb = packet['cloudbase']
             cb_vt = ValueTuple(cb, self.p_alt_type, self.p_alt_group)
@@ -2186,10 +2184,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         # ver - gauge-data.txt version number
         data['ver'] = self.version
         # month to date rain, only calculate if we have been asked
+        # TODO. Check this, particularly usage of buffer['rain'].sum
         if self.mtd_rain:
             if self.month_rain is not None:
                 rain_m = convert(self.month_rain, self.rain_group).value
-                rain_b_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
+                rain_b_vt = ValueTuple(self.buffer['rain'].sum, self.p_rain_type, self.p_rain_group)
                 rain_b = convert(rain_b_vt, self.rain_group).value
                 if rain_m is not None and rain_b is not None:
                     rain_m = rain_m + rain_b
@@ -2199,10 +2198,11 @@ class RealtimeGaugeDataThread(threading.Thread):
                 rain_m = 0.0
             data['mrfall'] = self.rain_format % rain_m
         # year to date rain, only calculate if we have been asked
+        # TODO. Check this, particularly usage of buffer['rain'].sum
         if self.ytd_rain:
             if self.year_rain is not None:
                 rain_y = convert(self.year_rain, self.rain_group).value
-                rain_b_vt = ValueTuple(self.buffer.rainsum, self.p_rain_type, self.p_rain_group)
+                rain_b_vt = ValueTuple(self.buffer['rain'].sum, self.p_rain_type, self.p_rain_group)
                 rain_b = convert(rain_b_vt, self.rain_group).value
                 if rain_y is not None and rain_b is not None:
                     rain_y = rain_y + rain_b
@@ -2236,8 +2236,15 @@ class RealtimeGaugeDataThread(threading.Thread):
     def end_archive_period(self):
         """Control processing at the end of each archive period."""
 
-        # Reset our loop stats.
-        self.buffer.reset_loop_stats()
+        # TODO. is this required?
+        # # Reset our loop stats.
+        # self.buffer.reset_loop_stats()
+
+    # TODO.Is this required?
+    def parse_field_map(self, rtgd_config_dict):
+        """Parse the field map."""
+
+        _field_map = rtgd_config_dict.get("FieldMap", None)
 
     def get_lost_contact(self, rec, packet_type):
         """Determine is station has lost contact with sensors."""
