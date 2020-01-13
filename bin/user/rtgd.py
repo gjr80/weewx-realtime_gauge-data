@@ -939,26 +939,26 @@ class RealtimeGaugeData(StdService):
         """
 
         if hasattr(self, 'rtgd_ctl_queue') and hasattr(self, 'rtgd_thread'):
-            if self.rtgd_ctl_queue and self.rtgd_thread.isAlive():
+            if self.rtgd_ctl_queue and self.rtgd_thread.is_alive():
                 # Put a None in the rtgd_ctl_queue to signal the thread to
                 # shutdown
                 self.rtgd_ctl_queue.put(None)
         if hasattr(self, 'source_ctl_queue') and hasattr(self, 'source_thread'):
-            if self.source_ctl_queue and self.source_thread.isAlive():
+            if self.source_ctl_queue and self.source_thread.is_alive():
                 # Put a None in the source_ctl_queue to signal the thread to
                 # shutdown
                 self.source_ctl_queue.put(None)
-        if hasattr(self, 'rtgd_thread') and self.rtgd_thread.isAlive():
+        if hasattr(self, 'rtgd_thread') and self.rtgd_thread.is_alive():
             # Wait up to 15 seconds for the thread to exit:
             self.rtgd_thread.join(15.0)
-            if self.rtgd_thread.isAlive():
+            if self.rtgd_thread.is_alive():
                 log.error("Unable to shut down %s thread" % self.rtgd_thread.name)
             else:
                 log.debug("Shut down %s thread." % self.rtgd_thread.name)
-        if hasattr(self, 'source_thread') and self.source_thread.isAlive():
+        if hasattr(self, 'source_thread') and self.source_thread.is_alive():
             # Wait up to 15 seconds for the thread to exit:
             self.source_thread.join(15.0)
-            if self.source_thread.isAlive():
+            if self.source_thread.is_alive():
                 log.error("Unable to shut down %s thread" % self.source_thread.name)
             else:
                 log.debug("Shut down %s thread." % self.source_thread.name)
@@ -1050,7 +1050,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                 self.rsync_remote_rtgd_dir = rtgd_config_dict.get(
                     'rsync_remote_rtgd_dir', None)
                 self.rsync_dest_path_file = os.path.join(self.rsync_remote_rtgd_dir,
-                    rtgd_config_dict.get('rtgd_file_name', 'gauge-data.txt'))
+                                                         rtgd_config_dict.get('rtgd_file_name',
+                                                                              'gauge-data.txt'))
                 self.rsync_compress = to_bool(rtgd_config_dict.get(
                     'rsync_compress', False))
                 self.rsync_log_success = to_bool(rtgd_config_dict.get(
@@ -1456,8 +1457,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                 if self.rsync_server is not None:
                     # rsync the data
                     ts = cached_packet['dateTime']
-                    packetTime = datetime.datetime.fromtimestamp(ts)
-                    self.rsync_data(packetTime)
+                    packet_time = datetime.datetime.fromtimestamp(ts)
+                    self.rsync_data(packet_time)
                 # log the generation
                 # FIXME. revert to log.debug2
                 # if weewx.debug == 2:
@@ -1481,14 +1482,13 @@ class RealtimeGaugeDataThread(threading.Thread):
             for key, value in package.items():
                 setattr(self, key, value)
 
-    def rsync_data(self, packetTime):
+    def rsync_data(self, packet_time):
         # Don't upload if more than rsync_skip_if_older_than seconds behind.
         if self.rsync_skip_if_older_than != 0:
             now = datetime.datetime.now()
-            age = now - packetTime
+            age = now - packet_time
             if age.total_seconds() > self.rsync_skip_if_older_than:
-                log.info("rsync_data",
-                    "skipping packet (%s) with age: %d" % (packetTime, age.total_seconds()))
+                log.info("skipping packet (%s) with age: %d" % (packet_time, age.total_seconds()))
                 return
         rsync_upload = weeutil.rsyncupload.RsyncUpload(
             local_root=self.rtgd_path_file,
