@@ -600,21 +600,24 @@ import socket
 import threading
 import time
 
+from operator import itemgetter
+
 # Python 2/3 compatibility shims
 import six
 from six.moves import http_client
 from six.moves import queue
 from six.moves import urllib
 
-# weeWX imports
+# WeeWX imports
 import weewx
 import weeutil.logger
+import weeutil.rsyncupload
 import weeutil.weeutil
 import weewx.units
 import weewx.wxformulas
+
 from weewx.engine import StdService
-from weewx.units import ValueTuple, convert, getStandardUnitType
-import weeutil.rsyncupload
+from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts
 from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with_none
 
 # get a logger object
@@ -646,6 +649,17 @@ UNITS_CLOUD = {'foot':  'ft',
 GROUP_DIST = {'mile_per_hour':      'mile',
               'meter_per_second':   'km',
               'km_per_hour':        'km'}
+
+# the obs that we will buffer
+MANIFEST = ['outTemp', 'barometer', 'outHumidity', 'rain', 'rainRate',
+            'humidex', 'windchill', 'heatindex', 'windSpeed', 'inTemp',
+            'appTemp', 'dewpoint', 'windDir', 'UV', 'radiation', 'wind',
+            'windGust', 'windGustDir']
+
+# obs for which we need a history
+HIST_MANIFEST = ['windSpeed', 'windDir', 'windGust', 'wind']
+
+MAX_AGE = 600
 
 # Define station lost contact checks for supported stations. Note that at
 # present only Vantage and FOUSB stations lost contact reporting is supported.
@@ -1145,7 +1159,7 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # initialise last wind directions for use when respective direction is
         # None. We need latest and average
-        self.last_latest_dir = 0
+        self.last_dir = 0
         self.last_average_dir = 0
 
         # Are we updating windrun using archive data only or archive and loop
@@ -1161,8 +1175,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.apptemp_binding = rtgd_config_dict.get('apptemp_binding',
                                                     'wx_binding')
 
-        # create a RtgdBuffer object to hold our loop 'stats'
-        self.buffer = RtgdBuffer()
+        # create a Buffer object to hold our loop 'stats'
+        self.buffer = Buffer(MANIFEST)
 
         # Lost contact
         # do we ignore the lost contact 'calculation'
@@ -1252,130 +1266,144 @@ class RealtimeGaugeDataThread(threading.Thread):
         # running in a thread we need to wait until the thread is actually
         # running before getting db managers
 
-        # get a db manager
-        self.db_manager = weewx.manager.open_manager(self.manager_dict)
-        # get a db manager for appTemp
-        self.apptemp_manager = weewx.manager.open_manager_with_config(self.config_dict,
-                                                                      self.apptemp_binding)
-        # initialise our day stats
-        self.day_stats = self.db_manager._get_day_summary(time.time())
-        # initialise our day stats from our appTemp block
-        self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
-        # get a windrose to start with since it is only on receipt of an
-        # archive record
-        self.rose = calc_windrose(int(time.time()),
-                                  self.db_manager,
-                                  self.wr_period,
-                                  self.wr_points)
-        if weewx.debug == 2:
-            log.debug("windrose data calculated")
-        elif weewx.debug >= 3:
-            log.debug("windrose data calculated: %s" % (self.rose,))
-        # setup our loop cache and set some starting wind values
-        _ts = self.db_manager.lastGoodStamp()
-        if _ts is not None:
-            _rec = self.db_manager.getRecord(_ts)
-        else:
-            _rec = {'usUnits': None}
-        # get a CachedPacket object as our loop packet cache and prime it with
-        # values from the last good archive record if available
-        self.packet_cache = CachedPacket(_rec)
-        if weewx.debug == 2:
-            log.debug("loop packet cache initialised")
-        # save the windSpeed value to use as our archive period average, this
-        # needs to be a ValueTuple since we may need to convert units
-        if 'windSpeed' in _rec:
-            self.windSpeedAvg_vt = weewx.units.as_value_tuple(_rec, 'windSpeed')
-        # save the windDir value to use as our archive period average
-        if 'windDir' in _rec:
-            self.windDirAvg = _rec['windDir']
+        try:
+            # get a db manager
+            self.db_manager = weewx.manager.open_manager(self.manager_dict)
+            # get a db manager for appTemp
+            self.apptemp_manager = weewx.manager.open_manager_with_config(self.config_dict,
+                                                                          self.apptemp_binding)
+            # initialise our day stats
+            self.day_stats = self.db_manager._get_day_summary(time.time())
+            # set the unit system for our day stats
+            self.day_stats.unit_system = self.db_manager.std_unit_system
+            # initialise our day stats from our appTemp source
+            self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
+            # get a Buffer object
+            self.buffer = Buffer(MANIFEST,
+                                 day_stats=self.day_stats,
+                                 additional_day_stats=self.apptemp_day_stats)
 
-        # now run a continuous loop, waiting for records to appear in the rtgd
-        # queue then processing them.
-        while True:
-            # inner loop to monitor the queues
+            # get a windrose to start with since it is only on receipt of an
+            # archive record
+            self.rose = calc_windrose(int(time.time()),
+                                      self.db_manager,
+                                      self.wr_period,
+                                      self.wr_points)
+            if weewx.debug == 2:
+                log.debug("windrose data calculated")
+            elif weewx.debug >= 3:
+                log.debug("windrose data calculated: %s" % (self.rose,))
+            # setup our loop cache and set some starting wind values
+            _ts = self.db_manager.lastGoodStamp()
+            if _ts is not None:
+                _rec = self.db_manager.getRecord(_ts)
+            else:
+                _rec = {'usUnits': None}
+            # get a CachedPacket object as our loop packet cache and prime it with
+            # values from the last good archive record if available
+            self.packet_cache = CachedPacket(_rec)
+            if weewx.debug >= 2:
+                log.debug("loop packet cache initialised")
+            # save the windSpeed value to use as our archive period average, this
+            # needs to be a ValueTuple since we may need to convert units
+            if 'windSpeed' in _rec:
+                self.windSpeedAvg_vt = weewx.units.as_value_tuple(_rec, 'windSpeed')
+            # save the windDir value to use as our archive period average
+            if 'windDir' in _rec:
+                self.windDirAvg = _rec['windDir']
+
+            # now run a continuous loop, waiting for records to appear in the rtgd
+            # queue then processing them.
             while True:
-                # If we have a result queue check to see if we have received
-                # any forecast data. Use get_nowait() so we don't block the
-                # rtgd control queue. Wrap in a try..except to catch the error
-                # if there is nothing in the queue.
-                if self.result_queue:
+                # inner loop to monitor the queues
+                while True:
+                    # If we have a result queue check to see if we have received
+                    # any forecast data. Use get_nowait() so we don't block the
+                    # rtgd control queue. Wrap in a try..except to catch the error
+                    # if there is nothing in the queue.
+                    if self.result_queue:
+                        try:
+                            # use nowait() so we don't block
+                            _package = self.result_queue.get_nowait()
+                        except queue.Empty:
+                            # nothing in the queue so continue
+                            pass
+                        else:
+                            # we did get something in the queue but was it a
+                            # 'forecast' package
+                            if isinstance(_package, dict):
+                                if 'type' in _package and _package['type'] == 'forecast':
+                                    # we have forecast text so log and save it
+                                    if weewx.debug >= 2:
+                                        log.debug("received forecast text: %s" % _package['payload'])
+                                    self.forecast_text = _package['payload']
+                    # now deal with the control queue
                     try:
-                        # use nowait() so we don't block
-                        _package = self.result_queue.get_nowait()
+                        _package = self.control_queue.get_nowait()
                     except queue.Empty:
                         # nothing in the queue so continue
                         pass
                     else:
-                        # we did get something in the queue but was it a
-                        # 'forecast' package
-                        if isinstance(_package, dict):
-                            if 'type' in _package and _package['type'] == 'forecast':
-                                # we have forecast text so log and save it
-                                if weewx.debug == 2:
-                                    log.debug("received forecast text: %s" % _package['payload'])
-                                self.scroller_text = _package['payload']
-                # now deal with the control queue
-                try:
-                    # block for one second waiting for package, if nothing
-                    # received throw queue.Empty
-                    _package = self.control_queue.get(True, 1.0)
-                except queue.Empty:
-                    # nothing in the queue so continue
-                    pass
-                else:
-                    # a None record is our signal to exit
-                    if _package is None:
-                        return
-                    elif _package['type'] == 'archive':
-                        if weewx.debug == 2:
-                            log.debug("received archive record (%s)" % _package['payload']['dateTime'])
-                        elif weewx.debug >= 3:
-                            log.debug("received archive record: %s" % _package['payload'])
-                        self.new_archive_record(_package['payload'])
-                        self.rose = calc_windrose(_package['payload']['dateTime'],
-                                                  self.db_manager,
-                                                  self.wr_period,
-                                                  self.wr_points)
-                        if weewx.debug == 2:
-                            log.debug("windrose data calculated")
-                        elif weewx.debug >= 3:
-                            log.debug("windrose data calculated: %s" % (self.rose,))
-                        continue
-                    elif _package['type'] == 'event':
-                        if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
-                            if weewx.debug == 2:
-                                log.debug("received event - END_ARCHIVE_PERIOD")
-                            self.end_archive_period()
-                        continue
-                    elif _package['type'] == 'stats':
-                        if weewx.debug == 2:
-                            log.debug("received stats package")
-                        elif weewx.debug >= 3:
-                            log.debug("received stats package: %s" % _package['payload'])
-                        self.process_stats(_package['payload'])
-                        continue
-                    elif _package['type'] == 'loop':
-                        # we now have a packet to process, wrap in a
-                        # try..except so we can catch any errors
-                        try:
-                            if weewx.debug == 2:
-                                log.debug("received loop packet (%s)" % _package['payload']['dateTime'])
-                            elif weewx.debug >= 3:
-                                log.debug("received loop packet: %s" % _package['payload'])
-                            self.process_packet(_package['payload'])
-                            continue
-                        except Exception as e:
-                            # Some unknown exception occurred. This is probably
-                            # a serious problem. Exit.
-                            log.critical("Unexpected exception of type %s" % (type(e), ))
-                            weeutil.logger.log_traceback(log.critical, "    ****  ")
-                            log.critical("Thread exiting. Reason: %s" % (e, ))
+                        # a None record is our signal to exit
+                        if _package is None:
                             return
-                # if packets have backed up in the control queue, trim it until
-                # it's no bigger than the max allowed backlog
-                while self.control_queue.qsize() > 5:
-                    self.control_queue.get()
+                        elif _package['type'] == 'archive':
+                            if weewx.debug == 2:
+                                log.debug("received archive record (%s)" % _package['payload']['dateTime'])
+                            elif weewx.debug >= 3:
+                                log.debug("received archive record: %s" % _package['payload'])
+                            self.new_archive_record(_package['payload'])
+                            self.rose = calc_windrose(_package['payload']['dateTime'],
+                                                      self.db_manager,
+                                                      self.wr_period,
+                                                      self.wr_points)
+                            if weewx.debug == 2:
+                                log.debug("windrose data calculated")
+                            elif weewx.debug >= 3:
+                                log.debug("windrose data calculated: %s" % (self.rose,))
+                            continue
+                        elif _package['type'] == 'event':
+                            # FIXME. do we need this event?
+                            if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
+                                if weewx.debug == 2:
+                                    log.debug("received event - END_ARCHIVE_PERIOD")
+                                # self.end_archive_period()
+                            continue
+                        elif _package['type'] == 'stats':
+                            if weewx.debug == 2:
+                                log.debug("received stats package")
+                            elif weewx.debug >= 3:
+                                log.debug("received stats package: %s" % _package['payload'])
+                            self.process_stats(_package['payload'])
+                            continue
+                        elif _package['type'] == 'loop':
+                            # we now have a packet to process, wrap in a
+                            # try..except so we can catch any errors
+                            try:
+                                if weewx.debug == 2:
+                                    log.debug("received loop packet (%s)" % _package['payload']['dateTime'])
+                                elif weewx.debug >= 3:
+                                    log.debug("received loop packet: %s" % _package['payload'])
+                                self.process_packet(_package['payload'])
+                                continue
+                            except Exception as e:
+                                # Some unknown exception occurred. This is probably
+                                # a serious problem. Exit.
+                                log.critical("Unexpected exception of type %s" % (type(e),))
+                                weeutil.logger.log_traceback(log.debug, 'rtgdthread: **** ')
+                                log.critical("Thread exiting. Reason: %s" % (e, ))
+                                return
+                    # if packets have backed up in the control queue, trim it until
+                    # it's no bigger than the max allowed backlog
+                    while self.control_queue.qsize() > 5:
+                        self.control_queue.get()
+        except Exception as e:
+            # Some unknown exception occurred. This is probably
+            # a serious problem. Exit.
+            log.critical("Unexpected exception of type %s" % (type(e), ))
+            weeutil.logger.log_traceback(log.debug, 'rtgdthread: **** ')
+            log.critical("Thread exiting. Reason: %s" % (e, ))
+            return
 
     def process_packet(self, packet):
         """Process incoming loop packets and generate gauge-data.txt.
@@ -1386,18 +1414,26 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get time for debug timing
         t1 = time.time()
+        # convert our incoming packet
+        log.info("1")
+        log.info("packet=%s" % (packet,))
+        log.info("rtgdthread", "self.day_stats.unit_system=%s" % (self.day_stats.unit_system,))
+        _conv_packet = weewx.units.to_std_system(packet,
+                                                 self.day_stats.unit_system)
         # update the packet cache with this packet
-        self.packet_cache.update(packet, packet['dateTime'])
-        # do those things that must be done with every loop packet
-        # ie update our lows and highs and our 5 and 10 min wind lists
-        self.buffer.set_lows_and_highs(packet)
+        log.info("2")
+        self.packet_cache.update(_conv_packet, _conv_packet['dateTime'])
+        # update the buffer with the converted packet
+        log.info("3")
+        self.buffer.add_packet(_conv_packet)
         # generate if we have no minimum interval setting or if minimum
         # interval seconds have elapsed since our last generation
+        log.info("4")
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
             # TODO. Could this try..except be reduced in scope
             try:
                 # get a cached packet
-                cached_packet = self.packet_cache.get_packet(packet['dateTime'],
+                cached_packet = self.packet_cache.get_packet(_conv_packet['dateTime'],
                                                              self.max_cache_age)
                 if weewx.debug == 2:
                     log.debug("created cached loop packet (%s)" % cached_packet['dateTime'])
@@ -1422,15 +1458,16 @@ class RealtimeGaugeDataThread(threading.Thread):
                     packetTime = datetime.datetime.fromtimestamp(ts)
                     self.rsync_data(packetTime)
                 # log the generation
-                if weewx.debug == 2:
-                    log.debug("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
-                                                                           (self.last_write-t1)))
+                # FIXME. revert to log.debug2
+                # if weewx.debug == 2:
+                log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
+                                                                            (self.last_write - t1)))
             except Exception as e:
                 weeutil.logger.log_traceback(log.info, 'rtgdthread: **** ')
         else:
             # we skipped this packet so log it
             if weewx.debug == 2:
-                log.debug("packet (%s) skipped" % packet['dateTime'])
+                log.debug("packet (%s) skipped" % _conv_packet['dateTime'])
 
     def process_stats(self, package):
         """Process a stats package.
@@ -1585,10 +1622,9 @@ class RealtimeGaugeDataThread(threading.Thread):
             Dictionary of gauge-data.txt data elements.
         """
 
-        packet_d = dict(packet)
-        ts = packet_d['dateTime']
-        if self.packet_units is None or self.packet_units != packet_d['usUnits']:
-            self.packet_units = packet_d['usUnits']
+        ts = packet['dateTime']
+        if self.packet_units is None or self.packet_units != packet['usUnits']:
+            self.packet_units = packet['usUnits']
             (self.p_temp_type, self.p_temp_group) = getStandardUnitType(self.packet_units,
                                                                         'outTemp')
             (self.p_wind_type, self.p_wind_group) = getStandardUnitType(self.packet_units,
@@ -2672,6 +2708,413 @@ class RtgdBuffer(object):
             old_ts = ts - self.wind_period
             # remove any samples older than 10 minutes
             self.wind_dir_list = [s for s in self.wind_dir_list if s[4] > old_ts]
+
+
+# ============================================================================
+#                           class ObsBuffer
+# ============================================================================
+
+
+class ObsBuffer(object):
+    """Base class to buffer an obs."""
+
+    def __init__(self, stats, units=None, history=False):
+        self.units = units
+        self.last = None
+        self.lasttime = None
+        if history:
+            self.use_history = True
+            self.history_full = False
+            self.history = []
+        else:
+            self.use_history = False
+
+    def add_value(self, val, ts, hilo=True):
+        """Add a value to my hilo and history stats as required."""
+
+        pass
+
+    def day_reset(self):
+        """Reset the vector obs buffer."""
+
+        pass
+
+    def trim_history(self, ts):
+        """Trim any old data from the history list."""
+
+        # calc ts of oldest sample we want to retain
+        oldest_ts = ts - MAX_AGE
+        # set history_full
+        self.history_full = min([a.ts for a in self.history if a.ts is not None]) <= oldest_ts
+        # remove any values older than oldest_ts
+        self.history = [s for s in self.history if s.ts > oldest_ts]
+
+    def history_max(self, ts, age=MAX_AGE):
+        """Return the max value in my history.
+
+        Search the last age seconds of my history for the max value and the
+        corresponding timestamp.
+
+        Inputs:
+            ts:  the timestamp to start searching back from
+            age: the max age of the records being searched
+
+        Returns:
+            An object of type ObsTuple where value is a 3 way tuple of
+            (value, x component, y component) and ts is the timestamp when
+            it occurred.
+        """
+
+        born = ts - age
+        snapshot = [a for a in self.history if a.ts >= born]
+        if len(snapshot) > 0:
+            _max = max(snapshot, key=itemgetter(1))
+            return ObsTuple(_max[0], _max[1])
+        else:
+            return None
+
+    def history_avg(self, ts, age=MAX_AGE):
+        """Return the average value in my history.
+
+        Search the last age seconds of my history for the max value and the
+        corresponding timestamp.
+
+        Inputs:
+            ts:  the timestamp to start searching back from
+            age: the max age of the records being searched
+
+        Returns:
+            An object of type ObsTuple where value is a 3 way tuple of
+            (value, x component, y component) and ts is the timestamp when
+            it occurred.
+        """
+
+        born = ts - age
+        snapshot = [a.value[0] for a in self.history if a.ts >= born]
+        if len(snapshot) > 0:
+            return float(sum(snapshot)/len(snapshot))
+        else:
+            return None
+
+
+# ============================================================================
+#                             class VectorBuffer
+# ============================================================================
+
+
+class VectorBuffer(ObsBuffer):
+    """Class to buffer vector obs."""
+
+    default_init = (None, None, None, None, None)
+
+    def __init__(self, stats, units=None, history=False):
+        # initialize my superclass
+        super(VectorBuffer, self).__init__(stats, units=units, history=history)
+
+        if stats:
+            self.min = stats.min
+            self.mintime = stats.mintime
+            self.max = stats.max
+            self.max_dir = stats.max_dir
+            self.maxtime = stats.maxtime
+            self.sum = stats.sum
+            self.xsum = stats.xsum
+            self.ysum = stats.ysum
+            self.sumtime = stats.sumtime
+        else:
+            (self.min, self.mintime,
+             self.max, self.max_dir, self.maxtime) = VectorBuffer.default_init
+            self.sum = 0.0
+            self.xsum = 0.0
+            self.ysum = 0.0
+            self.sumtime = 0.0
+
+    def add_value(self, val, ts, hilo=True):
+        """Add a value to my hilo and history stats as required."""
+
+        (w_speed, w_dir) = val
+        if w_speed is not None:
+            if hilo:
+                if self.min is None or w_speed < self.min:
+                    self.min = w_speed
+                    self.mintime = ts
+                if self.max is None or w_speed > self.max:
+                    self.max = w_speed
+                    self.max_dir = w_dir
+                    self.maxtime = ts
+            self.sum += w_speed
+            if self.lasttime:
+                self.sumtime += ts - self.lasttime
+            if w_dir is not None:
+                self.xsum += w_speed * math.cos(math.radians(90.0 - w_dir))
+                self.ysum += w_speed * math.sin(math.radians(90.0 - w_dir))
+            if self.lasttime is None or ts >= self.lasttime:
+                self.last = (w_speed, w_dir)
+                self.lasttime = ts
+            if self.use_history and w_dir is not None:
+                self.history.append(ObsTuple((w_speed,
+                                              math.cos(math.radians(90.0 - w_dir)),
+                                              math.sin(math.radians(90.0 - w_dir))), ts))
+                self.trim_history(ts)
+
+    def day_reset(self):
+        """Reset the vector obs buffer."""
+
+        (self.min, self.mintime,
+         self.max, self.max_dir, self.maxtime) = VectorBuffer.default_init
+        try:
+            self.sum = 0.0
+        except AttributeError:
+            pass
+
+    @property
+    def vec_avg(self):
+        """The day vector average value."""
+
+        return math.sqrt((self.xsum**2 + self.ysum**2) / self.sumtime**2)
+
+    @property
+    def vec_dir(self):
+        """The day vector average direction."""
+
+        _dir = 90.0 - math.degrees(math.atan2(self.ysum, self.xsum))
+        if _dir < 0.0:
+            _dir += 360.0
+        return _dir
+
+
+# ============================================================================
+#                             class ScalarBuffer
+# ============================================================================
+
+
+class ScalarBuffer(ObsBuffer):
+    """Class to buffer scalar obs."""
+
+    default_init = (None, None, None, None, 0.0)
+
+    def __init__(self, stats, units=None, history=False):
+        # initialize my superclass
+        super(ScalarBuffer, self).__init__(stats, units=units, history=history)
+
+        if stats:
+            self.min = stats.min
+            self.mintime = stats.mintime
+            self.max = stats.max
+            self.maxtime = stats.maxtime
+            self.sum = stats.sum
+        else:
+            (self.min, self.mintime,
+             self.max, self.maxtime, self.sum) = ScalarBuffer.default_init
+
+    def add_value(self, val, ts):
+        """Add a value to my stats as required."""
+
+        if val is not None:
+            if self.lasttime is None or ts >= self.lasttime:
+                self.last = val
+                self.lasttime = ts
+            if self.min is None or val < self.min:
+                self.min = val
+                self.mintime = ts
+            if self.max is None or val > self.max:
+                self.max = val
+                self.maxtime = ts
+            self.sum += val
+            if self.use_history:
+                self.history.append(ObsTuple(val, ts))
+                self.trim_history(ts)
+
+    def day_reset(self):
+        """Reset the scalar obs buffer."""
+
+        (self.min, self.mintime,
+         self.max, self.maxtime) = ScalarBuffer.default_init
+        try:
+            self.sum = 0.0
+        except AttributeError:
+            pass
+
+
+# ============================================================================
+#                               class Buffer
+# ============================================================================
+
+
+class Buffer(dict):
+    """Class to buffer various loop packet obs.
+
+    If archive based stats are an efficient means of getting stats for today.
+    However, their use would mean that any daily stat (eg today's max outTemp)
+    that 'occurs' after the most recent archive record but before the next
+    archive record is written to archive will not be captured. For this reason
+    selected loop data is buffered to ensure that such stats are correctly
+    reflected.
+    """
+
+    def __init__(self, manifest, day_stats, additional_day_stats):
+        """Initialise an instance of our class."""
+
+        self.manifest = manifest
+        # seed our buffer objects from day_stats
+        for obs in [f for f in day_stats if f in self.manifest]:
+            seed_func = seed_functions.get(obs, Buffer.seed_scalar)
+            seed_func(self, day_stats, obs, history=obs in HIST_MANIFEST)
+        # seed our buffer objects from additional_day_stats
+        if additional_day_stats:
+            for obs in [f for f in additional_day_stats if f in self.manifest]:
+                if obs not in self:
+                    seed_func = seed_functions.get(obs, Buffer.seed_scalar)
+                    seed_func(self, additional_day_stats, obs,
+                              history=obs in HIST_MANIFEST)
+        self.primary_unit_system = day_stats.unit_system
+        self.last_windSpeed_ts = None
+        self.windrun = self.seed_windrun(day_stats)
+
+    def seed_scalar(self, stats, obs_type, history):
+        """Seed a scalar buffer."""
+
+        self[obs_type] = init_dict.get(obs_type, ScalarBuffer)(stats=stats[obs_type],
+                                                               units=stats.unit_system,
+                                                               history=history)
+
+    def seed_vector(self, stats, obs_type, history):
+        """Seed a vector buffer."""
+
+        self[obs_type] = init_dict.get(obs_type, VectorBuffer)(stats=stats[obs_type],
+                                                               units=stats.unit_system,
+                                                               history=history)
+
+    def seed_windrun(self, day_stats):
+        """Seed day windrun."""
+
+        if 'windSpeed' in day_stats:
+            # The wsum field hold the sum of (windSpeed * interval in seconds)
+            # for today so we can calculate windrun from wsum - just need to
+            # do a little unit conversion and scaling
+
+            # The day_stats units may be different to our buffer unit system so
+            # first convert the wsum value to a km_per_hour based value (the
+            # wsum 'units' are a distance but we can use the group_speed
+            # conversion to convert to a km_per_hour based value)
+            # first get the day_stats windSpeed unit and unit group
+            (unit, group) = weewx.units.getStandardUnitType(day_stats.unit_system,
+                                                            'windSpeed')
+            # now express wsum as a 'group_speed' ValueTuple
+            _wr_vt = ValueTuple(day_stats['windSpeed'].wsum, unit, group)
+            # convert it to a 'km_per_hour' based value
+            _wr_km = convert(_wr_vt, 'km_per_hour').value
+            # but _wr_km was based on wsum which was based on seconds not hours
+            # so we need to divide by 3600 to get our real windrun in km
+            windrun = _wr_km/3600.0
+        else:
+            windrun = 0.0
+        return windrun
+
+    def add_packet(self, packet):
+        """Add a packet to the buffer."""
+
+#        packet = weewx.units.to_std_system(packet, self.primary_unit_system)
+        if packet['dateTime'] is not None:
+            for obs in [f for f in packet if f in self.manifest]:
+                add_func = add_functions.get(obs, Buffer.add_value)
+                add_func(self, packet, obs)
+
+    def add_value(self, packet, obs):
+        """Add a value to the buffer."""
+
+        # if we haven't seen this obs before add it to our buffer
+        if obs not in self:
+            self[obs] = init_dict.get(obs, ScalarBuffer)(stats=None,
+                                                         units=packet['usUnits'],
+                                                         history=obs in HIST_MANIFEST)
+        if self[obs].units == packet['usUnits']:
+            _value = packet[obs]
+        else:
+            (unit, group) = getStandardUnitType(packet['usUnits'], obs)
+            _vt = ValueTuple(packet[obs], unit, group)
+            _value = weewx.units.convertStd(_vt, self[obs].units).value
+        self[obs].add_value(_value, packet['dateTime'])
+
+    def add_wind_value(self, packet, obs):
+        """Add a wind value to the buffer."""
+
+        # first add it as 'windSpeed' the scalar
+        self.add_value(packet, obs)
+
+        # update today's windrun
+        if 'windSpeed' in packet:
+            try:
+                self.windrun += packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts)/1000.0
+            except TypeError:
+                pass
+            self.last_windSpeed_ts = packet['dateTime']
+
+        # now add it as the special vector 'wind'
+        if 'wind' not in self:
+            self['wind'] = VectorBuffer(stats=None, units=packet['usUnits'])
+        if self['wind'].units == packet['usUnits']:
+            _value = packet['windSpeed']
+        else:
+            (unit, group) = getStandardUnitType(packet['usUnits'], 'windSpeed')
+            _vt = ValueTuple(packet['windSpeed'], unit, group)
+            _value = weewx.units.convertStd(_vt, self['wind'].units).value
+        self['wind'].add_value((_value, packet.get('windDir')),
+                               packet['dateTime'])
+
+    def start_of_day_reset(self):
+        """Reset our buffer stats at the end of an archive period.
+
+        Reset our hi/lo data but don't touch the history, it might need to be
+        kept longer than the end of the archive period.
+        """
+
+        for obs in self.manifest:
+            self[obs].day_reset()
+
+
+# ============================================================================
+#                            Configuration dictionaries
+# ============================================================================
+
+init_dict = ListOfDicts({'wind': VectorBuffer})
+add_functions = ListOfDicts({'windSpeed': Buffer.add_wind_value})
+seed_functions = ListOfDicts({'wind': Buffer.seed_vector})
+
+
+# ============================================================================
+#                              class ObsTuple
+# ============================================================================
+
+
+# A observation during some period can be represented by the value of the
+# observation and the time at which it was observed. This can be represented
+# in a 2 way tuple called an obs tuple. An obs tuple is useful because its
+# contents can be accessed using named attributes.
+#
+# Item   attribute   Meaning
+#    0    value      The observed value eg 19.5
+#    1    ts         The epoch timestamp that the value was observed
+#                    eg 1488245400
+#
+# It is valid to have an observed value of None.
+#
+# It is also valid to have a ts of None (meaning there is no information about
+# the time the was was observed.
+
+class ObsTuple(tuple):
+
+    def __new__(cls, *args):
+        return tuple.__new__(cls, args)
+
+    @property
+    def value(self):
+        return self[0]
+
+    @property
+    def ts(self):
+        return self[1]
+
 
 # ============================================================================
 #                            Class CachedPacket
