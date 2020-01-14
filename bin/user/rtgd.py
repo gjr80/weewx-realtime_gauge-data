@@ -1077,7 +1077,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         except ValueError:
             self.wr_points = 16
 
-        # setup max solar rad calcs
+        # setup max solar rad calculations
         # do we have any?
         calc_dict = config_dict.get('Calculate', {})
         # algorithm
@@ -1085,19 +1085,19 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.solar_algorithm = algo_dict.get('maxSolarRad', 'RS')
         # atmospheric transmission coefficient [0.7-0.91]
         self.atc = float(calc_dict.get('atc', 0.8))
-        # Fail hard if out of range:
+        # fail hard if out of range
         if not 0.7 <= self.atc <= 0.91:
             raise weewx.ViolatedPrecondition("Atmospheric transmission "
                                              "coefficient (%f) out of "
                                              "range [.7-.91]" % self.atc)
         # atmospheric turbidity (2=clear, 4-5=smoggy)
         self.nfac = float(calc_dict.get('nfac', 2))
-        # Fail hard if out of range:
+        # fail hard if out of range
         if not 2 <= self.nfac <= 5:
             raise weewx.ViolatedPrecondition("Atmospheric turbidity (%d) "
                                              "out of range (2-5)" % self.nfac)
 
-        # Get our groups and format strings
+        # get our groups and format strings
         self.date_format = rtgd_config_dict.get('date_format',
                                                 '%Y.%m.%d %H:%M')
         self.time_format = '%H:%M'
@@ -1183,9 +1183,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.apptemp_binding = rtgd_config_dict.get('apptemp_binding',
                                                     'wx_binding')
 
-        # create a Buffer object to hold our loop 'stats'
-        self.buffer = Buffer(MANIFEST)
-
         # Lost contact
         # do we ignore the lost contact 'calculation'
         self.ignore_lost_contact = to_bool(rtgd_config_dict.get('ignore_lost_contact',
@@ -1220,6 +1217,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.p_alt_type = None
         self.p_alt_group = None
 
+        self.buffer = None
+        self.forecast_text = None
         self.rose = None
 
         # initialise the scroller text
@@ -1423,20 +1422,24 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get time for debug timing
         t1 = time.time()
         # convert our incoming packet
-        log.info("1")
-        log.info("packet=%s" % (packet,))
-        log.info("rtgdthread", "self.day_stats.unit_system=%s" % (self.day_stats.unit_system,))
+        # TODO. Delete following three lines before release
+        # log.info("1")
+        # log.info("packet=%s" % (packet,))
+        # log.info("self.day_stats.unit_system=%s" % (self.day_stats.unit_system,))
         _conv_packet = weewx.units.to_std_system(packet,
                                                  self.day_stats.unit_system)
         # update the packet cache with this packet
-        log.info("2")
+        # TODO. Delete following line before release
+        # log.info("2")
         self.packet_cache.update(_conv_packet, _conv_packet['dateTime'])
         # update the buffer with the converted packet
-        log.info("3")
+        # TODO. Delete following line before release
+        # log.info("3")
         self.buffer.add_packet(_conv_packet)
         # generate if we have no minimum interval setting or if minimum
         # interval seconds have elapsed since our last generation
-        log.info("4")
+        # TODO. Delete following line before release
+        # log.info("4")
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
             # TODO. Could this try..except be reduced in scope
             try:
