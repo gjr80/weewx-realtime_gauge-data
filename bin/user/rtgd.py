@@ -1044,6 +1044,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get server/user/remote_rtgd_path for rsync if they exist;
         # else set to None.
         # Consider rsync only if remote_server_url is None
+        # TODO. Quick fix to handle unknown AttributeError on self.rsync_server where self.remote_server_url is set. Needs revisiting.
+        self.rsync_server = None
         if self.remote_server_url is None:
             self.rsync_server = rtgd_config_dict.get('rsync_server', None)
             if self.rsync_server is not None:
