@@ -622,20 +622,22 @@ import weewx.units
 import weewx.wxformulas
 
 from weewx.engine import StdService
-from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts
+from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts, as_value_tuple, _getUnitGroup
 from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with_none
 
 # get a logger object
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.4.2'
+RTGD_VERSION = '0.5.0a1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
 # ordinal compass points supported
 COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                   'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N']
+
+DEFAULT_UNITS = weewx.units.MetricUnits
 
 # map WeeWX unit names to unit names supported by the SteelSeries Weather
 # Gauges
@@ -685,85 +687,303 @@ ARCHIVE_STATIONS = ['Vantage']
 # stations supporting lost contact reporting through their loop packet
 LOOP_STATIONS = ['FineOffsetUSB']
 # default field map
-FIELD_MAP = {'timeUTC': '',
-             'date': '',
-             'dateFormat': '',
-             'SensorContactLost': '',
-             'tempunit': '',
-             'windunit': '',
-             'pressunit': '',
-             'rainunit': '',
-             'cloudbaseunit': '',
-             'temp': '',
-             'tempTL': '',
-             'tempTH': '',
-             'TtempTL': '',
-             'TtempTH': '',
-             'temptrend': '',
-             'inTemp': '',
-             'inTempTL': '',
-             'inTempTH': '',
-             'TinTempTL': '',
-             'TinTempTH': '',
-             'hum': '',
-             'humTL': '',
-             'humTH': '',
-             'ThumTL': '',
-             'ThumTH': '',
-             'dew': '',
-             'dewpointTL': '',
-             'dewpointTH': '',
-             'TdewpointTL': '',
-             'TdewpointTH': '',
-             'wchill': '',
-             'wchillTL': '',
-             'TwchillTL': '',
-             'heatindex': '',
-             'heatindexTH': '',
-             'TheatindexTH': '',
-             'apptemp': '',
-             'apptempTL': '',
-             'apptempTH': '',
-             'TapptempTL': '',
-             'TapptempTH': '',
-             'press': '',
-             'pressTL': '',
-             'pressTH': '',
-             'TpressTL': '',
-             'TpressTH': '',
-             'presstrendval': '',
-             'rfall': '',
-             'rrate': '',
-             'rrateTM': '',
-             'hourlyrainTH': '',
-             'ThourlyrainTH': '',
-             'LastRainTipISO': '',
-             'wlatest': '',
-             'wspeed': '',
-             'windTM': '',
-             'wgust': '',
-             'wgustTM': '',
-             'TwgustTM': '',
-             'bearing': '',
-             'avgbearing': '',
-             'bearingTM': '',
-             'BearingRangeFrom10': '',
-             'BearingRangeTo10': '',
-             'domwinddir': '',
-             'WindRoseData': '',
-             'windrun': '',
-             'Tbeaufort': '',
-             'UV': '',
-             'UVTH': '',
-             'SolarRad': '',
-             'SolarRadTM': '',
-             'CurrentSolarMax': '',
-             'cloudbasevalue': '',
-             'forecast': '',
-             'version': '',
-             'build': '',
-             'ver': ''
-             }
+DEFAULT_FIELD_MAP = {#'timeUTC': {},
+                     #'date': {},
+                     #'dateFormat': {},
+                     #'SensorContactLost': {},
+                     #'tempunit': {},
+                     #'windunit': {},
+                     #'pressunit': {},
+                     #'rainunit': {},
+                     #'cloudbaseunit': {},
+                     'temp': {
+                         'source': 'outTemp',
+                         'format': '%.1f'
+                     },
+                     'tempTL': {
+                         'source': 'outTemp',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'tempTH': {
+                         'source': 'outTemp',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TtempTL': {
+                         'source': 'outTemp',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'TtempTH': {
+                         'source': 'outTemp',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     #'temptrend': {},
+                     'inTemp': {
+                         'source': 'inTemp',
+                         'format': '%.1f'
+                     },
+                     'inTempTL': {
+                         'source': 'inTemp',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'inTempTH': {
+                         'source': 'inTemp',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TinTempTL': {
+                         'source': 'inTemp',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'TinTempTH': {
+                         'source': 'inTemp',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'hum': {
+                         'source': 'outHumidity',
+                         'format': '%.1f'
+                     },
+                     'humTL': {
+                         'source': 'outHumidity',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'humTH': {
+                         'source': 'outHumidity',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'ThumTL': {
+                         'source': 'outHumidity',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'ThumTH': {
+                         'source': 'outHumidity',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'dew': {
+                         'source': 'dewpoint',
+                         'format': '%.1f'
+                     },
+                     'dewpointTL': {
+                         'source': 'dewpoint',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'dewpointTH': {
+                         'source': 'dewpoint',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TdewpointTL': {
+                         'source': 'dewpoint',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'TdewpointTH': {
+                         'source': 'dewpoint',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'wchill': {
+                         'source': 'windchill',
+                         'format': '%.1f'
+                     },
+                     'wchillTL': {
+                         'source': 'windchill',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TwchillTL': {
+                         'source': 'windchill',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'heatindex': {
+                         'source': 'heatindex',
+                         'format': '%.1f'
+                     },
+                     'heatindexTH': {
+                         'source': 'heatindex',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TheatindexTH': {
+                         'source': 'heatindex',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'apptemp': {
+                         'source': 'appTemp',
+                         'format': '%.1f'
+                     },
+                     'apptempTL': {
+                         'source': 'appTemp',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'apptempTH': {
+                         'source': 'appTemp',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TapptempTL': {
+                         'source': 'appTemp',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'TapptempTH': {
+                         'source': 'appTemp',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'press': {
+                         'source': 'barometer',
+                         'format': '%.1f'
+                     },
+                     'pressTL': {
+                         'source': 'barometer',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'pressTH': {
+                         'source': 'barometer',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TpressTL': {
+                         'source': 'barometer',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'TpressTH': {
+                         'source': 'barometer',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     #'presstrendval': {},
+                     'rfall': {
+                         'source': 'rain',
+                         'aggregate': 'sum',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'rrate': {
+                         'source': 'rainRate',
+                         'format': '%.1f'
+                     },
+                     'rrateTM': {
+                         'source': 'rainRate',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     #'hourlyrainTH': {},
+                     #'ThourlyrainTH': {},
+                     #'LastRainTipISO': {},
+                     #'wlatest': {},
+                     #'wspeed': {},
+                     #'windTM': {},
+                     'wgust': {
+                         'source': 'windGust',
+                         'format': '%.1f'
+                     },
+                     'wgustTM': {
+                         'source': 'windGust',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TwgustTM': {
+                         'source': 'windGust',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'bearing': {
+                         'source': 'windDir',
+                         'format': '%.1f'
+                     },
+                     'avgbearing': {
+                         'source': 'windDir',
+                         'format': '%.1f'
+                     },
+                     #'bearingTM': {},
+                     #'BearingRangeFrom10': {},
+                     #'BearingRangeTo10': {},
+                     #'domwinddir': {},
+                     #'WindRoseData': {},
+                     #'windrun': {},
+                     #'Tbeaufort': {},
+                     'UV': {
+                         'source': 'UV',
+                         'format': '%.1f'
+                     },
+                     'UVTH': {
+                         'source': 'UV',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'SolarRad': {
+                         'source': 'radiation',
+                         'format': '%.1f'
+                     },
+                     'SolarRadTM': {
+                         'source': 'radiation',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     #'CurrentSolarMax': {
+                     #    'source': 'maxSolarRad',
+                     #    'format': '%.1f'
+                     #},
+                     'cloudbasevalue': {
+                         'source': 'cloudbase',
+                         'format': '%.1f'
+                     },
+                     #'forecast': {},
+                     #'version': {},
+                     #'build': {},
+                     #'ver': {}
+                     }
 
 # ============================================================================
 #                     Exceptions that could get thrown
@@ -1158,6 +1378,36 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.alt_format = rtgd_config_dict['StringFormats'].get(self.alt_group,
                                                                 '%.1f')
         self.flag_format = '%.0f'
+        
+        # set up output units dict
+        _units_dict = DEFAULT_UNITS
+        _config_units_dict = rtgd_config_dict.get('Groups', {})
+        _units_dict.update(_config_units_dict)
+        self.units_dict = _units_dict
+
+        # setup the field map
+        _field_map = rtgd_config_dict.get('FieldMap', DEFAULT_FIELD_MAP)
+        # update the field map with any extensions
+        _extensions = rtgd_config_dict.get('FieldMapExtensions', {})
+        # update the field map with any extensions
+        _field_map.update(_extensions)
+
+        # convert any defaults to ValueTuples
+        for field in list(_field_map.items()):
+            field_config = field[1]
+            _group = _getUnitGroup(field_config['source'])
+            _default = field_config.get('default', None)
+            if _default is None:
+                # no default specified so use 0 in output units
+                _vt = ValueTuple(0, self.units_dict[_group], _group)
+            elif len(_default) == 1:
+                # just a value so use it in output units
+                _vt = ValueTuple(float(_default), self.units_dict[_group], _group)
+            elif len(_default) == 2:
+                # we have a value and units so use that value in those units
+                _vt = ValueTuple(float(_default[0]), self.units_dict[_group], _default[1])
+            _field_map[field[0]]['default'] = _vt
+        self.field_map = _field_map
 
         # what units are incoming packets using
         self.packet_units = None
@@ -1202,20 +1452,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.apptemp_day_stats = None
 
         self.packet_cache = None
-
-        # initialise packet obs types and unit groups
-        self.p_temp_type = None
-        self.p_temp_group = None
-        self.p_wind_type = None
-        self.p_wind_group = None
-        self.p_baro_type = None
-        self.p_baro_group = None
-        self.p_rain_type = None
-        self.p_rain_group = None
-        self.p_rainr_type = None
-        self.p_rainr_group = None
-        self.p_alt_type = None
-        self.p_alt_group = None
 
         self.buffer = None
         self.forecast_text = None
@@ -1622,6 +1858,81 @@ class RealtimeGaugeDataThread(threading.Thread):
         # and copy the temporary file to our destination
         os.rename(self.rtgd_path_file_tmp, self.rtgd_path_file)
 
+    def get_field_value(self, field, packet):
+        """Obtain the value for an output field."""
+
+        # prime our result
+        result = None
+        # get the map for this field
+        this_field_map = self.field_map.get(field)
+        # do we know about this field and do we have a source?
+        if this_field_map is not None and this_field_map.get('source') is not None:
+            # we have a source
+            source = this_field_map['source']
+            # do we have an aggregate
+            if this_field_map.get('aggregate') is not None and this_field_map.get('aggregate_period') is not None:
+                # we have an aggregate
+                agg = this_field_map['aggregate'].lower()
+                aggregate_period = this_field_map['aggregate_period'].lower()
+                if agg == 'trend':
+                    pass
+                if aggregate_period == 'day':
+                    # aggregate since start of today
+                    # is it an aggregate that has units?
+                    if agg in ('min', 'max', 'last', 'sum'):
+                        # it has units so obtain as a ValueTuple, convert as
+                        # required and check for None
+                        _raw_vt = ValueTuple(getattr(self.buffer[source], agg),
+                                             self.packet_unit_dict[source]['units'],
+                                             self.packet_unit_dict[source]['group'])
+                        # convert to the output units
+                        # first get the destination unit group, it may be explicitly
+                        # specified or we may get it from the field name
+                        _group = this_field_map['group'] if 'group' in this_field_map else _getUnitGroup(source)
+                        # now the destination units
+                        dest_units = self.units_dict[_group]
+                        _conv_raw = convert(_raw_vt, dest_units).value
+                        if _conv_raw is None:
+                            _conv_raw = convert(this_field_map['default'], dest_units).value
+                        result = this_field_map['format'] % _conv_raw
+                    elif agg in ('mintime', 'maxtime', 'lasttime'):
+                        # its a time so get the time as a localtime and format
+                        _raw = time.localtime(getattr(self.buffer[source], agg))
+                        result = time.strftime(this_field_map['format'], _raw)
+                    else:
+                        pass
+                else:
+                    # afraid we don't know what to do
+                    pass
+            else:
+                # no aggregate so get the value from the packet as a ValueTuple
+                _raw_vt = as_value_tuple(packet, source)
+                # convert to the output units
+                # first get the destination unit group, it may be explicitly
+                # specified or we may get it from the field name
+                _group = this_field_map['group'] if 'group' in this_field_map else _getUnitGroup(source)
+                # now the destination units
+                dest_units = self.units_dict[_group]
+                _conv_raw = convert(_raw_vt, dest_units).value
+                if _conv_raw is None:
+                    _conv_raw = convert(this_field_map['default'], dest_units).value
+                result = this_field_map['format'] % _conv_raw
+        return result
+
+    def get_packet_units(self, packet):
+        """Given a packet obtain unit details for each field map source."""
+
+        packet_unit_dict = {}
+        packet_unit_system = packet['usUnits']
+        for field, field_map in self.field_map.items():
+            source = field_map['source']
+            if source not in packet_unit_dict:
+                (units, unit_group) = getStandardUnitType(packet_unit_system,
+                                                          source)
+                packet_unit_dict[source] = {'units': units,
+                                            'group': unit_group}
+        return packet_unit_dict
+
     def calculate(self, packet):
         """Construct a data dict for gauge-data.txt.
 
@@ -1633,6 +1944,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         """
 
         ts = packet['dateTime']
+        self.packet_unit_dict = self.get_packet_units(packet)
         if self.packet_units is None or self.packet_units != packet['usUnits']:
             self.packet_units = packet['usUnits']
             (self.p_temp_type, self.p_temp_group) = getStandardUnitType(self.packet_units,
@@ -1667,48 +1979,26 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['rainunit'] = UNITS_RAIN[self.rain_group]
         # cloudbaseunit - cloud base units - m, ft
         data['cloudbaseunit'] = UNITS_CLOUD[self.alt_group]
+
         # temp - outside temperature
-        temp_vt = ValueTuple(packet['outTemp'],
-                             self.p_temp_type,
-                             self.p_temp_group)
-        temp = convert(temp_vt, self.temp_group).value
-        temp = temp if temp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                     self.temp_group).value
-        data['temp'] = self.temp_format % temp
+        data['temp'] = self.get_field_value('temp', packet)
         # tempTL - today's low temperature
-        temp_tl_vt = ValueTuple(self.buffer['outTemp'].min,
-                                self.p_temp_type,
-                                self.p_temp_group)
-        temp_tl = convert(temp_tl_vt, self.temp_group).value
-        temp_tl = temp_tl if temp_tl is not None else temp
-        data['tempTL'] = self.temp_format % temp_tl
+        data['tempTL'] = self.get_field_value('tempTL', packet)
         # tempTH - today's high temperature
-        temp_th_vt = ValueTuple(self.buffer['outTemp'].max,
-                                self.p_temp_type,
-                                self.p_temp_group)
-        temp_th = convert(temp_th_vt, self.temp_group).value
-        temp_th = temp_th if temp_th is not None else temp
-        data['tempTH'] = self.temp_format % temp_th
+        data['tempTH'] = self.get_field_value('tempTH', packet)
         # TtempTL - time of today's low temp (hh:mm)
-        # TODO. Is there a conditional needed here similar to the following?
-        # if temp_h_loop is not None and temp_th is not None and temp_h_loop <= temp_th:
-        #    ttemp_th = time.localtime(self.buffer['outTemp'].maxtime)
-        # else:
-        #     ttemp_th = time.localtime(self.buffer.tempH_loop[1]
-        ttemp_tl = time.localtime(self.buffer['outTemp'].mintime)
-        data['TtempTL'] = time.strftime(self.time_format, ttemp_tl)
+        data['TtempTL'] = self.get_field_value('TtempTL', packet)
         # TtempTH - time of today's high temp (hh:mm)
-        ttemp_th = time.localtime(self.buffer['outTemp'].maxtime)
-        data['TtempTH'] = time.strftime(self.time_format, ttemp_th)
+        data['TtempTH'] = self.get_field_value('TtempTH', packet)
+
         # temptrend - temperature trend value
+        temp_vt = as_value_tuple(packet, 'outTemp')
         _temp_trend_val = calc_trend('outTemp', temp_vt, self.temp_group,
                                      self.db_manager, ts - 3600, 300)
         temp_trend = _temp_trend_val if _temp_trend_val is not None else 0.0
         data['temptrend'] = self.temp_format % temp_trend
         # intemp - inside temperature
-        intemp_vt = ValueTuple(packet['inTemp'],
-                               self.p_temp_type,
-                               self.p_temp_group)
+        intemp_vt = as_value_tuple(packet, 'inTemp')
         intemp = convert(intemp_vt, self.temp_group).value
         intemp = intemp if intemp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                            self.temp_group).value
@@ -1758,9 +2048,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             inhum = packet['inHumidity'] if packet['inHumidity'] is not None else 0.0
             data['inhum'] = self.hum_format % inhum
         # dew - dew point
-        dew_vt = ValueTuple(packet['dewpoint'],
-                            self.p_temp_type,
-                            self.p_temp_group)
+        dew_vt = as_value_tuple(packet, 'dewpoint')
         dew = convert(dew_vt, self.temp_group).value
         dew = dew if dew is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                   self.temp_group).value
@@ -1786,9 +2074,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         tdewpoint_th = time.localtime(self.buffer['dewpoint'].maxtime)
         data['TdewpointTH'] = time.strftime(self.time_format, tdewpoint_th)
         # wchill - wind chill
-        wchill_vt = ValueTuple(packet['windchill'],
-                               self.p_temp_type,
-                               self.p_temp_group)
+        wchill_vt = as_value_tuple(packet, 'windchill')
         wchill = convert(wchill_vt, self.temp_group).value
         wchill = wchill if wchill is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                            self.temp_group).value
@@ -1804,9 +2090,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         twchill_tl = time.localtime(self.buffer['windchill'].mintime)
         data['TwchillTL'] = time.strftime(self.time_format, twchill_tl)
         # heatindex - heat index
-        heatindex_vt = ValueTuple(packet['heatindex'],
-                                  self.p_temp_type,
-                                  self.p_temp_group)
+        heatindex_vt = as_value_tuple(packet, 'heatindex')
         heatindex = convert(heatindex_vt, self.temp_group).value
         heatindex = heatindex if heatindex is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
                                                                     self.temp_group).value
@@ -1824,17 +2108,13 @@ class RealtimeGaugeDataThread(threading.Thread):
         # apptemp - apparent temperature
         if 'appTemp' in packet:
             # appTemp has been calculated for us so use it
-            apptemp_vt = ValueTuple(packet['appTemp'],
-                                    self.p_temp_type,
-                                    self.p_temp_group)
+            apptemp_vt = as_value_tuple(packet, 'appTemp')
         else:
             # apptemp not available so calculate it
             # first get the arguments for the calculation, if any of our
             # pre-reqs are missing or None the calculated app temp will be None
             temp_c = convert(temp_vt, 'degree_C').value
-            windspeed_vt = ValueTuple(packet.get('windSpeed', None),
-                                      self.p_wind_type,
-                                      self.p_wind_group)
+            windspeed_vt = as_value_tuple(packet, 'windSpeed')
             windspeed_ms = convert(windspeed_vt, 'meter_per_second').value
             # now calculate it
             apptemp_c = weewx.wxformulas.apptempC(temp_c,
@@ -1885,9 +2165,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # humidex - humidex
         if 'humidex' in packet:
             # humidex is in the packet so use it
-            humidex_vt = ValueTuple(packet['humidex'],
-                                    self.p_temp_type,
-                                    self.p_temp_group)
+            humidex_vt = as_value_tuple(packet, 'humidex')
             humidex = convert(humidex_vt, self.temp_group).value
         else:
             # humidex is not in our loop packet so  calculate it
@@ -1900,9 +2178,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
         data['humidex'] = self.temp_format % humidex
         # press - barometer
-        press_vt = ValueTuple(packet['barometer'],
-                              self.p_baro_type,
-                              self.p_baro_group)
+        press_vt = as_value_tuple(packet, 'barometer')
         press = convert(press_vt, self.pres_group).value
         press = press if press is not None else 0.0
         data['press'] = self.pres_format % press
@@ -1963,9 +2239,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # rrate - current rain rate (per hour)
         # TODO. Can this be simplified?
         if 'rainRate' in packet:
-            rrate_vt = ValueTuple(packet['rainRate'],
-                                  self.p_rainr_type,
-                                  self.p_rainr_group)
+            rrate_vt = as_value_tuple(packet, 'rainRate')
             rrate = convert(rrate_vt, self.rainrate_group).value if rrate_vt.value is not None else 0.0
         else:
             rrate = 0.0
@@ -1996,9 +2270,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # FIXME. Need to determine LastRainTipISO
         data['LastRainTipISO'] = "00:00"
         # wlatest - latest wind speed reading
-        wlatest_vt = ValueTuple(packet['windSpeed'],
-                                self.p_wind_type,
-                                self.p_wind_group)
+        wlatest_vt = as_value_tuple(packet, 'windSpeed')
         wlatest = convert(wlatest_vt, self.wind_group).value
         wlatest = wlatest if wlatest is not None else 0.0
         data['wlatest'] = self.wind_format % wlatest
@@ -2167,8 +2439,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['CurrentSolarMax'] = self.rad_format % curr_solar_max
         # cloudbasevalue - current cloudbase
         if 'cloudbase' in packet:
-            cb = packet['cloudbase']
-            cb_vt = ValueTuple(cb, self.p_alt_type, self.p_alt_group)
+            cb_vt = as_value_tuple(packet, 'cloudbase')
         else:
             temp_c = convert(temp_vt, 'degree_C').value
             cb = weewx.wxformulas.cloudbase_Metric(temp_c,
@@ -2198,7 +2469,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.mtd_rain:
             if self.month_rain is not None:
                 rain_m = convert(self.month_rain, self.rain_group).value
-                rain_b_vt = ValueTuple(self.buffer['rain'].sum, self.p_rain_type, self.p_rain_group)
+                rain_b_vt = ValueTuple(self.buffer['rain'].sum,
+                                       self.p_rain_type,
+                                       self.p_rain_group)
                 rain_b = convert(rain_b_vt, self.rain_group).value
                 if rain_m is not None and rain_b is not None:
                     rain_m = rain_m + rain_b
@@ -2212,7 +2485,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.ytd_rain:
             if self.year_rain is not None:
                 rain_y = convert(self.year_rain, self.rain_group).value
-                rain_b_vt = ValueTuple(self.buffer['rain'].sum, self.p_rain_type, self.p_rain_group)
+                rain_b_vt = ValueTuple(self.buffer['rain'].sum,
+                                       self.p_rain_type,
+                                       self.p_rain_group)
                 rain_b = convert(rain_b_vt, self.rain_group).value
                 if rain_y is not None and rain_b is not None:
                     rain_y = rain_y + rain_b
