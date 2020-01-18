@@ -1947,16 +1947,10 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.packet_unit_dict = self.get_packet_units(packet)
         if self.packet_units is None or self.packet_units != packet['usUnits']:
             self.packet_units = packet['usUnits']
-            (self.p_temp_type, self.p_temp_group) = getStandardUnitType(self.packet_units,
-                                                                        'outTemp')
             (self.p_wind_type, self.p_wind_group) = getStandardUnitType(self.packet_units,
                                                                         'windSpeed')
-            (self.p_baro_type, self.p_baro_group) = getStandardUnitType(self.packet_units,
-                                                                        'barometer')
             (self.p_rain_type, self.p_rain_group) = getStandardUnitType(self.packet_units,
                                                                         'rain')
-            (self.p_rainr_type, self.p_rainr_group) = getStandardUnitType(self.packet_units,
-                                                                          'rainRate')
             (self.p_alt_type, self.p_alt_group) = getStandardUnitType(self.packet_units,
                                                                       'altitude')
         data = dict()
@@ -1980,16 +1974,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         # cloudbaseunit - cloud base units - m, ft
         data['cloudbaseunit'] = UNITS_CLOUD[self.alt_group]
 
-        # temp - outside temperature
-        data['temp'] = self.get_field_value('temp', packet)
-        # tempTL - today's low temperature
-        data['tempTL'] = self.get_field_value('tempTL', packet)
-        # tempTH - today's high temperature
-        data['tempTH'] = self.get_field_value('tempTH', packet)
-        # TtempTL - time of today's low temp (hh:mm)
-        data['TtempTL'] = self.get_field_value('TtempTL', packet)
-        # TtempTH - time of today's high temp (hh:mm)
-        data['TtempTH'] = self.get_field_value('TtempTH', packet)
+        # populate all fields in the field map
+        for field in self.field_map:
+            data[field] = self.get_field_value(field, packet)
 
         # temptrend - temperature trend value
         temp_vt = as_value_tuple(packet, 'outTemp')
@@ -1997,269 +1984,13 @@ class RealtimeGaugeDataThread(threading.Thread):
                                      self.db_manager, ts - 3600, 300)
         temp_trend = _temp_trend_val if _temp_trend_val is not None else 0.0
         data['temptrend'] = self.temp_format % temp_trend
-        # intemp - inside temperature
-        intemp_vt = as_value_tuple(packet, 'inTemp')
-        intemp = convert(intemp_vt, self.temp_group).value
-        intemp = intemp if intemp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                           self.temp_group).value
-        data['intemp'] = self.temp_format % intemp
-        # intempTL - today's low inside temperature
-        intemp_tl_vt = ValueTuple(self.buffer['inTemp'].min,
-                                  self.p_temp_type,
-                                  self.p_temp_group)
-        intemp_tl = convert(intemp_tl_vt, self.temp_group).value
-        intemp_tl = intemp_tl if intemp_tl is not None else intemp
-        data['intempTL'] = self.temp_format % intemp_tl
-        # intempTH - today's high inside temperature
-        intemp_th_vt = ValueTuple(self.buffer['inTemp'].max,
-                                  self.p_temp_type,
-                                  self.p_temp_group)
-        intemp_th = convert(intemp_th_vt, self.temp_group).value
-        intemp_th = intemp_th if intemp_th is not None else intemp
-        data['intempTH'] = self.temp_format % intemp_th
-        # TintempTL - time of today's low inside temp (hh:mm)
-        tintemp_tl = time.localtime(self.buffer['inTemp'].mintime)
-        data['TintempTL'] = time.strftime(self.time_format, tintemp_tl)
-        # TintempTH - time of today's high inside temp (hh:mm)
-        tintemp_th = time.localtime(self.buffer['inTemp'].maxtime)
-        data['TintempTH'] = time.strftime(self.time_format, tintemp_th)
-        # hum - relative humidity
-        hum = packet['outHumidity'] if packet['outHumidity'] is not None else 0.0
-        data['hum'] = self.hum_format % hum
-        # humTL - today's low relative humidity
-        hum_tl = self.buffer['outHumidity'].min
-        hum_tl = hum_tl if hum_tl is not None else hum
-        data['humTL'] = self.hum_format % hum_tl
-        # humTH - today's high relative humidity
-        hum_th = self.buffer['outHumidity'].max
-        hum_th = hum_th if hum_th is not None else hum
-        data['humTH'] = self.hum_format % hum_th
-        # ThumTL - time of today's low relative humidity (hh:mm)
-        thum_tl = time.localtime(self.buffer['outHumidity'].mintime)
-        data['ThumTL'] = time.strftime(self.time_format, thum_tl)
-        # ThumTH - time of today's high relative humidity (hh:mm)
-        thum_th = time.localtime(self.buffer['outHumidity'].maxtime)
-        data['ThumTH'] = time.strftime(self.time_format, thum_th)
-        # inhum - inside humidity
-        # TODO. Can this be done more succinctly?
-        if 'inHumidity' not in packet:
-            data['inhum'] = self.hum_format % 0.0
-        else:
-            inhum = packet['inHumidity'] if packet['inHumidity'] is not None else 0.0
-            data['inhum'] = self.hum_format % inhum
-        # dew - dew point
-        dew_vt = as_value_tuple(packet, 'dewpoint')
-        dew = convert(dew_vt, self.temp_group).value
-        dew = dew if dew is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                  self.temp_group).value
-        data['dew'] = self.temp_format % dew
-        # dewpointTL - today's low dew point
-        dewpoint_tl_vt = ValueTuple(self.buffer['dewpoint'].min,
-                                    self.p_temp_type,
-                                    self.p_temp_group)
-        dewpoint_tl = convert(dewpoint_tl_vt, self.temp_group).value
-        dewpoint_tl = dewpoint_tl if dewpoint_tl is not None else dew
-        data['dewpointTL'] = self.temp_format % dewpoint_tl
-        # dewpointTH - today's high dew point
-        dewpoint_th_vt = ValueTuple(self.buffer['dewpoint'].max,
-                                    self.p_temp_type,
-                                    self.p_temp_group)
-        dewpoint_th = convert(dewpoint_th_vt, self.temp_group).value
-        dewpoint_th = dewpoint_th if dewpoint_th is not None else dew
-        data['dewpointTH'] = self.temp_format % dewpoint_th
-        # TdewpointTL - time of today's low dew point (hh:mm)
-        tdewpoint_tl = time.localtime(self.buffer['dewpoint'].mintime)
-        data['TdewpointTL'] = time.strftime(self.time_format, tdewpoint_tl)
-        # TdewpointTH - time of today's high dew point (hh:mm)
-        tdewpoint_th = time.localtime(self.buffer['dewpoint'].maxtime)
-        data['TdewpointTH'] = time.strftime(self.time_format, tdewpoint_th)
-        # wchill - wind chill
-        wchill_vt = as_value_tuple(packet, 'windchill')
-        wchill = convert(wchill_vt, self.temp_group).value
-        wchill = wchill if wchill is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                           self.temp_group).value
-        data['wchill'] = self.temp_format % wchill
-        # wchillTL - today's low wind chill
-        wchill_tl_vt = ValueTuple(self.buffer['windchill'].min,
-                                  self.p_temp_type,
-                                  self.p_temp_group)
-        wchill_tl = convert(wchill_tl_vt, self.temp_group).value
-        wchill_tl = wchill_tl if wchill_tl is not None else wchill
-        data['wchillTL'] = self.temp_format % wchill_tl
-        # TwchillTL - time of today's low wind chill (hh:mm)
-        twchill_tl = time.localtime(self.buffer['windchill'].mintime)
-        data['TwchillTL'] = time.strftime(self.time_format, twchill_tl)
-        # heatindex - heat index
-        heatindex_vt = as_value_tuple(packet, 'heatindex')
-        heatindex = convert(heatindex_vt, self.temp_group).value
-        heatindex = heatindex if heatindex is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                                    self.temp_group).value
-        data['heatindex'] = self.temp_format % heatindex
-        # heatindexTH - today's high heat index
-        heatindex_th_vt = ValueTuple(self.buffer['heatindex'].max,
-                                     self.p_temp_type,
-                                     self.p_temp_group)
-        heatindex_th = convert(heatindex_th_vt, self.temp_group).value
-        heatindex_th = heatindex_th if heatindex_th is not None else heatindex
-        data['heatindexTH'] = self.temp_format % heatindex_th
-        # TheatindexTH - time of today's high heat index (hh:mm)
-        theatindex_th = time.localtime(self.buffer['heatindex'].maxtime)
-        data['TheatindexTH'] = time.strftime(self.time_format, theatindex_th)
-        # apptemp - apparent temperature
-        if 'appTemp' in packet:
-            # appTemp has been calculated for us so use it
-            apptemp_vt = as_value_tuple(packet, 'appTemp')
-        else:
-            # apptemp not available so calculate it
-            # first get the arguments for the calculation, if any of our
-            # pre-reqs are missing or None the calculated app temp will be None
-            temp_c = convert(temp_vt, 'degree_C').value
-            windspeed_vt = as_value_tuple(packet, 'windSpeed')
-            windspeed_ms = convert(windspeed_vt, 'meter_per_second').value
-            # now calculate it
-            apptemp_c = weewx.wxformulas.apptempC(temp_c,
-                                                  packet.get('outHumidity', None),
-                                                  windspeed_ms)
-            apptemp_vt = ValueTuple(apptemp_c, 'degree_C', 'group_temperature')
-        apptemp = convert(apptemp_vt, self.temp_group).value
-        apptemp = apptemp if apptemp is not None else convert(ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                                                              self.temp_group).value
-        data['apptemp'] = self.temp_format % apptemp
-        # apptempTL - today's low apparent temperature
-        # apptempTH - today's high apparent temperature
-        # TapptempTL - time of today's low apparent temperature (hh:mm)
-        # TapptempTH - time of today's high apparent temperature (hh:mm)
-        if 'appTemp' in self.buffer:
-            # we have day stats for appTemp
-            apptemp_tl_vt = ValueTuple(self.buffer['appTemp'].min,
-                                       self.p_temp_type,
-                                       self.p_temp_group)
-            apptemp_tl = convert(apptemp_tl_vt, self.temp_group).value
-            apptemp_th_vt = ValueTuple(self.buffer['appTemp'].max,
-                                       self.p_temp_type,
-                                       self.p_temp_group)
-            apptemp_th = convert(apptemp_th_vt, self.temp_group).value
-            apptemp_th = apptemp_th if apptemp_th is not None else convert(
-                ValueTuple(0.0, 'degree_C', 'group_temperature'),
-                self.temp_group).value
-            tapptemp_tl = time.localtime(self.buffer['appTemp'].mintime)
-            tapptemp_th = time.localtime(self.buffer['appTemp'].maxtime)
-        else:
-            # There are no appTemp day stats. Normally we would return None but
-            # the SteelSeries Gauges do not like None/null. Return the current
-            # appTemp value so as to not upset the gauge auto scaling. The day
-            # apptemp range wedge will not show, and the mouse-over low/highs
-            # will be wrong but it is the best we can do.
-            apptemp_tl = apptemp
-            apptemp_th = apptemp
-            tapptemp_tl = datetime.date.today().timetuple()
-            tapptemp_th = datetime.date.today().timetuple()
-        apptemp_tl = apptemp_tl if apptemp_tl is not None else \
-            convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
-        data['apptempTL'] = self.temp_format % apptemp_tl
-        apptemp_th = apptemp_th if apptemp_th is not None else \
-            convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
-        data['apptempTH'] = self.temp_format % apptemp_th
-        data['TapptempTL'] = time.strftime(self.time_format, tapptemp_tl)
-        data['TapptempTH'] = time.strftime(self.time_format, tapptemp_th)
-        # humidex - humidex
-        if 'humidex' in packet:
-            # humidex is in the packet so use it
-            humidex_vt = as_value_tuple(packet, 'humidex')
-            humidex = convert(humidex_vt, self.temp_group).value
-        else:
-            # humidex is not in our loop packet so  calculate it
-            temp_c = convert(temp_vt, 'degree_C').value
-            humidex_c = weewx.wxformulas.humidexC(temp_c,
-                                                  packet.get('outHumidity', None))
-            humidex_vt = ValueTuple(humidex_c, 'degree_C', 'group_temperature')
-            humidex = convert(humidex_vt, self.temp_group).value
-        humidex = humidex if humidex is not None else \
-            convert(ValueTuple(0.0, 'degree_C', 'group_temperature'), self.temp_group).value
-        data['humidex'] = self.temp_format % humidex
-        # press - barometer
-        press_vt = as_value_tuple(packet, 'barometer')
-        press = convert(press_vt, self.pres_group).value
-        press = press if press is not None else 0.0
-        data['press'] = self.pres_format % press
-        # pressTL - today's low barometer
-        # pressTH - today's high barometer
-        # TpressTL - time of today's low barometer (hh:mm)
-        # TpressTH - time of today's high barometer (hh:mm)
-        if 'barometer' in self.buffer:
-            press_tl_vt = ValueTuple(self.buffer['barometer'].min,
-                                     self.p_baro_type,
-                                     self.p_baro_group)
-            press_tl = convert(press_tl_vt, self.pres_group).value
-            press_tl = press_tl if press_tl is not None else press
-            data['pressTL'] = self.pres_format % press_tl
-            press_th_vt = ValueTuple(self.buffer['barometer'].max,
-                                     self.p_baro_type,
-                                     self.p_baro_group)
-            press_th = convert(press_th_vt, self.pres_group).value
-            data['pressTH'] = self.pres_format % press_th
-            tpress_tl = time.localtime(self.buffer['barometer'].mintime)
-            data['TpressTL'] = time.strftime(self.time_format, tpress_tl)
-            tpress_th = time.localtime(self.buffer['barometer'].maxtime)
-            data['TpressTH'] = time.strftime(self.time_format, tpress_th)
-        else:
-            data['pressTL'] = self.pres_format % 0.0
-            data['pressTH'] = self.pres_format % 0.0
-            data['TpressTL'] = None
-            data['TpressTH'] = None
-        # pressL - all time low barometer
-        if self.min_barometer is not None:
-            press_l_vt = ValueTuple(self.min_barometer,
-                                    self.p_baro_type,
-                                    self.p_baro_group)
-        else:
-            press_l_vt = ValueTuple(850, 'hPa', self.p_baro_group)
-        press_l = convert(press_l_vt, self.pres_group).value
-        data['pressL'] = self.pres_format % press_l
-        # pressH - all time high barometer
-        if self.max_barometer is not None:
-            press_h_vt = ValueTuple(self.max_barometer,
-                                    self.p_baro_type,
-                                    self.p_baro_group)
-        else:
-            press_h_vt = ValueTuple(1100, 'hPa', self.p_baro_group)
-        press_h = convert(press_h_vt, self.pres_group).value
-        data['pressH'] = self.pres_format % press_h
         # presstrendval -  pressure trend value
+        press_vt = as_value_tuple(packet, 'barometer')
         _p_trend_val = calc_trend('barometer', press_vt, self.pres_group,
                                   self.db_manager, ts - 3600, 300)
         presstrendval = _p_trend_val if _p_trend_val is not None else 0.0
         data['presstrendval'] = self.pres_format % presstrendval
-        # rfall - rain today
-        rain_day = self.buffer['rain'].sum
-        rain_t_vt = ValueTuple(rain_day, self.p_rain_type, self.p_rain_group)
-        rain_t = convert(rain_t_vt, self.rain_group).value
-        rain_t = rain_t if rain_t is not None else 0.0
-        data['rfall'] = self.rain_format % rain_t
-        # rrate - current rain rate (per hour)
-        # TODO. Can this be simplified?
-        if 'rainRate' in packet:
-            rrate_vt = as_value_tuple(packet, 'rainRate')
-            rrate = convert(rrate_vt, self.rainrate_group).value if rrate_vt.value is not None else 0.0
-        else:
-            rrate = 0.0
-        data['rrate'] = self.rainrate_format % rrate
-        # rrateTM - today's maximum rain rate (per hour)
-        if 'rainRate' in self.buffer:
-            rrate_tm_vt = ValueTuple(self.buffer['rainRate'].max,
-                                     self.p_rainr_type,
-                                     self.p_rainr_group)
-            rrate_tm = convert(rrate_tm_vt, self.rainrate_group).value
-        else:
-            rrate_tm = 0
-        rrate_tm = rrate_tm if rrate_tm is not None else 0.0
-        data['rrateTM'] = self.rainrate_format % rrate_tm
-        # TrrateTM - time of today's maximum rain rate (per hour)
-        if 'rainRate' in self.buffer:
-            trrate_tm = time.localtime(self.buffer['rainRate'].maxtime)
-            data['TrrateTM'] = time.strftime(self.time_format, trrate_tm)
-        else:
-            data['TrrateTM'] = '00:00'
+
         # hourlyrainTH - Today's highest hourly rain
         # FIXME. Need to determine hourlyrainTH
         data['hourlyrainTH'] = "0.0"
@@ -2395,33 +2126,6 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                       'knot').value))
         else:
             data['Tbeaufort'] = "0"
-        # UV - UV index
-        if 'UV' not in packet:
-            uv = 0.0
-        else:
-            uv = packet['UV'] if packet['UV'] is not None else 0.0
-        data['UV'] = self.uv_format % uv
-        # UVTH - today's high UV index
-        if 'UV' not in self.buffer:
-            uv_th = uv
-        else:
-            uv_th = self.buffer['UV'].max
-        uv_th = uv_th if uv_th is not None else 0.0
-        data['UVTH'] = self.uv_format % uv_th
-        # SolarRad - solar radiation W/m2
-        if 'radiation' not in packet:
-            solar_rad = 0.0
-        else:
-            solar_rad = packet['radiation']
-        solar_rad = solar_rad if solar_rad is not None else 0.0
-        data['SolarRad'] = self.rad_format % solar_rad
-        # SolarTM - today's maximum solar radiation W/m2
-        if 'radiation' not in self.buffer:
-            solar_tm = 0.0
-        else:
-            solar_tm = self.buffer['radiation'].max
-        solar_tm = solar_tm if solar_tm is not None else 0.0
-        data['SolarTM'] = self.rad_format % solar_tm
         # CurrentSolarMax - Current theoretical maximum solar radiation
         if self.solar_algorithm == 'Bras':
             curr_solar_max = weewx.wxformulas.solar_rad_Bras(self.latitude,
