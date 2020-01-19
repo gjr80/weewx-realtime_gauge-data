@@ -724,7 +724,13 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                          'aggregate_period': 'day',
                          'format': '%H:%M'
                      },
-                     #'temptrend': {},
+                     'temptrend': {
+                         'source': 'outTemp',
+                         'aggregate': 'trend',
+                         'aggregate_period': '3600',
+                         'grace_period': '300',
+                         'format': '%.1f'
+                     },
                      'inTemp': {
                          'source': 'inTemp',
                          'format': '%.1f'
@@ -897,7 +903,13 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                          'aggregate_period': 'day',
                          'format': '%H:%M'
                      },
-                     #'presstrendval': {},
+                     'presstrendval': {
+                         'source': 'barometer',
+                         'aggregate': 'trend',
+                         'aggregate_period': '3600',
+                         'grace_period': '300',
+                         'format': '%.1f'
+                     },
                      'rfall': {
                          'source': 'rain',
                          'aggregate': 'sum',
@@ -917,9 +929,17 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                      #'hourlyrainTH': {},
                      #'ThourlyrainTH': {},
                      #'LastRainTipISO': {},
-                     #'wlatest': {},
+                     'wlatest': {
+                         'source': 'windSpeed',
+                         'format': '%.1f'
+                     },
                      #'wspeed': {},
-                     #'windTM': {},
+                     'windTM': {
+                         'source': 'windSpeed',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
                      'wgust': {
                          'source': 'windGust',
                          'format': '%.1f'
@@ -944,7 +964,12 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                          'source': 'windDir',
                          'format': '%.1f'
                      },
-                     #'bearingTM': {},
+                     'bearingTM': {
+                         'source': 'wind',
+                         'aggregate': 'max_dir',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
                      #'BearingRangeFrom10': {},
                      #'BearingRangeTo10': {},
                      #'domwinddir': {},
@@ -1326,8 +1351,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.temp_format = rtgd_config_dict['StringFormats'].get(self.temp_group,
                                                                  '%.1f')
         self.hum_group = 'percent'
-        self.hum_format = rtgd_config_dict['StringFormats'].get(self.hum_group,
-                                                                '%.0f')
         self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
                                                          'hPa')
         # SteelSeries Weather Gauges don't understand mmHg so default to hPa
@@ -1357,8 +1380,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         # SteelSeries Weather gauges derives rain rate units from rain units,
         # so must we
         self.rainrate_group = ''.join([self.rain_group, '_per_hour'])
-        self.rainrate_format = rtgd_config_dict['StringFormats'].get(self.rainrate_group,
-                                                                     '%.1f')
         self.dir_group = 'degree_compass'
         self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
                                                                 '%.1f')
@@ -1366,13 +1387,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.rad_format = rtgd_config_dict['StringFormats'].get(self.rad_group,
                                                                 '%.0f')
         self.uv_group = 'uv_index'
-        self.uv_format = rtgd_config_dict['StringFormats'].get(self.uv_group,
-                                                               '%.1f')
         # SteelSeries Weather gauges derives windrun units from wind speed
         # units, so must we
         self.dist_group = GROUP_DIST[self.wind_group]
-        self.dist_format = rtgd_config_dict['StringFormats'].get(self.dist_group,
-                                                                 '%.1f')
         self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
                                                         'meter')
         self.alt_format = rtgd_config_dict['StringFormats'].get(self.alt_group,
@@ -1658,24 +1675,14 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get time for debug timing
         t1 = time.time()
         # convert our incoming packet
-        # TODO. Delete following three lines before release
-        # log.info("1")
-        # log.info("packet=%s" % (packet,))
-        # log.info("self.day_stats.unit_system=%s" % (self.day_stats.unit_system,))
         _conv_packet = weewx.units.to_std_system(packet,
                                                  self.day_stats.unit_system)
         # update the packet cache with this packet
-        # TODO. Delete following line before release
-        # log.info("2")
         self.packet_cache.update(_conv_packet, _conv_packet['dateTime'])
         # update the buffer with the converted packet
-        # TODO. Delete following line before release
-        # log.info("3")
         self.buffer.add_packet(_conv_packet)
         # generate if we have no minimum interval setting or if minimum
         # interval seconds have elapsed since our last generation
-        # TODO. Delete following line before release
-        # log.info("4")
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
             # TODO. Could this try..except be reduced in scope
             try:
@@ -1869,13 +1876,37 @@ class RealtimeGaugeDataThread(threading.Thread):
         if this_field_map is not None and this_field_map.get('source') is not None:
             # we have a source
             source = this_field_map['source']
+            # get a few things about our result:
+            # unit group
+            result_group = this_field_map['group'] if 'group' in this_field_map else _getUnitGroup(source)
+            # result units
+            result_units = self.units_dict[result_group]
             # do we have an aggregate
             if this_field_map.get('aggregate') is not None and this_field_map.get('aggregate_period') is not None:
-                # we have an aggregate
+                # We have an aggregate. Aggregates we know about are min, max,
+                # sum, last and trend.
                 agg = this_field_map['aggregate'].lower()
                 aggregate_period = this_field_map['aggregate_period'].lower()
+                # Trend requires ome special processing so pull it out first.
                 if agg == 'trend':
-                    pass
+                    try:
+                        trend_period = int(aggregate_period)
+                    except TypeError:
+                        trend_period = 3600
+                    grace_period = int(this_field_map.get('grace', 300))
+                    # obtain the current value as a ValueTuple
+                    _current_vt = as_value_tuple(packet, source)
+                    # calculate the trend
+                    _trend = calc_trend(obs_type=source,
+                                        now_vt=_current_vt,
+                                        target_units=result_units,
+                                        db_manager=self.db_manager,
+                                        then_ts=packet['dateTime'] - trend_period,
+                                        grace=grace_period)
+                    # if the trend result is None use the specified default
+                    if _trend is None:
+                        _trend = convert(this_field_map['default'], result_units).value
+                    result = this_field_map['format'] % _trend
                 if aggregate_period == 'day':
                     # aggregate since start of today
                     # is it an aggregate that has units?
@@ -1886,14 +1917,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                              self.packet_unit_dict[source]['units'],
                                              self.packet_unit_dict[source]['group'])
                         # convert to the output units
-                        # first get the destination unit group, it may be explicitly
-                        # specified or we may get it from the field name
-                        _group = this_field_map['group'] if 'group' in this_field_map else _getUnitGroup(source)
-                        # now the destination units
-                        dest_units = self.units_dict[_group]
-                        _conv_raw = convert(_raw_vt, dest_units).value
+                        _conv_raw = convert(_raw_vt, result_units).value
                         if _conv_raw is None:
-                            _conv_raw = convert(this_field_map['default'], dest_units).value
+                            _conv_raw = convert(this_field_map['default'], result_units).value
                         result = this_field_map['format'] % _conv_raw
                     elif agg in ('mintime', 'maxtime', 'lasttime'):
                         # its a time so get the time as a localtime and format
@@ -1908,14 +1934,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # no aggregate so get the value from the packet as a ValueTuple
                 _raw_vt = as_value_tuple(packet, source)
                 # convert to the output units
-                # first get the destination unit group, it may be explicitly
-                # specified or we may get it from the field name
-                _group = this_field_map['group'] if 'group' in this_field_map else _getUnitGroup(source)
-                # now the destination units
-                dest_units = self.units_dict[_group]
-                _conv_raw = convert(_raw_vt, dest_units).value
+                _conv_raw = convert(_raw_vt, result_units).value
                 if _conv_raw is None:
-                    _conv_raw = convert(this_field_map['default'], dest_units).value
+                    _conv_raw = convert(this_field_map['default'], result_units).value
                 result = this_field_map['format'] % _conv_raw
         return result
 
@@ -1978,44 +1999,23 @@ class RealtimeGaugeDataThread(threading.Thread):
         for field in self.field_map:
             data[field] = self.get_field_value(field, packet)
 
-        # temptrend - temperature trend value
-        temp_vt = as_value_tuple(packet, 'outTemp')
-        _temp_trend_val = calc_trend('outTemp', temp_vt, self.temp_group,
-                                     self.db_manager, ts - 3600, 300)
-        temp_trend = _temp_trend_val if _temp_trend_val is not None else 0.0
-        data['temptrend'] = self.temp_format % temp_trend
-        # presstrendval -  pressure trend value
-        press_vt = as_value_tuple(packet, 'barometer')
-        _p_trend_val = calc_trend('barometer', press_vt, self.pres_group,
-                                  self.db_manager, ts - 3600, 300)
-        presstrendval = _p_trend_val if _p_trend_val is not None else 0.0
-        data['presstrendval'] = self.pres_format % presstrendval
-
         # hourlyrainTH - Today's highest hourly rain
         # FIXME. Need to determine hourlyrainTH
         data['hourlyrainTH'] = "0.0"
+
         # ThourlyrainTH - time of Today's highest hourly rain
         # FIXME. Need to determine ThourlyrainTH
         data['ThourlyrainTH'] = "00:00"
+
         # LastRainTipISO -
         # FIXME. Need to determine LastRainTipISO
         data['LastRainTipISO'] = "00:00"
-        # wlatest - latest wind speed reading
-        wlatest_vt = as_value_tuple(packet, 'windSpeed')
-        wlatest = convert(wlatest_vt, self.wind_group).value
-        wlatest = wlatest if wlatest is not None else 0.0
-        data['wlatest'] = self.wind_format % wlatest
+
         # wspeed - wind speed (average)
         wspeed = convert(self.windSpeedAvg_vt, self.wind_group).value
         wspeed = wspeed if wspeed is not None else 0.0
         data['wspeed'] = self.wind_format % wspeed
-        # windTM - today's high wind speed (average)
-        wind_tm_vt = ValueTuple(self.buffer['windSpeed'].max,
-                                self.p_wind_type,
-                                self.p_wind_group)
-        wind_tm = convert(wind_tm_vt, self.wind_group).value
-        wind_tm = wind_tm if wind_tm is not None else 0.0
-        data['windTM'] = self.wind_format % wind_tm
+
         # wgust - 10 minute high gust
         if 'windGust' in self.buffer:
             wgust = self.buffer['windGust'].history_max(ts).value
@@ -2027,17 +2027,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         wgust = convert(wgust_vt, self.wind_group).value
         wgust = wgust if wgust is not None else 0.0
         data['wgust'] = self.wind_format % wgust
-        # wgustTM - today's high wind gust
-        wgust_tm_vt = ValueTuple(self.buffer['wind'].max,
-                                 self.p_wind_type,
-                                 self.p_wind_group)
-        wgust_tm = convert(wgust_tm_vt, self.wind_group).value
-        wgust_tm = wgust_tm if wgust_tm is not None else 0.0
-        data['wgustTM'] = self.wind_format % wgust_tm
-        # TwgustTM - time of today's high wind gust (hh:mm)
-        twgust_tm = time.localtime(self.buffer['wind'].maxtime)
-        data['TwgustTM'] = time.strftime(self.time_format, twgust_tm)
-        # bearing - wind bearing (degrees)
+
+        # keep bearing - wind bearing (degrees)
         bearing = packet['windDir']
         bearing = bearing if bearing is not None else self.last_dir
         # save this bearing to use next time if there is no windDir, this way
@@ -2045,17 +2036,12 @@ class RealtimeGaugeDataThread(threading.Thread):
         # than return to 0
         self.last_dir = bearing
         data['bearing'] = self.dir_format % bearing
+
         # avgbearing - 10-minute average wind bearing (degrees)
         avg_bearing = self.windDirAvg if self.windDirAvg is not None else self.last_average_dir
         self.last_average_dir = avg_bearing
         data['avgbearing'] = self.dir_format % avg_bearing
-        # bearingTM - The wind bearing at the time of today's high gust
-        # As our self.buffer is really a WeeWX accumulator filled with the
-        # relevant days stats we need to use .max_dir rather than .gustdir
-        # to get the gust direction for the day.
-        bearing_tm = self.buffer['wind'].max_dir
-        bearing_tm = bearing_tm if bearing_tm is not None else 0
-        data['bearingTM'] = self.dir_format % bearing_tm
+
         # FIXME.
         # # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
@@ -2121,6 +2107,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         #     windrun = windrun_day_average
         # data['windrun'] = self.dist_format % windrun
         # Tbeaufort - wind speed (Beaufort)
+        wlatest_vt = as_value_tuple(packet, 'windSpeed')
         if packet['windSpeed'] is not None:
             data['Tbeaufort'] = str(weewx.wxformulas.beaufort(convert(wlatest_vt,
                                                                       'knot').value))
@@ -2787,17 +2774,17 @@ def degree_to_compass(x):
     return COMPASS_POINTS[idx]
 
 
-def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
+def calc_trend(obs_type, now_vt, target_units, db_manager, then_ts, grace=0):
     """ Calculate change in an observation over a specified period.
 
     Inputs:
-        obs_type:   database field name of observation concerned
-        now_vt:     value of observation now (ie the finishing value)
-        group:      group our returned value must be in
-        db_manager: manager to be used
-        then_ts:    timestamp of start of trend period
-        grace:      the largest difference in time when finding the then_ts
-                    record that is acceptable
+        obs_type:     database field name of observation concerned
+        now_vt:       value of observation now (ie the finishing value)
+        target_units: units our returned value must be in
+        db_manager:   manager to be used
+        then_ts:      timestamp of start of trend period
+        grace:        the largest difference in time when finding the then_ts
+                      record that is acceptable
 
     Returns:
         Change in value over trend period. Can be positive, 0, negative or
@@ -2814,8 +2801,8 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
             return None
         else:
             then_vt = weewx.units.as_value_tuple(then_record, obs_type)
-            now = convert(now_vt, group).value
-            then = convert(then_vt, group).value
+            now = convert(now_vt, target_units).value
+            then = convert(then_vt, target_units).value
             return now - then
 
 
