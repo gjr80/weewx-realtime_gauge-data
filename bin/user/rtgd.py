@@ -1538,6 +1538,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.day_stats.unit_system = self.db_manager.std_unit_system
             # initialise our day stats from our appTemp source
             self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
+            # set the unit system for our day stats
+            self.apptemp_day_stats.unit_system = self.apptemp_manager.std_unit_system
             # get a Buffer object
             self.buffer = Buffer(MANIFEST,
                                  day_stats=self.day_stats,
@@ -1612,7 +1614,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 log.debug("received archive record (%s)" % _package['payload']['dateTime'])
                             elif weewx.debug >= 3:
                                 log.debug("received archive record: %s" % _package['payload'])
-                            self.new_archive_record(_package['payload'])
+                            self.process_new_archive_record(_package['payload'])
                             self.rose = calc_windrose(_package['payload']['dateTime'],
                                                       self.db_manager,
                                                       self.wr_period,
@@ -2189,7 +2191,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             data['yrfall'] = self.rain_format % rain_y
         return data
 
-    def new_archive_record(self, record):
+    def process_new_archive_record(self, record):
         """Control processing when new a archive record is presented."""
 
         # set our lost contact flag if applicable
@@ -2207,7 +2209,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         # refresh our day (archive record based) stats to date in case we have
         # jumped to the next day
         self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
+        self.day_stats.unit_system = self.db_manager.std_unit_system
         self.apptemp_day_stats = self.apptemp_manager._get_day_summary(record['dateTime'])
+        self.apptemp_day_stats.unit_system = self.apptemp_manager.std_unit_system
 
     def end_archive_period(self):
         """Control processing at the end of each archive period."""
