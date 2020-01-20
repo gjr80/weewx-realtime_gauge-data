@@ -1331,17 +1331,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.time_format = '%H:%M'
         self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
                                                          'degree_C')
-        self.temp_format = rtgd_config_dict['StringFormats'].get(self.temp_group,
-                                                                 '%.1f')
-        self.hum_group = 'percent'
         self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
                                                          'hPa')
-        # SteelSeries Weather Gauges don't understand mmHg so default to hPa
-        # if we have been told to use mmHg
-        if self.pres_group == 'mmHg':
-            self.pres_group = 'hPa'
-        self.pres_format = rtgd_config_dict['StringFormats'].get(self.pres_group,
-                                                                 '%.1f')
         self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
                                                          'km_per_hour')
         # Since the SteelSeries Weather Gauges derives distance units from wind
@@ -1360,30 +1351,21 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.rain_group = 'mm'
         self.rain_format = rtgd_config_dict['StringFormats'].get(self.rain_group,
                                                                  '%.1f')
-        # SteelSeries Weather gauges derives rain rate units from rain units,
-        # so must we
-        self.rainrate_group = ''.join([self.rain_group, '_per_hour'])
         self.dir_group = 'degree_compass'
         self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
                                                                 '%.1f')
         self.rad_group = 'watt_per_meter_squared'
         self.rad_format = rtgd_config_dict['StringFormats'].get(self.rad_group,
                                                                 '%.0f')
-        self.uv_group = 'uv_index'
-        # SteelSeries Weather gauges derives windrun units from wind speed
-        # units, so must we
-        self.dist_group = GROUP_DIST[self.wind_group]
         self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
                                                         'meter')
-        self.alt_format = rtgd_config_dict['StringFormats'].get(self.alt_group,
-                                                                '%.1f')
         self.flag_format = '%.0f'
         
         # set up output units dict
-        _units_dict = DEFAULT_UNITS
+        # first get the Groups config from our config dict
         _config_units_dict = rtgd_config_dict.get('Groups', {})
-        _units_dict.update(_config_units_dict)
-        self.units_dict = _units_dict
+        # add the Groups config to the chainmap and set the units_dict property
+        self.units_dict = ListOfDicts(_config_units_dict, DEFAULT_UNITS)
 
         # setup the field map
         _field_map = rtgd_config_dict.get('FieldMap', DEFAULT_FIELD_MAP)
