@@ -691,11 +691,6 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                      #'date': {},
                      #'dateFormat': {},
                      #'SensorContactLost': {},
-                     #'tempunit': {},
-                     #'windunit': {},
-                     #'pressunit': {},
-                     #'rainunit': {},
-                     #'cloudbaseunit': {},
                      'temp': {
                          'source': 'outTemp',
                          'format': '%.1f'
@@ -996,10 +991,10 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                          'aggregate_period': 'day',
                          'format': '%.1f'
                      },
-                     #'CurrentSolarMax': {
-                     #    'source': 'maxSolarRad',
-                     #    'format': '%.1f'
-                     #},
+                     'CurrentSolarMax': {
+                         'source': 'maxSolarRad',
+                         'format': '%.1f'
+                     },
                      'cloudbasevalue': {
                          'source': 'cloudbase',
                          'format': '%.1f'
@@ -1067,7 +1062,6 @@ class RealtimeGaugeData(StdService):
         # bind our self to the relevant WeeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
-        self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
 
         self.source_ctl_queue = None
         self.result_queue = None
@@ -1167,17 +1161,6 @@ class RealtimeGaugeData(StdService):
                 elif weewx.debug >= 3:
                     log.debug("queued year to date rain: %s" % _package['payload'])
     
-    def end_archive_period(self, event):
-        """Puts END_ARCHIVE_PERIOD event in the rtgd queue."""
-
-        # package the event in a dict since this is not the only data we send
-        # via the queue
-        _package = {'type': 'event',
-                    'payload': weewx.END_ARCHIVE_PERIOD}
-        self.rtgd_ctl_queue.put(_package)
-        if weewx.debug == 2:
-            log.debug("queued weewx.END_ARCHIVE_PERIOD event")
-
     def shutDown(self):
         """Shut down any threads.
 
@@ -1426,9 +1409,6 @@ class RealtimeGaugeDataThread(threading.Thread):
             _field_map[field[0]]['default'] = _vt
         self.field_map = _field_map
 
-        # what units are incoming packets using
-        self.packet_units = None
-
         # get max cache age
         self.max_cache_age = rtgd_config_dict.get('max_cache_age', 600)
 
@@ -1456,6 +1436,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                 False))
         # set the lost contact flag, assume we start off with contact
         self.lost_contact_flag = False
+
+        # initialise the packet unit dict
+        self.packet_unit_dict = None
 
         # initialise some properties used to hold archive period wind data
         self.windSpeedAvg_vt = ValueTuple(None, 'km_per_hour', 'group_speed')
@@ -1534,12 +1517,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                           self.apptemp_binding)
             # initialise our day stats
             self.day_stats = self.db_manager._get_day_summary(time.time())
-            # set the unit system for our day stats
-            self.day_stats.unit_system = self.db_manager.std_unit_system
             # initialise our day stats from our appTemp source
             self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
-            # set the unit system for our day stats
-            self.apptemp_day_stats.unit_system = self.apptemp_manager.std_unit_system
             # get a Buffer object
             self.buffer = Buffer(MANIFEST,
                                  day_stats=self.day_stats,
@@ -1623,13 +1602,6 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 log.debug("windrose data calculated")
                             elif weewx.debug >= 3:
                                 log.debug("windrose data calculated: %s" % (self.rose,))
-                            continue
-                        elif _package['type'] == 'event':
-                            # FIXME. do we need this event?
-                            if _package['payload'] == weewx.END_ARCHIVE_PERIOD:
-                                if weewx.debug == 2:
-                                    log.debug("received event - END_ARCHIVE_PERIOD")
-                                # self.end_archive_period()
                             continue
                         elif _package['type'] == 'stats':
                             if weewx.debug == 2:
@@ -1954,6 +1926,14 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                           source)
                 packet_unit_dict[source] = {'units': units,
                                             'group': unit_group}
+        # add in units and group details for fields windSpeed and rain to
+        # facilitate non-field map based field caclculations
+        for source in ('windSpeed', 'rain'):
+            if source not in packet_unit_dict:
+                (units, unit_group) = getStandardUnitType(packet_unit_system,
+                                                          source)
+                packet_unit_dict[source] = {'units': units,
+                                            'group': unit_group}
         return packet_unit_dict
 
     def calculate(self, packet):
@@ -1966,17 +1946,18 @@ class RealtimeGaugeDataThread(threading.Thread):
             Dictionary of gauge-data.txt data elements.
         """
 
+        # obtain the timestamp for the current packet
         ts = packet['dateTime']
+        # obtain a dict of units and unit group for each source in the field map
         self.packet_unit_dict = self.get_packet_units(packet)
-        if self.packet_units is None or self.packet_units != packet['usUnits']:
-            self.packet_units = packet['usUnits']
-            (self.p_wind_type, self.p_wind_group) = getStandardUnitType(self.packet_units,
-                                                                        'windSpeed')
-            (self.p_rain_type, self.p_rain_group) = getStandardUnitType(self.packet_units,
-                                                                        'rain')
-            (self.p_alt_type, self.p_alt_group) = getStandardUnitType(self.packet_units,
-                                                                      'altitude')
+        # construct a dict to hold our results
         data = dict()
+
+        # First we populate all non-field map calculated fields and then
+        # iterate over the field map populating the field map based fields.
+        # Populating the fields in this order allows the user to override the
+        # content of a non-field map based field (eg 'rose').
+
         # timeUTC - UTC date/time in format YYYY,mm,dd,HH,MM,SS
         data['timeUTC'] = datetime.datetime.utcfromtimestamp(ts).strftime("%Y,%m,%d,%H,%M,%S")
         # date - date in (default) format Y.m.d HH:MM
@@ -1997,9 +1978,13 @@ class RealtimeGaugeDataThread(threading.Thread):
         # cloudbaseunit - cloud base units - m, ft
         data['cloudbaseunit'] = UNITS_CLOUD[self.alt_group]
 
-        # populate all fields in the field map
-        for field in self.field_map:
-            data[field] = self.get_field_value(field, packet)
+        # domwinddir - Today's dominant wind direction as compass point
+        deg = 90.0 - math.degrees(math.atan2(self.buffer['wind'].ysum,
+                                             self.buffer['wind'].xsum))
+        dom_dir = deg if deg >= 0 else deg + 360.0
+        data['domwinddir'] = degree_to_compass(dom_dir)
+        # WindRoseData -
+        data['WindRoseData'] = self.rose
 
         # hourlyrainTH - Today's highest hourly rain
         # FIXME. Need to determine hourlyrainTH
@@ -2025,12 +2010,15 @@ class RealtimeGaugeDataThread(threading.Thread):
             wgust = self.buffer['windSpeed'].history_max(ts).value
         else:
             wgust = None
-        wgust_vt = ValueTuple(wgust, self.p_wind_type, self.p_wind_group)
-        wgust = convert(wgust_vt, self.wind_group).value
+        wgust_vt = ValueTuple(wgust,
+                              self.packet_unit_dict['windSpeed']['units'],
+                              self.packet_unit_dict['windSpeed']['group'])
+        wgust = convert(wgust_vt,
+                        self.packet_unit_dict['windSpeed']['units']).value
         wgust = wgust if wgust is not None else 0.0
         data['wgust'] = self.wind_format % wgust
 
-        # keep bearing - wind bearing (degrees)
+        # bearing - wind bearing (degrees)
         bearing = packet['windDir']
         bearing = bearing if bearing is not None else self.last_dir
         # save this bearing to use next time if there is no windDir, this way
@@ -2061,6 +2049,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # else:
         #     BearingRangeFrom10 = 0.0
         # data['BearingRangeFrom10'] = self.dir_format % BearingRangeFrom10
+
         # FIXME.
         # # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
         # # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
@@ -2078,20 +2067,14 @@ class RealtimeGaugeDataThread(threading.Thread):
         # else:
         #     BearingRangeTo10 = 0.0
         # data['BearingRangeTo10'] = self.dir_format % BearingRangeTo10
-        # domwinddir - Today's dominant wind direction as compass point
-        deg = 90.0 - math.degrees(math.atan2(self.buffer['wind'].ysum,
-                                  self.buffer['wind'].xsum))
-        dom_dir = deg if deg >= 0 else deg + 360.0
-        data['domwinddir'] = degree_to_compass(dom_dir)
-        # WindRoseData -
-        data['WindRoseData'] = self.rose
+
         # FIXME.
         # # windrun - wind run (today)
         # last_ts = self.db_manager.lastGoodStamp()
         # try:
         #     wind_sum_vt = ValueTuple(self.buffer['wind'].sum,
-        #                              self.p_wind_type,
-        #                              self.p_wind_group)
+        #                              self.packet_unit_dict['windSpeed']['units'],
+        #                              self.packet_unit_dict['windSpeed']['group'])
         #     windrun_day_average = (last_ts - startOfDay(ts))/3600.0 * convert(wind_sum_vt,
         #                                                                       self.wind_group).value/self.buffer['wind'].count
         # except (ValueError, TypeError, ZeroDivisionError):
@@ -2100,14 +2083,15 @@ class RealtimeGaugeDataThread(threading.Thread):
         #     loop_hours = (ts - last_ts)/3600.0
         #     try:
         #         windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum,
-        #                                                               self.p_wind_type,
-        #                                                               self.p_wind_group),
+        #                                                               self.packet_unit_dict['windSpeed']['units'],
+        #                                                               self.packet_unit_dict['windSpeed']['group']),
         #                                                              self.wind_group).value/self.buffer.windcount
         #     except (ValueError, TypeError):
         #         windrun = windrun_day_average
         # else:
         #     windrun = windrun_day_average
         # data['windrun'] = self.dist_format % windrun
+
         # Tbeaufort - wind speed (Beaufort)
         wlatest_vt = as_value_tuple(packet, 'windSpeed')
         if packet['windSpeed'] is not None:
@@ -2115,6 +2099,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                       'knot').value))
         else:
             data['Tbeaufort'] = "0"
+
         # CurrentSolarMax - Current theoretical maximum solar radiation
         if self.solar_algorithm == 'Bras':
             curr_solar_max = weewx.wxformulas.solar_rad_Bras(self.latitude,
@@ -2130,18 +2115,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                            self.atc)
         curr_solar_max = curr_solar_max if curr_solar_max is not None else 0.0
         data['CurrentSolarMax'] = self.rad_format % curr_solar_max
-        # cloudbasevalue - current cloudbase
-        if 'cloudbase' in packet:
-            cb_vt = as_value_tuple(packet, 'cloudbase')
-        else:
-            temp_c = convert(temp_vt, 'degree_C').value
-            cb = weewx.wxformulas.cloudbase_Metric(temp_c,
-                                                   packet['outHumidity'],
-                                                   self.altitude_m)
-            cb_vt = ValueTuple(cb, 'meter', self.p_alt_group)
-        cloudbase = convert(cb_vt, self.alt_group).value
-        cloudbase = cloudbase if cloudbase is not None else 0.0
-        data['cloudbasevalue'] = self.alt_format % cloudbase
+
         # forecast - forecast text
         _text = self.scroller_text if self.scroller_text is not None else ''
         # format the forecast string, we might get a UnicodeDecode error, be
@@ -2163,8 +2137,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             if self.month_rain is not None:
                 rain_m = convert(self.month_rain, self.rain_group).value
                 rain_b_vt = ValueTuple(self.buffer['rain'].sum,
-                                       self.p_rain_type,
-                                       self.p_rain_group)
+                                       self.packet_unit_dict['rain']['units'],
+                                       self.packet_unit_dict['rain']['group'])
                 rain_b = convert(rain_b_vt, self.rain_group).value
                 if rain_m is not None and rain_b is not None:
                     rain_m = rain_m + rain_b
@@ -2179,8 +2153,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             if self.year_rain is not None:
                 rain_y = convert(self.year_rain, self.rain_group).value
                 rain_b_vt = ValueTuple(self.buffer['rain'].sum,
-                                       self.p_rain_type,
-                                       self.p_rain_group)
+                                       self.packet_unit_dict['rain']['units'],
+                                       self.packet_unit_dict['rain']['group'])
                 rain_b = convert(rain_b_vt, self.rain_group).value
                 if rain_y is not None and rain_b is not None:
                     rain_y = rain_y + rain_b
@@ -2189,6 +2163,11 @@ class RealtimeGaugeDataThread(threading.Thread):
             else:
                 rain_y = 0.0
             data['yrfall'] = self.rain_format % rain_y
+
+        # now populate all fields in the field map
+        for field in self.field_map:
+            data[field] = self.get_field_value(field, packet)
+
         return data
 
     def process_new_archive_record(self, record):
@@ -2209,22 +2188,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # refresh our day (archive record based) stats to date in case we have
         # jumped to the next day
         self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
-        self.day_stats.unit_system = self.db_manager.std_unit_system
         self.apptemp_day_stats = self.apptemp_manager._get_day_summary(record['dateTime'])
-        self.apptemp_day_stats.unit_system = self.apptemp_manager.std_unit_system
-
-    def end_archive_period(self):
-        """Control processing at the end of each archive period."""
-
-        # TODO. is this required?
-        # # Reset our loop stats.
-        # self.buffer.reset_loop_stats()
-
-    # TODO.Is this required?
-    def parse_field_map(self, rtgd_config_dict):
-        """Parse the field map."""
-
-        _field_map = rtgd_config_dict.get("FieldMap", None)
 
     def get_lost_contact(self, rec, packet_type):
         """Determine is station has lost contact with sensors."""
@@ -2680,7 +2644,7 @@ class CachedPacket(object):
     OBS = ["cloudbase", "windDir", "windrun", "inHumidity", "outHumidity",
            "barometer", "radiation", "rain", "rainRate", "windSpeed",
            "appTemp", "dewpoint", "heatindex", "humidex", "inTemp",
-           "outTemp", "windchill", "UV"]
+           "outTemp", "windchill", "UV", "maxSolarRad"]
 
     def __init__(self, rec):
         """Initialise our cache object.
