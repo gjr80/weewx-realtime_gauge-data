@@ -608,7 +608,6 @@ import time
 from operator import itemgetter
 
 # Python 2/3 compatibility shims
-import six
 from six.moves import http_client
 from six.moves import queue
 from six.moves import urllib
@@ -637,6 +636,7 @@ GAUGE_DATA_VERSION = '14'
 COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                   'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N']
 
+# default units to use
 DEFAULT_UNITS = weewx.units.MetricUnits
 
 # map WeeWX unit names to unit names supported by the SteelSeries Weather
@@ -657,7 +657,7 @@ GROUP_DIST = {'mile_per_hour':      'mile',
               'meter_per_second':   'km',
               'km_per_hour':        'km'}
 
-# the obs that we will buffer
+# list of obs that we will attempt to buffer
 MANIFEST = ['outTemp', 'barometer', 'outHumidity', 'rain', 'rainRate',
             'humidex', 'windchill', 'heatindex', 'windSpeed', 'inTemp',
             'appTemp', 'dewpoint', 'windDir', 'UV', 'radiation', 'wind',
@@ -666,6 +666,7 @@ MANIFEST = ['outTemp', 'barometer', 'outHumidity', 'rain', 'rainRate',
 # obs for which we need a history
 HIST_MANIFEST = ['windSpeed', 'windDir', 'windGust', 'wind']
 
+# length of history to be maintained in seconds
 MAX_AGE = 600
 
 # Define station lost contact checks for supported stations. Note that at
@@ -686,11 +687,10 @@ STATION_LOST_CONTACT = {'Vantage': {'field': 'rxCheckPercent', 'value': 0},
 ARCHIVE_STATIONS = ['Vantage']
 # stations supporting lost contact reporting through their loop packet
 LOOP_STATIONS = ['FineOffsetUSB']
+
 # default field map
-DEFAULT_FIELD_MAP = {#'timeUTC': {},
-                     #'date': {},
-                     #'dateFormat': {},
-                     #'SensorContactLost': {},
+DEFAULT_FIELD_MAP = {  # 'timeUTC': {},
+                     # 'date': {},
                      'temp': {
                          'source': 'outTemp',
                          'format': '%.1f'
@@ -921,14 +921,14 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                          'aggregate_period': 'day',
                          'format': '%.1f'
                      },
-                     #'hourlyrainTH': {},
-                     #'ThourlyrainTH': {},
-                     #'LastRainTipISO': {},
+                     # 'hourlyrainTH': {},
+                     # 'ThourlyrainTH': {},
+                     # 'LastRainTipISO': {},
                      'wlatest': {
                          'source': 'windSpeed',
                          'format': '%.1f'
                      },
-                     #'wspeed': {},
+                     # 'wspeed': {},
                      'windTM': {
                          'source': 'windSpeed',
                          'aggregate': 'max',
@@ -965,12 +965,12 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                          'aggregate_period': 'day',
                          'format': '%.1f'
                      },
-                     #'BearingRangeFrom10': {},
-                     #'BearingRangeTo10': {},
-                     #'domwinddir': {},
-                     #'WindRoseData': {},
-                     #'windrun': {},
-                     #'Tbeaufort': {},
+                     # 'BearingRangeFrom10': {},
+                     # 'BearingRangeTo10': {},
+                     # 'domwinddir': {},
+                     # 'WindRoseData': {},
+                     # 'windrun': {},
+                     # 'Tbeaufort': {},
                      'UV': {
                          'source': 'UV',
                          'format': '%.1f'
@@ -998,12 +998,8 @@ DEFAULT_FIELD_MAP = {#'timeUTC': {},
                      'cloudbasevalue': {
                          'source': 'cloudbase',
                          'format': '%.1f'
-                     },
-                     #'forecast': {},
-                     #'version': {},
-                     #'build': {},
-                     #'ver': {}
                      }
+}
 
 # ============================================================================
 #                     Exceptions that could get thrown
@@ -1977,7 +1973,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['ThourlyrainTH'] = "00:00"
 
         # LastRainTipISO -
-        # FIXME. Need to determine LastRainTipISO
+        # TODO. Need to determine LastRainTipISO
         data['LastRainTipISO'] = "00:00"
 
         # wspeed - wind speed (average)
@@ -2004,7 +2000,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         bearing = packet['windDir']
         bearing = bearing if bearing is not None else self.last_dir
         # save this bearing to use next time if there is no windDir, this way
-        # our wind dir needle will always hsow the last non-None windDir rather
+        # our wind dir needle will always how the last non-None windDir rather
         # than return to 0
         self.last_dir = bearing
         data['bearing'] = self.dir_format % bearing
@@ -2387,20 +2383,21 @@ class ScalarBuffer(ObsBuffer):
             (self.min, self.mintime,
              self.max, self.maxtime, self.sum) = ScalarBuffer.default_init
 
-    def add_value(self, val, ts):
+    def add_value(self, val, ts, hilo=True):
         """Add a value to my stats as required."""
 
         if val is not None:
+            if hilo:
+                if self.min is None or val < self.min:
+                    self.min = val
+                    self.mintime = ts
+                if self.max is None or val > self.max:
+                    self.max = val
+                    self.maxtime = ts
+            self.sum += val
             if self.lasttime is None or ts >= self.lasttime:
                 self.last = val
                 self.lasttime = ts
-            if self.min is None or val < self.min:
-                self.min = val
-                self.mintime = ts
-            if self.max is None or val > self.max:
-                self.max = val
-                self.maxtime = ts
-            self.sum += val
             if self.use_history:
                 self.history.append(ObsTuple(val, ts))
                 self.trim_history(ts)
@@ -2408,8 +2405,9 @@ class ScalarBuffer(ObsBuffer):
     def day_reset(self):
         """Reset the scalar obs buffer."""
 
+        # TODO. Does setting self.sum = 0.0 cause a problem as it wasn't included before?
         (self.min, self.mintime,
-         self.max, self.maxtime) = ScalarBuffer.default_init
+         self.max, self.maxtime, self.sum) = ScalarBuffer.default_init
         try:
             self.sum = 0.0
         except AttributeError:
