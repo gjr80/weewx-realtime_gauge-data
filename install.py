@@ -10,12 +10,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.?.?                                        Date: 13 January 2020
+Version: 0.5.0a1                                        Date: ?? January 2020
 
 Revision History
 
-    13 January 2020     v0.?.?
-        - bumped version only
+    13 January 2020     v0.5.0
+        - fix incorrect date format
     23 November 2019    v0.4.2
         - bumped version only
     20 November 2019    v0.4.1
