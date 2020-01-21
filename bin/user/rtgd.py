@@ -27,6 +27,9 @@ Version: 0.5.0a1                                        Date: ?? January 2020
           buffer objects similar in operation to the WeeWX accumulators
         - implemented a field_map config item allowing certain JSON output field
           properties to be controlled by the user
+        - fields beaufort and currentSolarMax is no longer directly calculated
+          by rtgd but are now populated from WeeWX fields beaufort and
+          maxSolarRad respectively
     23 November 2019    v0.4.2
         - fix error in some expressions including > and < where operands could
           be None
@@ -970,7 +973,10 @@ DEFAULT_FIELD_MAP = {  # 'timeUTC': {},
                      # 'domwinddir': {},
                      # 'WindRoseData': {},
                      # 'windrun': {},
-                     # 'Tbeaufort': {},
+                     'Tbeaufort': {
+                         'source': 'beaufort',
+                         'format': '%.0f'
+                     },
                      'UV': {
                          'source': 'UV',
                          'format': '%.1f'
@@ -2069,14 +2075,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         # else:
         #     windrun = windrun_day_average
         # data['windrun'] = self.dist_format % windrun
-
-        # Tbeaufort - wind speed (Beaufort)
-        wlatest_vt = as_value_tuple(packet, 'windSpeed')
-        if packet['windSpeed'] is not None:
-            data['Tbeaufort'] = str(weewx.wxformulas.beaufort(convert(wlatest_vt,
-                                                                      'knot').value))
-        else:
-            data['Tbeaufort'] = "0"
 
         # forecast - forecast text
         _text = self.scroller_text if self.scroller_text is not None else ''
