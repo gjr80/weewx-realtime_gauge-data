@@ -2078,22 +2078,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         else:
             data['Tbeaufort'] = "0"
 
-        # CurrentSolarMax - Current theoretical maximum solar radiation
-        if self.solar_algorithm == 'Bras':
-            curr_solar_max = weewx.wxformulas.solar_rad_Bras(self.latitude,
-                                                             self.longitude,
-                                                             self.altitude_m,
-                                                             ts,
-                                                             self.nfac)
-        else:
-            curr_solar_max = weewx.wxformulas.solar_rad_RS(self.latitude,
-                                                           self.longitude,
-                                                           self.altitude_m,
-                                                           ts,
-                                                           self.atc)
-        curr_solar_max = curr_solar_max if curr_solar_max is not None else 0.0
-        data['CurrentSolarMax'] = self.rad_format % curr_solar_max
-
         # forecast - forecast text
         _text = self.scroller_text if self.scroller_text is not None else ''
         # format the forecast string, we might get a UnicodeDecode error, be
