@@ -104,7 +104,7 @@ class RtgdInstaller(ExtensionInstaller):
             report_services=['user.rtgd.RealtimeGaugeData'],
             config={
                 'RealtimeGaugeData': {
-                    'date_format': '%Y.%m.%d %H:%M',
+                    'date_format': '%Y-%m-%d %H:%M',
                     'rtgd_path': '/home/weewx/public_html',
                     'scroller_source': 'text|file|WU|DS|Zambretti',
                     'StringFormats': {

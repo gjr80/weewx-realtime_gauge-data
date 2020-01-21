@@ -30,6 +30,7 @@ Version: 0.5.0a1                                        Date: ?? January 2020
         - fields beaufort and currentSolarMax is no longer directly calculated
           by rtgd but are now populated from WeeWX fields beaufort and
           maxSolarRad respectively
+        - field lastRainTipISO is now populated
     23 November 2019    v0.4.2
         - fix error in some expressions including > and < where operands could
           be None
@@ -569,8 +570,8 @@ and nth_loop settings under [RealtimeGaugeData] in weewx.conf.
 gauge-data.txt is generated.
 
 To do:
-    - hourlyrainTH, ThourlyrainTH and LastRainTipISO. Need to populate these
-      fields, presently set to 0.0, 00:00 and 00:00 respectively.
+    - hourlyrainTH and ThourlyrainTH. Need to populate these fields, presently
+      set to 0.0 and 00:00 respectively.
     - Lost contact with station sensors is implemented for Vantage and
       Simulator stations only. Need to extend current code to cater for the
       WeeWX supported stations. Current code assume that contact is there
@@ -926,7 +927,6 @@ DEFAULT_FIELD_MAP = {  # 'timeUTC': {},
                      },
                      # 'hourlyrainTH': {},
                      # 'ThourlyrainTH': {},
-                     # 'LastRainTipISO': {},
                      'wlatest': {
                          'source': 'windSpeed',
                          'format': '%.1f'
@@ -1329,7 +1329,7 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get our groups and format strings
         self.date_format = rtgd_config_dict.get('date_format',
-                                                '%Y.%m.%d %H:%M')
+                                                '%Y-%m-%d %H:%M')
         self.time_format = '%H:%M'
         self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
                                                          'degree_C')
@@ -1440,6 +1440,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.buffer = None
         self.forecast_text = None
         self.rose = None
+        self.last_rain_ts = None
 
         # initialise the scroller text
         self.scroller_text = None
@@ -1507,6 +1508,9 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.buffer = Buffer(MANIFEST,
                                  day_stats=self.day_stats,
                                  additional_day_stats=self.apptemp_day_stats)
+
+            # initialise the time of last rain
+            self.last_rain_ts = self.calc_last_rain_stamp()
 
             # get a windrose to start with since it is only on receipt of an
             # archive record
@@ -1979,8 +1983,12 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['ThourlyrainTH'] = "00:00"
 
         # LastRainTipISO -
-        # TODO. Need to determine LastRainTipISO
-        data['LastRainTipISO'] = "00:00"
+        if self.last_rain_ts is not None:
+            _last_rain_tip_iso = time.strftime(self.date_format,
+                                               time.localtime(self.last_rain_ts))
+        else:
+            _last_rain_tip_iso = "1/1/1900 00:00"
+        data['LastRainTipISO'] = _last_rain_tip_iso
 
         # wspeed - wind speed (average)
         wspeed = convert(self.windSpeedAvg_vt, self.wind_group).value
@@ -2149,6 +2157,32 @@ class RealtimeGaugeDataThread(threading.Thread):
         # jumped to the next day
         self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
         self.apptemp_day_stats = self.apptemp_manager._get_day_summary(record['dateTime'])
+
+    def calc_last_rain_stamp(self):
+        """Calculate the timestamp of the last rain.
+
+        Searching a large archive for the last rainfall could be time consuming
+        so first search the daily summaries for the day of last rain and then
+        search that day for the actual timestamp.
+        """
+
+        _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive_day_rain WHERE sum > 0")
+        last_rain_ts = _row[0]
+        # now limit our search on the archive to the day concerned, wrap in a
+        # try statement just in case
+        if last_rain_ts is not None:
+            # We have a day so get a TimeSpan for the day containing
+            # last_rain_ts. last_rain_ts will be set to midnight at the start
+            # of a day (daily summary requirement) but in the archive this ts
+            # would belong to the previous day, so add 1 second and obtain the
+            # TimeSpan for the archive day containing that ts.
+            last_rain_tspan = weeutil.weeutil.archiveDaySpan(last_rain_ts+1)
+            try:
+                _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive WHERE rain > 0 AND dateTime > ? AND dateTime <= ?", (last_rain_tspan))
+                last_rain_ts = _row[0]
+            except:
+                last_rain_ts = None
+        return last_rain_ts
 
     def get_lost_contact(self, rec, packet_type):
         """Determine is station has lost contact with sensors."""
