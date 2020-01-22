@@ -1426,7 +1426,6 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # initialise some properties used to hold archive period wind data
         self.windSpeedAvg_vt = ValueTuple(None, 'km_per_hour', 'group_speed')
-        self.windDirAvg = None
         self.min_barometer = None
         self.max_barometer = None
 
@@ -1537,9 +1536,6 @@ class RealtimeGaugeDataThread(threading.Thread):
             # needs to be a ValueTuple since we may need to convert units
             if 'windSpeed' in _rec:
                 self.windSpeedAvg_vt = weewx.units.as_value_tuple(_rec, 'windSpeed')
-            # save the windDir value to use as our archive period average
-            if 'windDir' in _rec:
-                self.windDirAvg = _rec['windDir']
 
             # now run a continuous loop, waiting for records to appear in the rtgd
             # queue then processing them.
@@ -1934,6 +1930,9 @@ class RealtimeGaugeDataThread(threading.Thread):
             Dictionary of gauge-data.txt data elements.
         """
 
+        # obtain 10 minute average wind speed and direction
+        avg_speed_10 = self.buffer['windSpeed'].history_avg
+        avg_bearing_10 = self.buffer['wind'].history_vec_avg.dir
         # obtain the timestamp for the current packet
         ts = packet['dateTime']
         # obtain a dict of units and unit group for each source in the field map
@@ -1967,9 +1966,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['cloudbaseunit'] = UNITS_CLOUD[self.alt_group]
 
         # domwinddir - Today's dominant wind direction as compass point
-        deg = 90.0 - math.degrees(math.atan2(self.buffer['wind'].ysum,
-                                             self.buffer['wind'].xsum))
-        dom_dir = deg if deg >= 0 else deg + 360.0
+        dom_dir = self.buffer['wind'].day_vec_avg.dir
         data['domwinddir'] = degree_to_compass(dom_dir)
         # WindRoseData -
         data['WindRoseData'] = self.rose
@@ -1982,7 +1979,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # FIXME. Need to determine ThourlyrainTH
         data['ThourlyrainTH'] = "00:00"
 
-        # LastRainTipISO -
+        # LastRainTipISO - date and time of last rainfall
         if self.last_rain_ts is not None:
             _last_rain_tip_iso = time.strftime(self.date_format,
                                                time.localtime(self.last_rain_ts))
@@ -2020,45 +2017,42 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['bearing'] = self.dir_format % bearing
 
         # avgbearing - 10-minute average wind bearing (degrees)
-        avg_bearing = self.windDirAvg if self.windDirAvg is not None else self.last_average_dir
-        self.last_average_dir = avg_bearing
-        data['avgbearing'] = self.dir_format % avg_bearing
+        data['avgbearing'] = self.dir_format % avg_bearing_10
 
-        # FIXME.
-        # # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
-        # # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
-        # # down to nearest 10 degrees
-        # if self.windDirAvg is not None:
-        #     try:
-        #         fromBearing = max((self.windDirAvg-d) if ((d-self.windDirAvg) < 0 < s) else None for x, y, s, d, t in self.buffer.wind_dir_list)
-        #     except (TypeError, ValueError):
-        #         fromBearing = None
-        #     BearingRangeFrom10 = self.windDirAvg - fromBearing if fromBearing is not None else 0.0
-        #     if BearingRangeFrom10 < 0:
-        #         BearingRangeFrom10 += 360
-        #     elif BearingRangeFrom10 > 360:
-        #         BearingRangeFrom10 -= 360
-        # else:
-        #     BearingRangeFrom10 = 0.0
-        # data['BearingRangeFrom10'] = self.dir_format % BearingRangeFrom10
 
-        # FIXME.
-        # # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
-        # # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
-        # # up to the nearest 10 degrees
-        # if self.windDirAvg is not None:
-        #     try:
-        #         toBearing = max((d-self.windDirAvg) if ((d-self.windDirAvg) > 0 and s > 0) else None for x, y, s, d, t in self.buffer.wind_dir_list)
-        #     except (TypeError, ValueError):
-        #         toBearing = None
-        #     BearingRangeTo10 = self.windDirAvg + toBearing if toBearing is not None else 0.0
-        #     if BearingRangeTo10 < 0:
-        #         BearingRangeTo10 += 360
-        #     elif BearingRangeTo10 > 360:
-        #         BearingRangeTo10 -= 360
-        # else:
-        #     BearingRangeTo10 = 0.0
-        # data['BearingRangeTo10'] = self.dir_format % BearingRangeTo10
+        # TODO. Remove before release
+#        a = self.buffer['wind'].history_vec_avg
+#        log.info("a=%s" % (a,))
+
+        # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
+        # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
+        # (or as configured using AvgBearingMinutes in cumulus.ini), rounded
+        # down to nearest 10 degrees
+        if avg_bearing_10 is not None:
+            # First obtain a list of wind direction history over the last
+            # 10 minutes, but we want the direction to be in -180 to
+            # 180 degrees range rather than from 0 to 360 degrees. Also the
+            # values must be relative to the 10 minute average wind direction.
+            # Wrap in a try.except just in case.
+            try:
+                _offset_dir = [self.to_plusminus(obs.value.dir-avg_bearing_10) for obs in self.buffer['wind'].history]
+            except (TypeError, ValueError):
+                # if we strike an error then return 0 for both results
+                bearing_range_from_10 = 0
+                bearing_range_to_10 = 0
+            # Now find the min and max values and transpose back to the 0 to
+            # 360 degrees range relative to North (0 degrees). Wrap in a
+            # try..except just in case.
+            try:
+                bearing_range_from_10 = self.to_threesixty(min(_offset_dir) + avg_bearing_10)
+                bearing_range_to_10 = self.to_threesixty(max(_offset_dir) + avg_bearing_10)
+            except TypeError:
+                # if we strike an error then return 0 for both results
+                bearing_range_from_10 = 0
+                bearing_range_to_10 = 0
+        # store the formatted results
+        data['BearingRangeFrom10'] = self.dir_format % bearing_range_from_10
+        data['BearingRangeTo10'] = self.dir_format % bearing_range_to_10
 
         # FIXME.
         # # windrun - wind run (today)
@@ -2148,11 +2142,6 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.windSpeedAvg_vt = weewx.units.as_value_tuple(record, 'windSpeed')
         else:
             self.windSpeedAvg_vt = ValueTuple(None, 'km_per_hour', 'group_speed')
-        # save the windDir value to use as our archive period average
-        if 'windDir' in record:
-            self.windDirAvg = record['windDir']
-        else:
-            self.windDirAvg = None
         # refresh our day (archive record based) stats to date in case we have
         # jumped to the next day
         self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
@@ -2200,6 +2189,24 @@ class RealtimeGaugeDataThread(threading.Thread):
                     log.debug("KeyError: Could not determine sensor contact state")
                     result = True
         return result
+
+    @staticmethod
+    def to_plusminus(val):
+        """Map a 0 to 360 degree direction to -180 to +180 degrees."""
+
+        if val is not None and val > 180:
+            return val - 360
+        else:
+            return val
+
+    @staticmethod
+    def to_threesixty(val):
+        """Map a -180 to +180 degrees direction to 0 to 360 degrees."""
+
+        if val is not None and val < 0:
+            return val + 360
+        else:
+            return val
 
 
 # ============================================================================
@@ -2265,6 +2272,7 @@ class ObsBuffer(object):
         else:
             return None
 
+    # def history_avg(self, ts, age=MAX_AGE):
     def history_avg(self, ts, age=MAX_AGE):
         """Return the average value in my history.
 
@@ -2281,10 +2289,14 @@ class ObsBuffer(object):
             it occurred.
         """
 
-        born = ts - age
-        snapshot = [a.value[0] for a in self.history if a.ts >= born]
-        if len(snapshot) > 0:
-            return float(sum(snapshot)/len(snapshot))
+        # born = ts - age
+        # snapshot = [a.value[0] for a in self.history if a.ts >= born]
+        # if len(snapshot) > 0:
+        #     return float(sum(snapshot)/len(snapshot))
+        # else:
+        #     return None
+        if len(self.history) > 0:
+            return float(sum(self.history)/len(self.history))
         else:
             return None
 
@@ -2324,29 +2336,26 @@ class VectorBuffer(ObsBuffer):
     def add_value(self, val, ts, hilo=True):
         """Add a value to my hilo and history stats as required."""
 
-        (w_speed, w_dir) = val
-        if w_speed is not None:
+        if val.mag is not None:
             if hilo:
-                if self.min is None or w_speed < self.min:
-                    self.min = w_speed
+                if self.min is None or val.mag < self.min:
+                    self.min = val.mag
                     self.mintime = ts
-                if self.max is None or w_speed > self.max:
-                    self.max = w_speed
-                    self.max_dir = w_dir
+                if self.max is None or val.mag > self.max:
+                    self.max = val.mag
+                    self.max_dir = val.dir
                     self.maxtime = ts
-            self.sum += w_speed
+            self.sum += val.mag
             if self.lasttime:
                 self.sumtime += ts - self.lasttime
-            if w_dir is not None:
-                self.xsum += w_speed * math.cos(math.radians(90.0 - w_dir))
-                self.ysum += w_speed * math.sin(math.radians(90.0 - w_dir))
+            if val.dir is not None:
+                self.xsum += val.mag * math.cos(math.radians(90.0 - val.dir))
+                self.ysum += val.mag * math.sin(math.radians(90.0 - val.dir))
             if self.lasttime is None or ts >= self.lasttime:
-                self.last = (w_speed, w_dir)
+                self.last = val
                 self.lasttime = ts
-            if self.use_history and w_dir is not None:
-                self.history.append(ObsTuple((w_speed,
-                                              math.cos(math.radians(90.0 - w_dir)),
-                                              math.sin(math.radians(90.0 - w_dir))), ts))
+            if self.use_history and val.dir is not None:
+                self.history.append(ObsTuple(val, ts))
                 self.trim_history(ts)
 
     def day_reset(self):
@@ -2360,20 +2369,68 @@ class VectorBuffer(ObsBuffer):
             pass
 
     @property
-    def vec_avg(self):
-        """The day vector average value."""
+    def day_vec_avg(self):
+        """The day average vector."""
 
-        return math.sqrt((self.xsum**2 + self.ysum**2) / self.sumtime**2)
+        _magnitude = math.sqrt((self.xsum**2 + self.ysum**2) / self.sumtime**2)
+        _direction = 90.0 - math.degrees(math.atan2(self.ysum, self.xsum))
+        _direction = _direction if _direction >= 0.0 else _direction + 360.0
+        return VectorTuple(_magnitude, _direction)
 
     @property
-    def vec_dir(self):
-        """The day vector average direction."""
+    def history_vec_avg(self):
+        """The history average vector.
 
-        _dir = 90.0 - math.degrees(math.atan2(self.ysum, self.xsum))
-        if _dir < 0.0:
-            _dir += 360.0
-        return _dir
+        The period over which the average is calculated is the the history
+        retention period (nominally 10 minutes).
+        """
 
+        result = VectorTuple(None, None)
+        if self.use_history and len(self.history) > 0:
+            xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
+                   ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
+            xsum = sum(x for x,y in xy)
+            ysum = sum(y for x,y in xy)
+            oldest_ts = min(ob.ts for ob in self.history)
+            _magnitude = math.sqrt((xsum**2 + ysum**2) / (time.time() - oldest_ts)**2)
+            _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
+            _direction = _direction if _direction >= 0.0 else _direction + 360.0
+            result = VectorTuple(_magnitude, _direction)
+        return result
+
+#            [obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history]
+#            xsum = sum([obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history])
+#            ysum = sum([obs.value.mag * math.sin(math.radians(90.0 - obs.value.dir)) for obs in self.history])
+#            tsum =
+#            return math.sqrt((xsum**2 + ysum**2) / self.sumtime**2)
+#        else:
+#            return None
+
+    #            [obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history]
+    #            xsum = sum([obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history])
+    #            ysum = sum([obs.value.mag * math.sin(math.radians(90.0 - obs.value.dir)) for obs in self.history])
+    #            tsum =
+    #            return math.sqrt((xsum**2 + ysum**2) / self.sumtime**2)
+    #        else:
+    #            return None
+
+    @property
+    def history_vec_dir(self):
+        """The history vector average direction.
+
+        The period over which the average is calculated is the the history
+        retention period (nominally 10 minutes).
+        """
+
+        result = None
+        if self.use_history and len(self.history) > 0:
+            xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
+                   ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
+            xsum = sum(x for x,y in xy)
+            ysum = sum(y for x,y in xy)
+            _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
+            result = _direction if _direction >= 0.0 else _direction + 360.0
+        return result
 
 # ============================================================================
 #                             class ScalarBuffer
@@ -2554,7 +2611,7 @@ class Buffer(dict):
             (unit, group) = getStandardUnitType(packet['usUnits'], 'windSpeed')
             _vt = ValueTuple(packet['windSpeed'], unit, group)
             _value = weewx.units.convertStd(_vt, self['wind'].units).value
-        self['wind'].add_value((_value, packet.get('windDir')),
+        self['wind'].add_value(VectorTuple(_value, packet.get('windDir')),
                                packet['dateTime'])
 
     def start_of_day_reset(self):
@@ -2608,6 +2665,35 @@ class ObsTuple(tuple):
 
     @property
     def ts(self):
+        return self[1]
+
+
+# ============================================================================
+#                              class VectorTuple
+# ============================================================================
+
+
+# A vector value can be represented as a magnitude and direction. This can be
+# represented in a 2 way tuple called an vector tuple. A vector tuple is useful
+# because its contents can be accessed using named attributes.
+#
+# Item   attribute   Meaning
+#    0    mag        The magnitude of the vector
+#    1    dir        The direction of the vector in degrees
+#
+# mag and dir may be None
+
+class VectorTuple(tuple):
+
+    def __new__(cls, *args):
+        return tuple.__new__(cls, args)
+
+    @property
+    def mag(self):
+        return self[0]
+
+    @property
+    def dir(self):
         return self[1]
 
 
