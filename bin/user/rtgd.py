@@ -665,7 +665,7 @@ GROUP_DIST = {'mile_per_hour':      'mile',
 MANIFEST = ['outTemp', 'barometer', 'outHumidity', 'rain', 'rainRate',
             'humidex', 'windchill', 'heatindex', 'windSpeed', 'inTemp',
             'appTemp', 'dewpoint', 'windDir', 'UV', 'radiation', 'wind',
-            'windGust', 'windGustDir']
+            'windGust', 'windGustDir', 'windrun']
 
 # obs for which we need a history
 HIST_MANIFEST = ['windSpeed', 'windDir', 'windGust', 'wind']
@@ -693,9 +693,7 @@ ARCHIVE_STATIONS = ['Vantage']
 LOOP_STATIONS = ['FineOffsetUSB']
 
 # default field map
-DEFAULT_FIELD_MAP = {  # 'timeUTC': {},
-                     # 'date': {},
-                     'temp': {
+DEFAULT_FIELD_MAP = {'temp': {
                          'source': 'outTemp',
                          'format': '%.1f'
                      },
@@ -931,7 +929,6 @@ DEFAULT_FIELD_MAP = {  # 'timeUTC': {},
                          'source': 'windSpeed',
                          'format': '%.1f'
                      },
-                     # 'wspeed': {},
                      'windTM': {
                          'source': 'windSpeed',
                          'aggregate': 'max',
@@ -968,11 +965,12 @@ DEFAULT_FIELD_MAP = {  # 'timeUTC': {},
                          'aggregate_period': 'day',
                          'format': '%.1f'
                      },
-                     # 'BearingRangeFrom10': {},
-                     # 'BearingRangeTo10': {},
-                     # 'domwinddir': {},
-                     # 'WindRoseData': {},
-                     # 'windrun': {},
+                     'windrun': {
+                         'source': 'windrun',
+                         'aggregate': 'sum',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
                      'Tbeaufort': {
                          'source': 'beaufort',
                          'format': '%.0f'
@@ -1035,7 +1033,7 @@ class RealtimeGaugeData(StdService):
         super(RealtimeGaugeData, self).__init__(engine, config_dict)
 
         self.rtgd_ctl_queue = queue.Queue()
-        # get our RealtimeGaugeData config dictionary
+        # get the RealtimeGaugeData config dictionary
         rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
         manager_dict = weewx.manager.get_manager_dict_from_config(config_dict,
                                                                   'wx_binding')
@@ -1359,6 +1357,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.rad_group = 'watt_per_meter_squared'
         self.rad_format = rtgd_config_dict['StringFormats'].get(self.rad_group,
                                                                 '%.0f')
+        # SteelSeries Weather gauges derives windrun units from wind speed
+        # units, so must we
+        self.dist_group = GROUP_DIST[self.wind_group]
+        self.dist_format = rtgd_config_dict['StringFormats'].get(self.dist_group,
+                                                                 '%.1f')
         self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
                                                         'meter')
         self.flag_format = '%.0f'
@@ -1930,15 +1933,16 @@ class RealtimeGaugeDataThread(threading.Thread):
             Dictionary of gauge-data.txt data elements.
         """
 
-        # obtain 10 minute average wind speed and direction
-        avg_speed_10 = self.buffer['windSpeed'].history_avg
-        avg_bearing_10 = self.buffer['wind'].history_vec_avg.dir
         # obtain the timestamp for the current packet
         ts = packet['dateTime']
         # obtain a dict of units and unit group for each source in the field map
         self.packet_unit_dict = self.get_packet_units(packet)
         # construct a dict to hold our results
         data = dict()
+
+        # obtain 10 minute average wind speed and direction
+        avg_speed_10 = self.buffer['windSpeed'].history_avg(ts=ts, age=600)
+        avg_bearing_10 = self.buffer['wind'].history_vec_avg.dir
 
         # First we populate all non-field map calculated fields and then
         # iterate over the field map populating the field map based fields.
@@ -1968,6 +1972,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # domwinddir - Today's dominant wind direction as compass point
         dom_dir = self.buffer['wind'].day_vec_avg.dir
         data['domwinddir'] = degree_to_compass(dom_dir)
+
         # WindRoseData -
         data['WindRoseData'] = self.rose
 
@@ -1988,23 +1993,33 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['LastRainTipISO'] = _last_rain_tip_iso
 
         # wspeed - wind speed (average)
-        wspeed = convert(self.windSpeedAvg_vt, self.wind_group).value
+        # obtain the average wind speed from the buffer
+        wspeed = self.buffer['windSpeed'].history_avg(ts=ts, age=600)
+        # put into a ValueTuple so we can convert
+        wspeed_vt = ValueTuple(wspeed,
+                               self.packet_unit_dict['windSpeed']['units'],
+                               self.packet_unit_dict['windSpeed']['group'])
+        # convert to output units
+        convert(wspeed_vt, self.wind_group).value
+        # handle None values
         wspeed = wspeed if wspeed is not None else 0.0
         data['wspeed'] = self.wind_format % wspeed
 
         # wgust - 10 minute high gust
+        # first look for max windGust value in the history, if windGust is not
+        # in the buffer then use windSpeed, if no windSpeed then use 0.0
         if 'windGust' in self.buffer:
-            wgust = self.buffer['windGust'].history_max(ts).value
+            wgust = self.buffer['windGust'].history_max(ts, age=600).value
         elif 'windSpeed' in self.buffer:
-            wgust = self.buffer['windSpeed'].history_max(ts).value
+            wgust = self.buffer['windSpeed'].history_max(ts, age=600).value
         else:
-            wgust = None
+            wgust = 0.0
+        # put into a ValueTuple so we can convert
         wgust_vt = ValueTuple(wgust,
                               self.packet_unit_dict['windSpeed']['units'],
                               self.packet_unit_dict['windSpeed']['group'])
-        wgust = convert(wgust_vt,
-                        self.packet_unit_dict['windSpeed']['units']).value
-        wgust = wgust if wgust is not None else 0.0
+        # convert to output units
+        wgust = convert(wgust_vt, self.wind_group).value
         data['wgust'] = self.wind_format % wgust
 
         # bearing - wind bearing (degrees)
@@ -2018,11 +2033,6 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # avgbearing - 10-minute average wind bearing (degrees)
         data['avgbearing'] = self.dir_format % avg_bearing_10
-
-
-        # TODO. Remove before release
-#        a = self.buffer['wind'].history_vec_avg
-#        log.info("a=%s" % (a,))
 
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
@@ -2053,30 +2063,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         # store the formatted results
         data['BearingRangeFrom10'] = self.dir_format % bearing_range_from_10
         data['BearingRangeTo10'] = self.dir_format % bearing_range_to_10
-
-        # FIXME.
-        # # windrun - wind run (today)
-        # last_ts = self.db_manager.lastGoodStamp()
-        # try:
-        #     wind_sum_vt = ValueTuple(self.buffer['wind'].sum,
-        #                              self.packet_unit_dict['windSpeed']['units'],
-        #                              self.packet_unit_dict['windSpeed']['group'])
-        #     windrun_day_average = (last_ts - startOfDay(ts))/3600.0 * convert(wind_sum_vt,
-        #                                                                       self.wind_group).value/self.buffer['wind'].count
-        # except (ValueError, TypeError, ZeroDivisionError):
-        #     windrun_day_average = 0.0
-        # if self.windrun_loop:   # is loop/realtime estimate
-        #     loop_hours = (ts - last_ts)/3600.0
-        #     try:
-        #         windrun = windrun_day_average + loop_hours * convert((self.buffer.windsum,
-        #                                                               self.packet_unit_dict['windSpeed']['units'],
-        #                                                               self.packet_unit_dict['windSpeed']['group']),
-        #                                                              self.wind_group).value/self.buffer.windcount
-        #     except (ValueError, TypeError):
-        #         windrun = windrun_day_average
-        # else:
-        #     windrun = windrun_day_average
-        # data['windrun'] = self.dist_format % windrun
 
         # forecast - forecast text
         _text = self.scroller_text if self.scroller_text is not None else ''
@@ -2169,7 +2155,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             try:
                 _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive WHERE rain > 0 AND dateTime > ? AND dateTime <= ?", (last_rain_tspan))
                 last_rain_ts = _row[0]
-            except:
+            except (IndexError, TypeError):
                 last_rain_ts = None
         return last_rain_ts
 
@@ -2243,7 +2229,7 @@ class ObsBuffer(object):
 
         # calc ts of oldest sample we want to retain
         oldest_ts = ts - MAX_AGE
-        # set history_full
+        # set history_full property
         self.history_full = min([a.ts for a in self.history if a.ts is not None]) <= oldest_ts
         # remove any values older than oldest_ts
         self.history = [s for s in self.history if s.ts > oldest_ts]
@@ -2272,7 +2258,6 @@ class ObsBuffer(object):
         else:
             return None
 
-    # def history_avg(self, ts, age=MAX_AGE):
     def history_avg(self, ts, age=MAX_AGE):
         """Return the average value in my history.
 
@@ -2289,14 +2274,10 @@ class ObsBuffer(object):
             it occurred.
         """
 
-        # born = ts - age
-        # snapshot = [a.value[0] for a in self.history if a.ts >= born]
-        # if len(snapshot) > 0:
-        #     return float(sum(snapshot)/len(snapshot))
-        # else:
-        #     return None
-        if len(self.history) > 0:
-            return float(sum(self.history)/len(self.history))
+        born = ts - age
+        snapshot = [a.value for a in self.history if a.ts >= born]
+        if len(snapshot) > 0:
+            return float(sum(snapshot)/len(snapshot))
         else:
             return None
 
@@ -2309,7 +2290,7 @@ class ObsBuffer(object):
 class VectorBuffer(ObsBuffer):
     """Class to buffer vector obs."""
 
-    default_init = (None, None, None, None, None)
+    default_init = (None, None, None, None, None, 0.0, 0.0, 0.0, 0.0, 0)
 
     def __init__(self, stats, units=None, history=False):
         # initialize my superclass
@@ -2325,13 +2306,13 @@ class VectorBuffer(ObsBuffer):
             self.xsum = stats.xsum
             self.ysum = stats.ysum
             self.sumtime = stats.sumtime
+            self.count = stats.count
         else:
             (self.min, self.mintime,
-             self.max, self.max_dir, self.maxtime) = VectorBuffer.default_init
-            self.sum = 0.0
-            self.xsum = 0.0
-            self.ysum = 0.0
-            self.sumtime = 0.0
+             self.max, self.max_dir,
+             self.maxtime, self.sum,
+             self.xsum, self.ysum,
+             self.sumtime, self.count) = VectorBuffer.default_init
 
     def add_value(self, val, ts, hilo=True):
         """Add a value to my hilo and history stats as required."""
@@ -2354,6 +2335,7 @@ class VectorBuffer(ObsBuffer):
             if self.lasttime is None or ts >= self.lasttime:
                 self.last = val
                 self.lasttime = ts
+            self.count += 1
             if self.use_history and val.dir is not None:
                 self.history.append(ObsTuple(val, ts))
                 self.trim_history(ts)
@@ -2362,17 +2344,19 @@ class VectorBuffer(ObsBuffer):
         """Reset the vector obs buffer."""
 
         (self.min, self.mintime,
-         self.max, self.max_dir, self.maxtime) = VectorBuffer.default_init
-        try:
-            self.sum = 0.0
-        except AttributeError:
-            pass
+         self.max, self.max_dir,
+         self.maxtime, self.sum,
+         self.xsum, self.ysum,
+         self.sumtime, self.count) = VectorBuffer.default_init
 
     @property
     def day_vec_avg(self):
         """The day average vector."""
 
-        _magnitude = math.sqrt((self.xsum**2 + self.ysum**2) / self.sumtime**2)
+        try:
+            _magnitude = math.sqrt((self.xsum**2 + self.ysum**2) / self.sumtime**2)
+        except ZeroDivisionError:
+            return VectorTuple(0.0, 0.0)
         _direction = 90.0 - math.degrees(math.atan2(self.ysum, self.xsum))
         _direction = _direction if _direction >= 0.0 else _direction + 360.0
         return VectorTuple(_magnitude, _direction)
@@ -2385,34 +2369,19 @@ class VectorBuffer(ObsBuffer):
         retention period (nominally 10 minutes).
         """
 
+        # TODO. Check the maths here, time ?
         result = VectorTuple(None, None)
         if self.use_history and len(self.history) > 0:
             xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
                    ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
-            xsum = sum(x for x,y in xy)
-            ysum = sum(y for x,y in xy)
+            xsum = sum(x for x, y in xy)
+            ysum = sum(y for x, y in xy)
             oldest_ts = min(ob.ts for ob in self.history)
             _magnitude = math.sqrt((xsum**2 + ysum**2) / (time.time() - oldest_ts)**2)
             _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
             _direction = _direction if _direction >= 0.0 else _direction + 360.0
             result = VectorTuple(_magnitude, _direction)
         return result
-
-#            [obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history]
-#            xsum = sum([obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history])
-#            ysum = sum([obs.value.mag * math.sin(math.radians(90.0 - obs.value.dir)) for obs in self.history])
-#            tsum =
-#            return math.sqrt((xsum**2 + ysum**2) / self.sumtime**2)
-#        else:
-#            return None
-
-    #            [obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history]
-    #            xsum = sum([obs.value.mag * math.cos(math.radians(90.0 - obs.value.dir)) for obs in self.history])
-    #            ysum = sum([obs.value.mag * math.sin(math.radians(90.0 - obs.value.dir)) for obs in self.history])
-    #            tsum =
-    #            return math.sqrt((xsum**2 + ysum**2) / self.sumtime**2)
-    #        else:
-    #            return None
 
     @property
     def history_vec_dir(self):
@@ -2426,8 +2395,8 @@ class VectorBuffer(ObsBuffer):
         if self.use_history and len(self.history) > 0:
             xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
                    ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
-            xsum = sum(x for x,y in xy)
-            ysum = sum(y for x,y in xy)
+            xsum = sum(x for x, y in xy)
+            ysum = sum(y for x, y in xy)
             _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
             result = _direction if _direction >= 0.0 else _direction + 360.0
         return result
@@ -2440,7 +2409,7 @@ class VectorBuffer(ObsBuffer):
 class ScalarBuffer(ObsBuffer):
     """Class to buffer scalar obs."""
 
-    default_init = (None, None, None, None, 0.0)
+    default_init = (None, None, None, None, 0.0, 0)
 
     def __init__(self, stats, units=None, history=False):
         # initialize my superclass
@@ -2452,9 +2421,11 @@ class ScalarBuffer(ObsBuffer):
             self.max = stats.max
             self.maxtime = stats.maxtime
             self.sum = stats.sum
+            self.count = stats.count
         else:
             (self.min, self.mintime,
-             self.max, self.maxtime, self.sum) = ScalarBuffer.default_init
+             self.max, self.maxtime,
+             self.sum, self.count) = ScalarBuffer.default_init
 
     def add_value(self, val, ts, hilo=True):
         """Add a value to my stats as required."""
@@ -2471,6 +2442,7 @@ class ScalarBuffer(ObsBuffer):
             if self.lasttime is None or ts >= self.lasttime:
                 self.last = val
                 self.lasttime = ts
+            self.count += 1
             if self.use_history:
                 self.history.append(ObsTuple(val, ts))
                 self.trim_history(ts)
@@ -2478,13 +2450,9 @@ class ScalarBuffer(ObsBuffer):
     def day_reset(self):
         """Reset the scalar obs buffer."""
 
-        # TODO. Does setting self.sum = 0.0 cause a problem as it wasn't included before?
         (self.min, self.mintime,
-         self.max, self.maxtime, self.sum) = ScalarBuffer.default_init
-        try:
-            self.sum = 0.0
-        except AttributeError:
-            pass
+         self.max, self.maxtime,
+         self.sum, self.count) = ScalarBuffer.default_init
 
 
 # ============================================================================
@@ -2518,9 +2486,9 @@ class Buffer(dict):
                     seed_func = seed_functions.get(obs, Buffer.seed_scalar)
                     seed_func(self, additional_day_stats, obs,
                               history=obs in HIST_MANIFEST)
-        self.primary_unit_system = day_stats.unit_system
+        # timestamp of the last packet containign windSpeed, used for windrun
+        # calcs
         self.last_windSpeed_ts = None
-        self.windrun = self.seed_windrun(day_stats)
 
     def seed_scalar(self, stats, obs_type, history):
         """Seed a scalar buffer."""
@@ -2536,37 +2504,9 @@ class Buffer(dict):
                                                                units=stats.unit_system,
                                                                history=history)
 
-    @staticmethod
-    def seed_windrun(day_stats):
-        """Seed day windrun."""
-
-        if 'windSpeed' in day_stats:
-            # The wsum field hold the sum of (windSpeed * interval in seconds)
-            # for today so we can calculate windrun from wsum - just need to
-            # do a little unit conversion and scaling
-
-            # The day_stats units may be different to our buffer unit system so
-            # first convert the wsum value to a km_per_hour based value (the
-            # wsum 'units' are a distance but we can use the group_speed
-            # conversion to convert to a km_per_hour based value)
-            # first get the day_stats windSpeed unit and unit group
-            (unit, group) = weewx.units.getStandardUnitType(day_stats.unit_system,
-                                                            'windSpeed')
-            # now express wsum as a 'group_speed' ValueTuple
-            _wr_vt = ValueTuple(day_stats['windSpeed'].wsum, unit, group)
-            # convert it to a 'km_per_hour' based value
-            _wr_km = convert(_wr_vt, 'km_per_hour').value
-            # but _wr_km was based on wsum which was based on seconds not hours
-            # so we need to divide by 3600 to get our real windrun in km
-            windrun = _wr_km/3600.0
-        else:
-            windrun = 0.0
-        return windrun
-
     def add_packet(self, packet):
         """Add a packet to the buffer."""
 
-#        packet = weewx.units.to_std_system(packet, self.primary_unit_system)
         if packet['dateTime'] is not None:
             for obs in [f for f in packet if f in self.manifest]:
                 add_func = add_functions.get(obs, Buffer.add_value)
@@ -2591,28 +2531,36 @@ class Buffer(dict):
     def add_wind_value(self, packet, obs):
         """Add a wind value to the buffer."""
 
-        # first add it as 'windSpeed' the scalar
+        # first add it as a scalar
         self.add_value(packet, obs)
 
-        # update today's windrun
-        if 'windSpeed' in packet:
-            try:
-                self.windrun += packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts)/1000.0
-            except TypeError:
-                pass
+        # if there is no windrun in the packet and if obs is windSpeed then we
+        # can use windSpeed to update windrun
+        if 'windrun' not in packet and obs == 'windSpeed':
+            # has windrun been seen before, if not add it to the Buffer
+            if 'windrun' not in self:
+                self['windrun'] = init_dict.get(obs, ScalarBuffer)(stats=None,
+                                                                   units=packet['usUnits'],
+                                                                   history=obs in HIST_MANIFEST)
+            # to calculate windrun we need a speed over a period of time, are
+            # we able to calculate the length of the time period?
+            if self.last_windSpeed_ts is not None:
+                windrun = self.calc_windrun(packet)
+                self['windrun'].add_value(windrun, packet['dateTime'])
             self.last_windSpeed_ts = packet['dateTime']
 
         # now add it as the special vector 'wind'
-        if 'wind' not in self:
-            self['wind'] = VectorBuffer(stats=None, units=packet['usUnits'])
-        if self['wind'].units == packet['usUnits']:
-            _value = packet['windSpeed']
-        else:
-            (unit, group) = getStandardUnitType(packet['usUnits'], 'windSpeed')
-            _vt = ValueTuple(packet['windSpeed'], unit, group)
-            _value = weewx.units.convertStd(_vt, self['wind'].units).value
-        self['wind'].add_value(VectorTuple(_value, packet.get('windDir')),
-                               packet['dateTime'])
+        if obs == 'windSpeed':
+            if 'wind' not in self:
+                self['wind'] = VectorBuffer(stats=None, units=packet['usUnits'])
+            if self['wind'].units == packet['usUnits']:
+                _value = packet['windSpeed']
+            else:
+                (unit, group) = getStandardUnitType(packet['usUnits'], 'windSpeed')
+                _vt = ValueTuple(packet['windSpeed'], unit, group)
+                _value = weewx.units.convertStd(_vt, self['wind'].units).value
+            self['wind'].add_value(VectorTuple(_value, packet.get('windDir')),
+                                   packet['dateTime'])
 
     def start_of_day_reset(self):
         """Reset our buffer stats at the end of an archive period.
@@ -2624,10 +2572,30 @@ class Buffer(dict):
         for obs in self.manifest:
             self[obs].day_reset()
 
+    def calc_windrun(self, packet):
+        """Calculate windrun given windSpeed."""
+
+
+        val = None
+        if packet['usUnits'] == weewx.US:
+            val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0
+            unit = 'mile'
+        elif packet['usUnits'] == weewx.METRIC:
+            val = data['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0
+            unit = 'km'
+        elif packet['usUnits'] == weewx.METRICWX:
+            val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts)
+            unit = 'meter'
+        if self['windrun'].units == packet['usUnits']:
+            return val
+        else:
+            _vt = ValueTuple(windrun, unit, 'group_distance')
+            return weewx.units.convertStd(_vt, self['windrun'].units).value
 
 # ============================================================================
 #                            Configuration dictionaries
 # ============================================================================
+
 
 init_dict = ListOfDicts({'wind': VectorBuffer})
 add_functions = ListOfDicts({'windSpeed': Buffer.add_wind_value})
