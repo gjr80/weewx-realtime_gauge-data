@@ -1372,7 +1372,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             now = datetime.datetime.now()
             age = now - packetTime
             if age.total_seconds() > self.rsync_skip_if_older_than:
-                loginf("rsync_data",
+                log.info("rsync_data",
                     "skipping packet (%s) with age: %d" % (packetTime, age.total_seconds()))
                 return
         rsync_upload = weeutil.rsyncupload.RsyncUpload(
