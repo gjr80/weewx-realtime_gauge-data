@@ -335,18 +335,6 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # legitimate sensor lost contact state. Optional, default is False.
     ignore_lost_contact = False
 
-    # Parameters used in/required by rtgd calculations
-    [[Calculate]]
-        # Atmospheric transmission coefficient [0.7-0.91]. Optional, default
-        # is 0.8
-        atc = 0.8
-        # Atmospheric turbidity (2=clear, 4-5=smoggy). Optional, default is 2.
-        nfac = 2
-        [[[Algorithm]]]
-            # Theoretical max solar radiation algorithm to use, must be RS or
-            # Bras. optional, default is RS
-            maxSolarRad = RS
-
     [[StringFormats]]
         # String formats. Optional.
         degree_C = %.1f
@@ -577,16 +565,6 @@ To do:
       WeeWX supported stations. Current code assume that contact is there
       unless told otherwise.
     - consolidate wind lists into a single list.
-    - add windTM to loop packet (a la appTemp in wd.py). windTM is
-      calculated as the greater of either (1) max windAv value for the day to
-      date (from stats db)or (2) calcFiveMinuteAverageWind which calculates
-      average wind speed over the 5 minutes preceding the latest loop packet.
-      Should calcFiveMinuteAverageWind produce a max average wind speed then
-      this may not be reflected in the stats database as the average wind max
-      recorded in stats db is based on archive records only. This is because
-      windAv is in an archive record but not in a loop packet. This can be
-      remedied by adding the calculated average to the loop packet. WeeWX
-      normal archive processing will then take care of updating stats db.
 
 Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
     - wind direction is from 1 to 360, 0 is treated as calm ie no wind
@@ -626,7 +604,7 @@ import weewx.wxformulas
 
 from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts, as_value_tuple, _getUnitGroup
-from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with_none
+from weeutil.weeutil import to_bool, to_int
 
 # get a logger object
 log = logging.getLogger(__name__)
@@ -1003,7 +981,7 @@ DEFAULT_FIELD_MAP = {'temp': {
                          'source': 'cloudbase',
                          'format': '%.1f'
                      }
-}
+                     }
 
 # ============================================================================
 #                     Exceptions that could get thrown
@@ -1222,6 +1200,188 @@ class RealtimeGaugeData(StdService):
         else:
             return None
 
+
+# ============================================================================
+#                            class HttpPostExport
+# ============================================================================
+
+
+class HttpPostExport(object):
+    """Class to handle HTTP posting of gauge-data.txt.
+
+    Once initialised data is posted by calling the objects export method and
+    passing the data to be posted.
+    """
+
+    def __init__(self, rtgd_config_dict, *_):
+
+        # first find our config
+        if 'HttpPost' in rtgd_config_dict:
+            post_config_dict = rtgd_config_dict.get('HttpPost', {})
+        else:
+            post_config_dict = rtgd_config_dict
+        # get the remote server URL if it exists, if it doesn't set it to None
+        self.remote_server_url = post_config_dict.get('remote_server_url', None)
+        # timeout to be used for remote URL posts
+        self.timeout = to_int(post_config_dict.get('timeout', 2))
+        # response text from remote URL if post was successful
+        self.response = post_config_dict.get('response_text', None)
+
+    def export(self, data):
+        """Post the data."""
+
+        self.post_data(data)
+
+    def post_data(self, data):
+        """Post data to a remote URL via HTTP POST.
+
+        This code is modelled on the WeeWX restFUL API, but rather then
+        retrying a failed post the failure is logged and then ignored. If
+        remote posts are not working then the user should set debug=1 and
+        restart WeeWX to see what the log says.
+
+        The data to be posted is sent as a JSON string.
+
+        Inputs:
+            data: dict to sent as JSON string
+        """
+
+        # get a Request object
+        req = urllib.request.Request(self.remote_server_url)
+        # set our content type to json
+        req.add_header('Content-Type', 'application/json')
+        # POST the data but wrap in a try..except so we can trap any errors
+        try:
+            response = self.post_request(req, json.dumps(data,
+                                                         separators=(',', ':'),
+                                                         sort_keys=True))
+            if 200 <= response.code <= 299:
+                # No exception thrown and we got a good response code, but did
+                # we get self.response back in a return message? Check for
+                # self.response, if its there then we can return. If it's
+                # not there then log it and return.
+                if self.response is not None:
+                    if self.response in response:
+                        # did get 'success' so log it and continue
+                        if weewx.debug == 2:
+                            log.debug("Successfully posted data")
+                    else:
+                        # it's possible the POST was successful if a response
+                        # code of 200 was received if under python3, check
+                        # response code and give it the benefit of the doubt
+                        # but log it anyway
+                        if response.code == 200:
+                            log.debug("Data may have been posted successfully. "
+                                      "Response message was not received but a valid response code was received.")
+                        else:
+                            log.debug("Failed to post data: Unexpected response")
+                return
+            # we received a bad response code, log it and continue
+            log.debug("Failed to post data: Code %s" % response.code())
+        except (urllib.error.URLError, socket.error,
+                http_client.BadStatusLine, http_client.IncompleteRead) as e:
+            # an exception was thrown, log it and continue
+            log.debug("Failed to post data: %s" % e)
+
+    def post_request(self, request, payload):
+        """Post a Request object.
+
+        Inputs:
+            request: urllib2 Request object
+            payload: the data to sent
+
+        Returns:
+            The urllib2.urlopen() response
+        """
+
+        # Under python 3 POST data should be bytes or an iterable of bytes and
+        # not of type str. So attempt to convert the POST data to bytes, if it
+        # already is of type bytes an error will be thrown under python 3, be
+        # prepared to catch this error.
+        try:
+            payload_b = payload.encode('utf-8')
+        except TypeError:
+            payload_b = payload
+
+        # Do the POST. Python 2.5 and earlier do not have a "timeout" parameter
+        # so we used to be prepared to catch the TypeError, but we no longer
+        # support python 2.5 so we can omit the exception.
+        _response = urllib.request.urlopen(request,
+                                           data=payload_b,
+                                           timeout=self.timeout)
+        return _response
+
+
+# ============================================================================
+#                            class RsyncExport
+# ============================================================================
+
+
+class RsyncExport(object):
+    """Class to handle rsync of gauge-data.txt.
+
+    Once initialised data is rsynced by calling the objects export method and
+    passing the data to be rsynced.
+    """
+
+    def __init__(self, rtgd_config_dict, rtgd_path_file):
+
+        # first find our config
+        if 'Rsync' in rtgd_config_dict:
+            rsync_config_dict = rtgd_config_dict.get('Rsync', {})
+        else:
+            rsync_config_dict = rtgd_config_dict
+        self.rtgd_path_file = rtgd_path_file
+        self.rsync_server = rsync_config_dict.get('rsync_server')
+        self.rsync_port = rsync_config_dict.get('rsync_port')
+        self.rsync_user = rsync_config_dict.get('rsync_user')
+        self.rsync_ssh_options = rsync_config_dict.get('rsync_ssh_options',
+                                                       '-o ConnectTimeout=1')
+        self.rsync_remote_rtgd_dir = rsync_config_dict.get('rsync_remote_rtgd_dir')
+        self.rsync_dest_path_file = os.path.join(self.rsync_remote_rtgd_dir,
+                                                 rsync_config_dict.get('rtgd_file_name',
+                                                                       'gauge-data.txt'))
+        self.rsync_compress = to_bool(rsync_config_dict.get('rsync_compress',
+                                                            False))
+        self.rsync_log_success = to_bool(rsync_config_dict.get('rsync_log_success',
+                                                               False))
+        self.rsync_timeout = rsync_config_dict.get('rsync_timeout')
+        self.rsync_skip_if_older_than = to_int(rsync_config_dict.get('rsync_skip_if_older_than',
+                                                                     4))
+
+    def export(self, data):
+        """Rsync the data."""
+
+        packet_time = datetime.datetime.fromtimestamp(data['dateTime'])
+        self.rsync_data(packet_time)
+
+    def rsync_data(self, packet_time):
+        """Perform the actual rsync."""
+
+        # don't upload if more than rsync_skip_if_older_than seconds behind.
+        if self.rsync_skip_if_older_than != 0:
+            now = datetime.datetime.now()
+            age = now - packet_time
+            if age.total_seconds() > self.rsync_skip_if_older_than:
+                log.info("skipping packet (%s) with age: %d" % (packet_time, age.total_seconds()))
+                return
+        rsync_upload = weeutil.rsyncupload.RsyncUpload(local_root=self.rtgd_path_file,
+                                                       remote_root=self.rsync_dest_path_file,
+                                                       server=self.rsync_server,
+                                                       user=self.rsync_user,
+                                                       port=self.rsync_port,
+                                                       ssh_options=self.rsync_ssh_options,
+                                                       compress=self.rsync_compress,
+                                                       delete=False,
+                                                       log_success=self.rsync_log_success,
+                                                       timeout=self.rsync_timeout)
+        try:
+            rsync_upload.run()
+        except IOError as e:
+            (cl, unused_ob, unused_tr) = sys.exc_info()
+            log.error("rtgd.rsync_data: Caught exception %s: %s" % (cl, e))
+
+
 # ============================================================================
 #                       class RealtimeGaugeDataThread
 # ============================================================================
@@ -1262,38 +1422,6 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                                 'gauge-data.txt'))
         self.rtgd_path_file_tmp = self.rtgd_path_file + '.tmp'
 
-        # get the remote server URL if it exists, if it doesn't set it to None
-        self.remote_server_url = rtgd_config_dict.get('remote_server_url', None)
-        # timeout to be used for remote URL posts
-        self.timeout = to_int(rtgd_config_dict.get('timeout', 2))
-        # response text from remote URL if post was successful
-        self.response = rtgd_config_dict.get('response_text', None)
-
-        # get server/user/remote_rtgd_path for rsync if they exist;
-        # else set to None.
-        # Consider rsync only if remote_server_url is None
-        # TODO. Quick fix to handle unknown AttributeError on self.rsync_server where self.remote_server_url is set. Needs revisiting.
-        self.rsync_server = None
-        if self.remote_server_url is None:
-            self.rsync_server = rtgd_config_dict.get('rsync_server', None)
-            if self.rsync_server is not None:
-                self.rsync_port = rtgd_config_dict.get('rsync_port')
-                self.rsync_user = rtgd_config_dict.get('rsync_user', None)
-                self.rsync_ssh_options = rtgd_config_dict.get(
-                    'rsync_ssh_options', '-o ConnectTimeout=1')
-                self.rsync_remote_rtgd_dir = rtgd_config_dict.get(
-                    'rsync_remote_rtgd_dir', None)
-                self.rsync_dest_path_file = os.path.join(self.rsync_remote_rtgd_dir,
-                                                         rtgd_config_dict.get('rtgd_file_name',
-                                                                              'gauge-data.txt'))
-                self.rsync_compress = to_bool(rtgd_config_dict.get(
-                    'rsync_compress', False))
-                self.rsync_log_success = to_bool(rtgd_config_dict.get(
-                    'rsync_log_success', False))
-                self.rsync_timeout = rtgd_config_dict.get('rsync_timeout', None)
-                self.rsync_skip_if_older_than = to_int(rtgd_config_dict.get(
-                    'rsync_skip_if_older_than', 4))
-
         # get windrose settings
         try:
             self.wr_period = int(rtgd_config_dict.get('windrose_period',
@@ -1304,26 +1432,6 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.wr_points = int(rtgd_config_dict.get('windrose_points', 16))
         except ValueError:
             self.wr_points = 16
-
-        # setup max solar rad calculations
-        # do we have any?
-        calc_dict = config_dict.get('Calculate', {})
-        # algorithm
-        algo_dict = calc_dict.get('Algorithm', {})
-        self.solar_algorithm = algo_dict.get('maxSolarRad', 'RS')
-        # atmospheric transmission coefficient [0.7-0.91]
-        self.atc = float(calc_dict.get('atc', 0.8))
-        # fail hard if out of range
-        if not 0.7 <= self.atc <= 0.91:
-            raise weewx.ViolatedPrecondition("Atmospheric transmission "
-                                             "coefficient (%f) out of "
-                                             "range [.7-.91]" % self.atc)
-        # atmospheric turbidity (2=clear, 4-5=smoggy)
-        self.nfac = float(calc_dict.get('nfac', 2))
-        # fail hard if out of range
-        if not 2 <= self.nfac <= 5:
-            raise weewx.ViolatedPrecondition("Atmospheric turbidity (%d) "
-                                             "out of range (2-5)" % self.nfac)
 
         # get our groups and format strings
         self.date_format = rtgd_config_dict.get('date_format',
@@ -1467,6 +1575,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.ytd_rain:
             self.year_rain = None
 
+        # obtain an object for exporting gauge-data.txt if required, if export
+        # not required property will be set to None
+        self.exporter = self.export_factory(rtgd_config_dict,
+                                            self.rtgd_path_file)
+
         # notify the user of a couple of things that we will do
         # frequency of generation
         if self.min_interval is None:
@@ -1483,6 +1596,27 @@ class RealtimeGaugeDataThread(threading.Thread):
         # lost contact
         if self.ignore_lost_contact:
             log.info("Sensor contact state will be ignored")
+
+    def export_factory(self, rtgd_config_dict, rtgd_path_file):
+        """Factory method to produce an object to export gauge-data.txt."""
+
+        exporter = None
+        # do we have a legacy remote_server_url setting or a HttpPost stanza
+        if 'HttpPost' in rtgd_config_dict or 'remote_server_url' in rtgd_config_dict:
+            exporter = 'httppost'
+        elif 'Rsync' in rtgd_config_dict:
+            exporter = 'rsync'
+        exporter_class = EXPORTERS.get(exporter) if exporter else None
+        if exporter_class is None:
+            # We have no exporter specified or otherwise lacking the necessary
+            # config. Log this and return None which will result in nothing
+            # being exported (only saving of gauge-data.txt locally).
+            log.info("gauge-data.txt will not be exported.")
+            exporter_object = None
+        else:
+            # get the exporter object
+            exporter_object = exporter_class(rtgd_config_dict, rtgd_path_file)
+        return exporter_object
 
     def run(self):
         """Collect packets from the rtgd queue and manage their processing.
@@ -1645,40 +1779,37 @@ class RealtimeGaugeDataThread(threading.Thread):
         # generate if we have no minimum interval setting or if minimum
         # interval seconds have elapsed since our last generation
         if self.min_interval is None or (self.last_write + float(self.min_interval)) < time.time():
-            # TODO. Could this try..except be reduced in scope
+            # get a cached packet
+            cached_packet = self.packet_cache.get_packet(_conv_packet['dateTime'],
+                                                         self.max_cache_age)
+            if weewx.debug == 2:
+                log.debug("created cached loop packet (%s)" % cached_packet['dateTime'])
+            elif weewx.debug >= 3:
+                log.debug("created cached loop packet: %s" % (cached_packet,))
+            # set our lost contact flag if applicable
+            self.lost_contact_flag = self.get_lost_contact(cached_packet, 'loop')
+            # get a data dict from which to construct our file
             try:
-                # get a cached packet
-                cached_packet = self.packet_cache.get_packet(_conv_packet['dateTime'],
-                                                             self.max_cache_age)
-                if weewx.debug == 2:
-                    log.debug("created cached loop packet (%s)" % cached_packet['dateTime'])
-                elif weewx.debug >= 3:
-                    log.debug("created cached loop packet: %s" % (cached_packet,))
-                # set our lost contact flag if applicable
-                self.lost_contact_flag = self.get_lost_contact(cached_packet, 'loop')
-                # get a data dict from which to construct our file
                 data = self.calculate(cached_packet)
-                # write to our file
-                self.write_data(data)
-                # set our write time
-                self.last_write = time.time()
-                # if required send the data to a remote URL via HTTP POST
-                if self.remote_server_url is not None:
-                    # post the data
-                    self.post_data(data)
-                # If an rsync_server is specified, rsync the data.
-                if self.rsync_server is not None:
-                    # rsync the data
-                    ts = cached_packet['dateTime']
-                    packet_time = datetime.datetime.fromtimestamp(ts)
-                    self.rsync_data(packet_time)
-                # log the generation
-                # FIXME. revert to log.debug2
-                # if weewx.debug == 2:
-                log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
-                                                                            (self.last_write - t1)))
             except Exception as e:
                 weeutil.logger.log_traceback(log.info, 'rtgdthread: **** ')
+            else:
+                # write to our file
+                try:
+                    self.write_data(data)
+                except Exception as e:
+                    weeutil.logger.log_traceback(log.info, 'rtgdthread: **** ')
+                else:
+                    # set our write time
+                    self.last_write = time.time()
+                    # export gauge-data.txt if we have an exporter object
+                    if self.exporter:
+                        self.exporter.export(data)
+                    # log the generation
+                    # TODO. revert to log.debug2
+                    # if weewx.debug == 2:
+                    log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
+                                                                                (self.last_write - t1)))
         else:
             # we skipped this packet so log it
             if weewx.debug == 2:
@@ -1694,110 +1825,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         if package is not None:
             for key, value in package.items():
                 setattr(self, key, value)
-
-    def rsync_data(self, packet_time):
-        # Don't upload if more than rsync_skip_if_older_than seconds behind.
-        if self.rsync_skip_if_older_than != 0:
-            now = datetime.datetime.now()
-            age = now - packet_time
-            if age.total_seconds() > self.rsync_skip_if_older_than:
-                log.info("skipping packet (%s) with age: %d" % (packet_time, age.total_seconds()))
-                return
-        rsync_upload = weeutil.rsyncupload.RsyncUpload(
-            local_root=self.rtgd_path_file,
-            remote_root=self.rsync_dest_path_file,
-            server=self.rsync_server,
-            user=self.rsync_user,
-            port=self.rsync_port,
-            ssh_options=self.rsync_ssh_options,
-            compress=self.rsync_compress,
-            delete=False,
-            log_success=self.rsync_log_success,
-            timeout=self.rsync_timeout)
-        try:
-            rsync_upload.run()
-        except IOError as e:
-            (cl, unused_ob, unused_tr) = sys.exc_info()
-            log.error("rtgd.rsync_data: Caught exception %s: %s" % (cl, e))
-
-    def post_data(self, data):
-        """Post data to a remote URL via HTTP POST.
-
-        This code is modelled on the WeeWX restFUL API, but rather then
-        retrying a failed post the failure is logged and then ignored. If
-        remote posts are not working then the user should set debug=1 and
-        restart WeeWX to see what the log says.
-
-        The data to be posted is sent as a JSON string.
-
-        Inputs:
-            data: dict to sent as JSON string
-        """
-
-        # get a Request object
-        req = urllib.request.Request(self.remote_server_url)
-        # set our content type to json
-        req.add_header('Content-Type', 'application/json')
-        # POST the data but wrap in a try..except so we can trap any errors
-        try:
-            response = self.post_request(req, json.dumps(data,
-                                                         separators=(',', ':'),
-                                                         sort_keys=True))
-            if 200 <= response.code <= 299:
-                # No exception thrown and we got a good response code, but did
-                # we get self.response back in a return message? Check for
-                # self.response, if its there then we can return. If it's
-                # not there then log it and return.
-                if self.response is not None:
-                    if self.response in response:
-                        # did get 'success' so log it and continue
-                        if weewx.debug == 2:
-                            log.debug("Successfully posted data")
-                    else:
-                        # it's possible the POST was successful if a response
-                        # code of 200 was received if under python3, check
-                        # response code and give it the benefit of the doubt
-                        # but log it anyway
-                        if response.code == 200:
-                            log.debug("Data may have been posted successfully. "
-                                      "Response message was not received but a valid response code was received.")
-                        else:
-                            log.debug("Failed to post data: Unexpected response")
-                return
-            # we received a bad response code, log it and continue
-            log.debug("Failed to post data: Code %s" % response.code())
-        except (urllib.error.URLError, socket.error,
-                http_client.BadStatusLine, http_client.IncompleteRead) as e:
-            # an exception was thrown, log it and continue
-            log.debug("Failed to post data: %s" % e)
-
-    def post_request(self, request, payload):
-        """Post a Request object.
-
-        Inputs:
-            request: urllib2 Request object
-            payload: the data to sent
-
-        Returns:
-            The urllib2.urlopen() response
-        """
-
-        # Under python 3 POST data should be bytes or an iterable of bytes and
-        # not of type str. So attempt to convert the POST data to bytes, if it
-        # already is of type bytes an error will be thrown under python 3, be
-        # prepared to catch this error.
-        try:
-            payload_b = payload.encode('utf-8')
-        except TypeError:
-            payload_b = payload
-
-        # Do the POST. Python 2.5 and earlier do not have a "timeout" parameter
-        # so we used to be prepared to catch the TypeError, but we no longer
-        # support python 2.5 so we can omit the exception.
-        _response = urllib.request.urlopen(request,
-                                           data=payload_b,
-                                           timeout=self.timeout)
-        return _response
 
     def write_data(self, data):
         """Write the gauge-data.txt file.
@@ -2153,7 +2180,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             # TimeSpan for the archive day containing that ts.
             last_rain_tspan = weeutil.weeutil.archiveDaySpan(last_rain_ts+1)
             try:
-                _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive WHERE rain > 0 AND dateTime > ? AND dateTime <= ?", (last_rain_tspan))
+                _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive WHERE rain > 0 AND dateTime > ? AND dateTime <= ?",
+                                              last_rain_tspan)
                 last_rain_ts = _row[0]
             except (IndexError, TypeError):
                 last_rain_ts = None
@@ -2574,7 +2602,6 @@ class Buffer(dict):
 
     def calc_windrun(self, packet):
         """Calculate windrun given windSpeed."""
-
 
         val = None
         if packet['usUnits'] == weewx.US:
@@ -4081,3 +4108,7 @@ SCROLLER_SOURCES = {'text': TextSource,
                     'weatherunderground': WUSource,
                     'darksky': DarkskySource,
                     'zambretti': ZambrettiSource}
+
+# available scroller text block classes
+EXPORTERS = {'httppost': HttpPostExport,
+             'rsync': RsyncExport}
