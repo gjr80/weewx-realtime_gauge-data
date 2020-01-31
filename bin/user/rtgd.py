@@ -1255,6 +1255,11 @@ class HttpPostExport(object):
             response = self.post_request(req, json.dumps(data,
                                                          separators=(',', ':'),
                                                          sort_keys=True))
+        except (urllib.error.URLError, socket.error,
+                http_client.BadStatusLine, http_client.IncompleteRead) as e:
+            # an exception was thrown, log it and continue
+            log.debug("Failed to post data: %s" % e)
+        else:
             if 200 <= response.code <= 299:
                 # No exception thrown and we got a good response code, but did
                 # we get self.response back in a return message? Check for
@@ -1278,10 +1283,6 @@ class HttpPostExport(object):
                 return
             # we received a bad response code, log it and continue
             log.debug("Failed to post data: Code %s" % response.code())
-        except (urllib.error.URLError, socket.error,
-                http_client.BadStatusLine, http_client.IncompleteRead) as e:
-            # an exception was thrown, log it and continue
-            log.debug("Failed to post data: %s" % e)
 
     def post_request(self, request, payload):
         """Post a Request object.
@@ -1302,10 +1303,7 @@ class HttpPostExport(object):
             payload_b = payload.encode('utf-8')
         except TypeError:
             payload_b = payload
-
-        # Do the POST. Python 2.5 and earlier do not have a "timeout" parameter
-        # so we used to be prepared to catch the TypeError, but we no longer
-        # support python 2.5 so we can omit the exception.
+        # do the POST
         _response = urllib.request.urlopen(request,
                                            data=payload_b,
                                            timeout=self.timeout)
@@ -1597,7 +1595,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         if self.ignore_lost_contact:
             log.info("Sensor contact state will be ignored")
 
-    def export_factory(self, rtgd_config_dict, rtgd_path_file):
+    @staticmethod
+    def export_factory(rtgd_config_dict, rtgd_path_file):
         """Factory method to produce an object to export gauge-data.txt."""
 
         exporter = None
@@ -1967,8 +1966,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # construct a dict to hold our results
         data = dict()
 
-        # obtain 10 minute average wind speed and direction
-        avg_speed_10 = self.buffer['windSpeed'].history_avg(ts=ts, age=600)
+        # obtain 10 minute average wind direction
         avg_bearing_10 = self.buffer['wind'].history_vec_avg.dir
 
         # First we populate all non-field map calculated fields and then
@@ -2021,13 +2019,13 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # wspeed - wind speed (average)
         # obtain the average wind speed from the buffer
-        wspeed = self.buffer['windSpeed'].history_avg(ts=ts, age=600)
+        _wspeed = self.buffer['windSpeed'].history_avg(ts=ts, age=600)
         # put into a ValueTuple so we can convert
-        wspeed_vt = ValueTuple(wspeed,
+        wspeed_vt = ValueTuple(_wspeed,
                                self.packet_unit_dict['windSpeed']['units'],
                                self.packet_unit_dict['windSpeed']['group'])
         # convert to output units
-        convert(wspeed_vt, self.wind_group).value
+        wspeed = convert(wspeed_vt, self.wind_group).value
         # handle None values
         wspeed = wspeed if wspeed is not None else 0.0
         data['wspeed'] = self.wind_format % wspeed
