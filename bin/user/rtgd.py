@@ -1499,6 +1499,9 @@ class RealtimeGaugeDataThread(threading.Thread):
             elif len(_default) == 2:
                 # we have a value and units so use that value in those units
                 _vt = ValueTuple(float(_default[0]), self.units_dict[_group], _default[1])
+            elif len(_default) == 3:
+                # we already have a ValueTuple so nothing to do
+                _vt = _default
             _field_map[field[0]]['default'] = _vt
         self.field_map = _field_map
 
@@ -1562,11 +1565,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
 
-        # are we providing month and/or year to date rain, default is no we are 
+        # are we providing month and/or year to date rain, default is no we are
         # not
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
-        # initialise some properties if we are providing month and/or year to 
+        # initialise some properties if we are providing month and/or year to
         # date rain
         if self.mtd_rain:
             self.month_rain = None
