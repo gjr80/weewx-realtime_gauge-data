@@ -2088,6 +2088,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # if we strike an error then return 0 for both results
                 bearing_range_from_10 = 0
                 bearing_range_to_10 = 0
+        else:
+            bearing_range_from_10 = 0
+            bearing_range_to_10 = 0
         # store the formatted results
         data['BearingRangeFrom10'] = self.dir_format % bearing_range_from_10
         data['BearingRangeTo10'] = self.dir_format % bearing_range_to_10
@@ -2609,7 +2612,7 @@ class Buffer(dict):
             val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0
             unit = 'mile'
         elif packet['usUnits'] == weewx.METRIC:
-            val = data['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0
+            val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0
             unit = 'km'
         elif packet['usUnits'] == weewx.METRICWX:
             val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts)
@@ -2617,7 +2620,7 @@ class Buffer(dict):
         if self['windrun'].units == packet['usUnits']:
             return val
         else:
-            _vt = ValueTuple(windrun, unit, 'group_distance')
+            _vt = ValueTuple(val, unit, 'group_distance')
             return weewx.units.convertStd(_vt, self['windrun'].units).value
 
 # ============================================================================
