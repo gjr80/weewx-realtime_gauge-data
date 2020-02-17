@@ -1808,10 +1808,10 @@ class RealtimeGaugeDataThread(threading.Thread):
                     if self.exporter:
                         self.exporter.export(data)
                     # log the generation
-                    # TODO. revert to log.debug2
+                    # TODO. Restore to debug == 2 before release
                     # if weewx.debug == 2:
-                    log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
-                                                                                (self.last_write - t1)))
+                    log.debug("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
+                                                                                 (self.last_write - t1)))
         else:
             # we skipped this packet so log it
             if weewx.debug == 2:
@@ -2060,7 +2060,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['bearing'] = self.dir_format % bearing
 
         # avgbearing - 10-minute average wind bearing (degrees)
-        data['avgbearing'] = self.dir_format % avg_bearing_10
+        data['avgbearing'] = self.dir_format % avg_bearing_10 if avg_bearing_10 is not None else self.dir_format % 0.0
 
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
