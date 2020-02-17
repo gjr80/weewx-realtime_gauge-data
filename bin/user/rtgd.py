@@ -1565,11 +1565,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
 
-        # are we providing month and/or year to date rain, default is no we are
+        # are we providing month and/or year to date rain, default is no we are 
         # not
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
-        # initialise some properties if we are providing month and/or year to
+        # initialise some properties if we are providing month and/or year to 
         # date rain
         if self.mtd_rain:
             self.month_rain = None
@@ -1703,7 +1703,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                                     self.forecast_text = _package['payload']
                     # now deal with the control queue
                     try:
-                        _package = self.control_queue.get_nowait()
+                        # block for one second waiting for package, if nothing
+                        # received throw queue.Empty
+                        _package = self.control_queue.get(True, 1.0)
                     except queue.Empty:
                         # nothing in the queue so continue
                         pass
@@ -1808,10 +1810,10 @@ class RealtimeGaugeDataThread(threading.Thread):
                     if self.exporter:
                         self.exporter.export(data)
                     # log the generation
-                    # TODO. Restore to debug == 2 before release
+                    # TODO. Restore to log.debug and debug == 2 before release
                     # if weewx.debug == 2:
-                    log.debug("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
-                                                                                 (self.last_write - t1)))
+                    log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
+                                                                                (self.last_write - t1)))
         else:
             # we skipped this packet so log it
             if weewx.debug == 2:
