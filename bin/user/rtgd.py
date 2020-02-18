@@ -1549,7 +1549,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.packet_cache = None
 
         self.buffer = None
-        self.forecast_text = None
         self.rose = None
         self.last_rain_ts = None
 
@@ -1700,7 +1699,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                     # we have forecast text so log and save it
                                     if weewx.debug >= 2:
                                         log.debug("received forecast text: %s" % _package['payload'])
-                                    self.forecast_text = _package['payload']
+                                    self.scroller_text = _package['payload']
                     # now deal with the control queue
                     try:
                         # block for one second waiting for package, if nothing
