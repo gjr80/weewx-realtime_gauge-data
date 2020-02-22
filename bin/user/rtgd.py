@@ -1999,6 +1999,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # cloudbaseunit - cloud base units - m, ft
         data['cloudbaseunit'] = UNITS_CLOUD[self.alt_group]
 
+        # TODO. pressL and pressH need to be refactored to use a field map
         # pressL - all time low barometer
         if self.min_barometer is not None:
             press_l_vt = ValueTuple(self.min_barometer,
