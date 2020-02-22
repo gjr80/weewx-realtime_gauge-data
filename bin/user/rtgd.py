@@ -1439,6 +1439,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                                                          'degree_C')
         self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
                                                          'hPa')
+        self.pres_format = rtgd_config_dict['StringFormats'].get(self.pres_group,
+                                                                 '%.1f')
         self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
                                                          'km_per_hour')
         # Since the SteelSeries Weather Gauges derives distance units from wind
@@ -1809,10 +1811,9 @@ class RealtimeGaugeDataThread(threading.Thread):
                     if self.exporter:
                         self.exporter.export(data)
                     # log the generation
-                    # TODO. Restore to log.debug and debug == 2 before release
-                    # if weewx.debug == 2:
-                    log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
-                                                                                (self.last_write - t1)))
+                    if weewx.debug == 2:
+                        log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
+                                                                                    (self.last_write - t1)))
         else:
             # we skipped this packet so log it
             if weewx.debug == 2:
@@ -1997,6 +1998,25 @@ class RealtimeGaugeDataThread(threading.Thread):
         data['rainunit'] = UNITS_RAIN[self.rain_group]
         # cloudbaseunit - cloud base units - m, ft
         data['cloudbaseunit'] = UNITS_CLOUD[self.alt_group]
+
+        # pressL - all time low barometer
+        if self.min_barometer is not None:
+            press_l_vt = ValueTuple(self.min_barometer,
+                                    self.packet_unit_dict['barometer']['units'],
+                                    self.packet_unit_dict['barometer']['group'])
+        else:
+            press_l_vt = ValueTuple(850, 'hPa', self.packet_unit_dict['barometer']['group'])
+        press_l = convert(press_l_vt, self.pres_group).value
+        data['pressL'] = self.pres_format % press_l
+        # pressH - all time high barometer
+        if self.max_barometer is not None:
+            press_h_vt = ValueTuple(self.max_barometer,
+                                    self.packet_unit_dict['barometer']['units'],
+                                    self.packet_unit_dict['barometer']['group'])
+        else:
+            press_h_vt = ValueTuple(1100, 'hPa', self.packet_unit_dict['barometer']['group'])
+        press_h = convert(press_h_vt, self.pres_group).value
+        data['pressH'] = self.pres_format % press_h
 
         # domwinddir - Today's dominant wind direction as compass point
         dom_dir = self.buffer['wind'].day_vec_avg.dir
