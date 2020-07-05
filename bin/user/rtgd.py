@@ -17,12 +17,14 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-Version: 0.?.?                                        Date: 13 January 2020
+Version: 0.5.0                                        Date: 5 July 2020
 
   Revision History
-    13 January 2020     v0.?.?
+    5 July 2020         v0.5.0
         - added ability to rsync gauge-data.txt to an rsync capable server,
           thanks to John Kline
+        - fixed bug that caused rtgd to abort if the first loop packet did not
+          contain inTemp
     23 November 2019    v0.4.2
         - fix error in some expressions including > and < where operands could
           be None
@@ -621,7 +623,7 @@ from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.4.2'
+RTGD_VERSION = '0.5.0'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 

@@ -1,6 +1,8 @@
-v0.?.?
+v0.5.0
 - added ability to rsync gauge-data.txt to an rsync capable server, thanks to
   John Kline
+- fixed bug that caused rtgd to abort if the first loop packet did not contain
+  inTemp
 v0.4.2
 - fix error in some expressions that include > and < where operands could be
   None

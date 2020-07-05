@@ -10,11 +10,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.?.?                                        Date: 13 January 2020
+Version: 0.5.0                                        Date: 5 July 2020
 
 Revision History
 
-    13 January 2020     v0.?.?
+    13 January 2020     v0.5.0
         - bumped version only
     23 November 2019    v0.4.2
         - bumped version only
@@ -81,7 +81,7 @@ from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 REQUIRED_VERSION = "4.0.0b1"
-RTGD_VERSION = "0.4.0"
+RTGD_VERSION = "0.5.0"
 
 
 def loader():
