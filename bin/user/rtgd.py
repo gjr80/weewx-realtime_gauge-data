@@ -1631,17 +1631,16 @@ class RealtimeGaugeDataThread(threading.Thread):
         intemp_th = intemp_th if intemp_th is not None else intemp
         data['intempTH'] = self.temp_format % intemp_th
         # TintempTL - time of today's low inside temp (hh:mm)
-        tintemp_tl = time.localtime(self.day_stats['inTemp'].mintime) if intemp_l_loop >= intemp_tl else \
-            time.localtime(self.buffer.intempL_loop[1])
+        if intemp_l_loop is not None and intemp_tl is not None and intemp_l_loop >= intemp_tl:
+            tintemp_tl = time.localtime(self.day_stats['inTemp'].mintime)
+        else:
+            tintemp_tl = time.localtime(self.buffer.intempL_loop[1])
         data['TintempTL'] = time.strftime(self.time_format, tintemp_tl)
         # TintempTH - time of today's high inside temp (hh:mm)
         if intemp_h_loop is not None and intemp_th is not None and intemp_h_loop <= intemp_th:
             tintemp_th = time.localtime(self.day_stats['inTemp'].maxtime)
         else:
             tintemp_th = time.localtime(self.buffer.intempH_loop[1])
-        # TODO. Remove following two lines
-        # tintemp_th = time.localtime(self.day_stats['inTemp'].maxtime) if intemp_h_loop <= intemp_th else \
-        #     time.localtime(self.buffer.intempH_loop[1])
         data['TintempTH'] = time.strftime(self.time_format, tintemp_th)
         # hum - relative humidity
         hum = packet_d['outHumidity'] if packet_d['outHumidity'] is not None else 0.0
