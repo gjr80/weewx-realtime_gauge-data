@@ -2756,7 +2756,7 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
             # we know now is not None but what of then?
             if then_vt is not None:
                 return now - then
-            else
+            else:
                 return None
 
 
