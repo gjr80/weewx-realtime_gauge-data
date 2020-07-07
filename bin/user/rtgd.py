@@ -2753,7 +2753,11 @@ def calc_trend(obs_type, now_vt, group, db_manager, then_ts, grace=0):
             then_vt = weewx.units.as_value_tuple(then_record, obs_type)
             now = convert(now_vt, group).value
             then = convert(then_vt, group).value
-            return now - then
+            # we know now is not None but what of then?
+            if then_vt is not None:
+                return now - then
+            else
+                return None
 
 
 def calc_windrose(now, db_manager, period, points):
