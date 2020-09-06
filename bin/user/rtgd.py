@@ -235,6 +235,9 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     #
     #
     # Fill out the following fields:
+    #   rsync_enable             : Set to true to enable rsync.  Default is True, but
+    #                              rsync won't be attempted if rsync_server is not
+    #                              also specified.
     #   rsync_server             : The server to which gauge-data.txt will be copied.
     #   rsync_user               : The userid on rsync_server with write
     #                              permission to rsync_remote_rtgd_dir.
@@ -597,11 +600,11 @@ import math
 import os
 import os.path
 import socket
+import sys
 import threading
 import time
 
 # Python 2/3 compatibility shims
-import six
 from six.moves import http_client
 from six.moves import queue
 from six.moves import urllib
@@ -615,7 +618,7 @@ import weewx.wxformulas
 from weewx.engine import StdService
 from weewx.units import ValueTuple, convert, getStandardUnitType
 import weeutil.rsyncupload
-from weeutil.weeutil import to_bool, to_int, startOfDay, max_with_none, min_with_none
+from weeutil.weeutil import to_bool, to_int, startOfDay
 
 # get a logger object
 log = logging.getLogger(__name__)
@@ -889,7 +892,6 @@ class RealtimeGaugeData(StdService):
     def get_rain(self, tspan):
         """Calculate rainfall over a given timespan."""
 
-        _result = {}
         _rain_vt = self.db_manager.getAggregate(tspan, 'rain', 'sum')
         if _rain_vt:
             return _rain_vt
@@ -946,11 +948,16 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get server/user/remote_rtgd_path for rsync if they exist;
         # else set to None.
         # Consider rsync only if remote_server_url is None
-        # TODO. Quick fix to handle unknown AttributeError on self.rsync_server where self.remote_server_url is set. Needs revisiting.
-        self.rsync_server = None
+        self.rsync_enable = False
         if self.remote_server_url is None:
+            # rsync_enable defaults to True because introducing this
+            # new flag and defaulting it to False would be a breaking change.
+            self.rsync_enable = to_bool(rtgd_config_dict.get(
+                'rsync_enable', True))
             self.rsync_server = rtgd_config_dict.get('rsync_server', None)
-            if self.rsync_server is not None:
+            if self.rsync_server is None:
+                self.rsync_enable = False
+            if self.rsync_enable:
                 self.rsync_port = rtgd_config_dict.get('rsync_port')
                 self.rsync_user = rtgd_config_dict.get('rsync_user', None)
                 self.rsync_ssh_options = rtgd_config_dict.get(
@@ -966,6 +973,11 @@ class RealtimeGaugeDataThread(threading.Thread):
                 self.rsync_timeout = rtgd_config_dict.get('rsync_timeout', None)
                 self.rsync_skip_if_older_than = to_int(rtgd_config_dict.get(
                     'rsync_skip_if_older_than', 4))
+
+        if self.rsync_enable:
+            log.info('Will rsync to %s:%s/%s' % (self.rsync_server, self.rsync_remote_rtgd_dir, self.rsync_dest_path_file))
+        else:
+            log.info('Rsync not enabled.')
 
         # get windrose settings
         try:
@@ -1338,8 +1350,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                 if self.remote_server_url is not None:
                     # post the data
                     self.post_data(data)
-                # If an rsync_server is specified, rsync the data.
-                if self.rsync_server is not None:
+                # If rsync_enable, rsync the data.
+                if self.rsync_enable:
                     # rsync the data
                     ts = cached_packet['dateTime']
                     packetTime = datetime.datetime.fromtimestamp(ts)
@@ -1348,7 +1360,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                 if weewx.debug == 2:
                     log.debug("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
                                                                            (self.last_write-t1)))
-            except Exception as e:
+            except Exception:
                 weeutil.logger.log_traceback(log.info, 'rtgdthread: **** ')
         else:
             # we skipped this packet so log it
