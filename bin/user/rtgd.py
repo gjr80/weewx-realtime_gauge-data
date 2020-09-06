@@ -975,7 +975,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                     'rsync_skip_if_older_than', 4))
 
         if self.rsync_enable:
-            log.info('Will rsync to %s:%s/%s' % (self.rsync_server, self.rsync_remote_rtgd_dir, self.rsync_dest_path_file))
+            log.info('Will rsync to %s:%s' % (self.rsync_server, self.rsync_dest_path_file))
         else:
             log.info('Rsync not enabled.')
 
