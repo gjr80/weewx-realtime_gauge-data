@@ -3,7 +3,7 @@ rtgd.py
 
 A WeeWX service to generate a loop based gauge-data.txt.
 
-Copyright (C) 2017-2019 Gary Roderick             gjroderick<at>gmail.com
+Copyright (C) 2017-2021 Gary Roderick             gjroderick<at>gmail.com
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,7 +17,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-Version: 0.5.0a1                                        Date: ?? January 2020
+Version: 0.5.0a2                                        Date: 7 February 2021
 
   Revision History
     ?? January 2020     v0.5.0
@@ -610,7 +610,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.0a1'
+RTGD_VERSION = '0.5.0a2'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
