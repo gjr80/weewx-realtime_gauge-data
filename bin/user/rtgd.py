@@ -1,7 +1,7 @@
 """
 rtgd.py
 
-A weeWX service to generate a loop based gauge-data.txt.
+A WeeWX service to generate a loop based gauge-data.txt.
 
 Copyright (C) 2017-2019 Gary Roderick             gjroderick<at>gmail.com
 
@@ -17,10 +17,10 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see http://www.gnu.org/licenses/.
 
-Version: 0.5.0                                        Date: 5 July 2020
+Version: 0.5.0                                        Date: 7 February 2021
 
   Revision History
-    5 July 2020         v0.5.0
+    7 February 2021     v0.5.0
         - added ability to rsync gauge-data.txt to an rsync capable server,
           thanks to John Kline
         - fixed bug that caused rtgd to abort if the first loop packet did not
@@ -47,7 +47,7 @@ Version: 0.5.0                                        Date: 5 July 2020
         - fixed incorrect rtgd.py version number
     1 January 2019      v0.3.5
         - added support for Darksky forecast API
-        - added support for Zambretti forecast text (subject to weeWX
+        - added support for Zambretti forecast text (subject to WeeWX
           forecasting extension being installed)
         - refactored code for obtaining scroller text
         - each scroller text block now uses its own 2nd level (ie [[ ]]) config
@@ -78,7 +78,7 @@ Version: 0.5.0                                        Date: 5 July 2020
         - unnecessary whitespace removed from JSON output(issue #2)
         - JSON output now sorted alphabetically by key (issue #2)
         - Revised debug logging. Now supports debug=0,1,2 and 3: (issue #7)
-          0 - standard weeWX output, no debug info
+          0 - standard WeeWX output, no debug info
           1 - as per debug=0, advises whether Zambretti is available, logs
               minor non-fatal errors (eg posting)
           2 - as per debug=1, logs events that occur, eg packets queued,
@@ -124,7 +124,7 @@ Version: 0.5.0                                        Date: 5 July 2020
         - no longer reads unit group config options that have only one possible
           unit
         - use of mmHg, knot or cm units reverts to hPa, mile_per_hour and mm
-          respectively due to weeWX or SteelSeries Gauges not understanding the
+          respectively due to WeeWX or SteelSeries Gauges not understanding the
           unit (or derived unit)
         - made gauge-data.txt unit code determination more robust
         - reworked code that formats gauge-data.txt field data to better handle
@@ -148,7 +148,7 @@ Version: 0.5.0                                        Date: 5 July 2020
     15 February 2017    v0.2.1
         - fixed error that resulted in incorrect pressL and pressH values
     24 January 2017     v0.2.0
-        - now runs in a thread to eliminate blocking impact on weeWX
+        - now runs in a thread to eliminate blocking impact on WeeWX
         - now calculates WindRoseData
         - now calculates pressL and pressH
         - frequency of generation is now specified by a single config option
@@ -165,7 +165,7 @@ Version: 0.5.0                                        Date: 5 July 2020
         - initial release
 
 
-A weeWX service to generate a loop based gauge-data.txt.
+A WeeWX service to generate a loop based gauge-data.txt.
 
 Used to update the SteelSeries Weather Gauges in near real time.
 
@@ -177,8 +177,8 @@ work by Alec Bennett. Refer https://github.com/wrybread/weewx-realtime_gauge-dat
 
 Abbreviated instructions for use:
 
-1.  Install the SteelSeries Weather Gauges for weeWX and confirm correct
-operation of the gauges with weeWX. Refer to
+1.  Install the SteelSeries Weather Gauges for WeeWX and confirm correct
+operation of the gauges with WeeWX. Refer to
 https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_server/WeeWX
 
 2.  Put this file in $BIN_ROOT/user.
@@ -296,7 +296,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # 2. the first line of a text file
     # 3. Weather Underground forecast from the Weather Underground API
     # 4. Darksky forecast from the Darksky API
-    # 5. Zambretti forecast from the weeWX forecast extension
+    # 5. Zambretti forecast from the WeeWX forecast extension
     #
     # The block to be used is specified using the scroller_source config 
     # option. The scroller_source should be set to one of the following strings 
@@ -364,7 +364,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
         watt_per_meter_squared = %.0f
 
     [[Groups]]
-        # Groups. Optional. Note not all available weeWX units are supported
+        # Groups. Optional. Note not all available WeeWX units are supported
         # for each group.
         group_altitude = foot        # Options are 'meter' or 'foot'
         group_pressure = hPa         # Options are 'inHg', 'mbar', or 'hPa'
@@ -510,7 +510,7 @@ sources are:
         [[Zambretti]]
             # Interval (in seconds) between forecast updates. Optional. 
             # Default is 1800.
-            # Note. In order to use the Zambretti forecast block the weeWX 
+            # Note. In order to use the Zambretti forecast block the WeeWX
             # forecast extension must be installed and the Zambretti forecast
             # enabled. RTGD reads the current Zambretti forecast every interval 
             # seconds. The forecast extension controls how often the Zambretti 
@@ -555,7 +555,7 @@ Gauges.
 
 8.  Delete the file $HTML_ROOT/ss/scripts/gauges.js.
 
-9.  Stop/start weeWX
+9.  Stop/start WeeWX
 
 10.  Confirm that gauge-data.txt is being generated regularly as per the period
 and nth_loop settings under [RealtimeGaugeData] in weewx.conf.
@@ -568,7 +568,7 @@ To do:
       fields, presently set to 0.0, 00:00 and 00:00 respectively.
     - Lost contact with station sensors is implemented for Vantage and
       Simulator stations only. Need to extend current code to cater for the
-      weeWX supported stations. Current code assume that contact is there
+      WeeWX supported stations. Current code assume that contact is there
       unless told otherwise.
     - consolidate wind lists into a single list.
     - add windTM to loop packet (a la appTemp in wd.py). windTM is
@@ -579,7 +579,7 @@ To do:
       this may not be reflected in the stats database as the average wind max
       recorded in stats db is based on archive records only. This is because
       windAv is in an archive record but not in a loop packet. This can be
-      remedied by adding the calculated average to the loop packet. weeWX
+      remedied by adding the calculated average to the loop packet. WeeWX
       normal archive processing will then take care of updating stats db.
 
 Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
@@ -608,7 +608,7 @@ from six.moves import http_client
 from six.moves import queue
 from six.moves import urllib
 
-# weeWX imports
+# WeeWX imports
 import weewx
 import weeutil.logger
 import weeutil.weeutil
@@ -631,7 +631,7 @@ GAUGE_DATA_VERSION = '14'
 COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                   'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N']
 
-# map weeWX unit names to unit names supported by the SteelSeries Weather
+# map WeeWX unit names to unit names supported by the SteelSeries Weather
 # Gauges
 UNITS_WIND = {'mile_per_hour':      'mph',
               'meter_per_second':   'm/s',
@@ -723,7 +723,7 @@ class RealtimeGaugeData(StdService):
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
         
-        # bind our self to the relevant weeWX events
+        # bind our self to the relevant WeeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
         self.bind(weewx.END_ARCHIVE_PERIOD, self.end_archive_period)
@@ -1022,7 +1022,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
                                                          'km_per_hour')
         # Since the SteelSeries Weather Gauges derives distance units from wind
-        # speed units we cannot use knots because weeWX does not know how to
+        # speed units we cannot use knots because WeeWX does not know how to
         # use distance in nautical miles. If we have been told to use knot then
         # default to mile_per_hour.
         if self.wind_group == 'knot':
@@ -1078,7 +1078,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.windrun_loop = to_bool(rtgd_config_dict.get('windrun_loop',
                                                          False))
 
-        # weeWX does not normally archive appTemp so day stats are not usually
+        # WeeWX does not normally archive appTemp so day stats are not usually
         # available; however, if the user does have appTemp in a database then
         # if we have a binding we can use it. Check if an appTemp binding was
         # specified, if so use it, otherwise default to 'wx_binding'. We will
@@ -1397,10 +1397,10 @@ class RealtimeGaugeDataThread(threading.Thread):
     def post_data(self, data):
         """Post data to a remote URL via HTTP POST.
 
-        This code is modelled on the weeWX restFUL API, but rather then
+        This code is modelled on the WeeWX RESTful API, but rather then
         retrying a failed post the failure is logged and then ignored. If
         remote posts are not working then the user should set debug=1 and
-        restart weeWX to see what the log says.
+        restart WeeWX to see what the log says.
 
         The data to be posted is sent as a JSON string.
 
@@ -2067,7 +2067,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.last_average_dir = avg_bearing
         data['avgbearing'] = self.dir_format % avg_bearing
         # bearingTM - The wind bearing at the time of today's high gust
-        # As our self.day_stats is really a weeWX accumulator filled with the
+        # As our self.day_stats is really a WeeWX accumulator filled with the
         # relevant days stats we need to use .max_dir rather than .gustdir
         # to get the gust direction for the day.
         bearing_tm = self.day_stats['wind'].max_dir if self.day_stats['wind'].max_dir is not None else 0
@@ -2443,7 +2443,7 @@ class RtgdBuffer(object):
     def set_lows_and_highs(self, packet):
         """ Update loop highs and lows with new loop data.
 
-        Almost operates as a mini weeWX accumulator but wind data is stored in
+        Almost operates as a mini WeeWX accumulator but wind data is stored in
         lists to allow samples to be added at one end and old samples dropped
         at the other end.
 
@@ -2827,7 +2827,7 @@ class ThreadedSource(threading.Thread):
         result_queue:        A Queue object used to pass forecast data to the
                              destination
         engine:              an instance of weewx.engine.StdEngine
-        config_dict:         A weeWX config dictionary.
+        config_dict:         A WeeWX config dictionary.
 
     ThreadedSource methods:
 
@@ -2991,7 +2991,7 @@ class WUSource(ThreadedSource):
         result_queue:   A Queue object used to pass forecast data to the
                         destination
         engine:         An instance of class weewx.weewx.Engine
-        config_dict:    A weeWX config dictionary.
+        config_dict:    A WeeWX config dictionary.
 
     WUThread methods:
 
@@ -3395,7 +3395,7 @@ class WeatherUndergroundAPIForecast(object):
 class ZambrettiSource(ThreadedSource):
     """Thread that obtains Zambretti forecast text and places it in a queue.
 
-    Requires the weeWX forecast extension to be installed and configured to
+    Requires the WeeWX forecast extension to be installed and configured to
     provide the Zambretti forecast.
 
     ZambrettiSource constructor parameters:
@@ -3405,7 +3405,7 @@ class ZambrettiSource(ThreadedSource):
         result_queue:   A Queue object used to pass forecast data to the
                         destination
         engine:         An instance of class weewx.weewx.Engine
-        config_dict:    A weeWX config dictionary.
+        config_dict:    A WeeWX config dictionary.
 
     ZambrettiSource methods:
 
@@ -3457,7 +3457,7 @@ class ZambrettiSource(ThreadedSource):
 class Zambretti(object):
     """Class to extract Zambretti forecast text.
 
-    Requires the weeWX forecast extension to be installed and configured to
+    Requires the WeeWX forecast extension to be installed and configured to
     provide the Zambretti forecast otherwise 'Forecast not available' will be
     returned.
     """
@@ -3480,7 +3480,7 @@ class Zambretti(object):
         # initialise container for timestamp of last db query
         self.last_query_ts = None
         
-        # flag as to whether the weeWX forecasting extension is installed
+        # flag as to whether the WeeWX forecasting extension is installed
         self.forecasting_installed = False
         
         # Get a db manager for the forecast database and import the Zambretti
@@ -3576,7 +3576,7 @@ class DarkskySource(ThreadedSource):
         result_queue:        A Queue object used to pass forecast data to the
                              destination
         engine:              A weewx.engine.StdEngine object
-        conf_dict:           A weeWX config dictionary.
+        conf_dict:           A WeeWX config dictionary.
 
     DarkskyThread methods:
 
@@ -3901,7 +3901,7 @@ class FileSource(ThreadedSource):
         result_queue:   A Queue object used to pass forecast data to the
                         destination
         engine:         An instance of class weewx.weewx.Engine
-        config_dict:    A weeWX config dictionary.
+        config_dict:    A WeeWX config dictionary.
 
     FileSource methods:
 
