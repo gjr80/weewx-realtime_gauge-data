@@ -1473,7 +1473,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
                                                         'meter')
         self.flag_format = '%.0f'
-        
+
         # set up output units dict
         # first get the Groups config from our config dict
         _config_units_dict = rtgd_config_dict.get('Groups', {})
@@ -1545,8 +1545,8 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         self.db_manager = None
         self.apptemp_manager = None
-        self.day_stats = None
-        self.apptemp_day_stats = None
+        self.stats_unit_system = None
+        self.day_span = None
 
         self.packet_cache = None
 
@@ -1566,11 +1566,11 @@ class RealtimeGaugeDataThread(threading.Thread):
         # gauge-data.txt version
         self.version = str(GAUGE_DATA_VERSION)
 
-        # are we providing month and/or year to date rain, default is no we are 
+        # are we providing month and/or year to date rain, default is no we are
         # not
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
-        # initialise some properties if we are providing month and/or year to 
+        # initialise some properties if we are providing month and/or year to
         # date rain
         if self.mtd_rain:
             self.month_rain = None
@@ -1639,14 +1639,17 @@ class RealtimeGaugeDataThread(threading.Thread):
             # get a db manager for appTemp
             self.apptemp_manager = weewx.manager.open_manager_with_config(self.config_dict,
                                                                           self.apptemp_binding)
-            # initialise our day stats
-            self.day_stats = self.db_manager._get_day_summary(time.time())
-            # initialise our day stats from our appTemp source
-            self.apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
+            # obtain the current day stats so we can initialise a Buffer object
+            day_stats = self.db_manager._get_day_summary(time.time())
+            # save our day stats unit system for use later
+            self.stats_unit_system = day_stats.unit_system
+            # obtain the current day stats from our appTemp source so we can
+            # initialise a Buffer object
+            apptemp_day_stats = self.apptemp_manager._get_day_summary(time.time())
             # get a Buffer object
             self.buffer = Buffer(MANIFEST,
-                                 day_stats=self.day_stats,
-                                 additional_day_stats=self.apptemp_day_stats)
+                                 day_stats=day_stats,
+                                 additional_day_stats=apptemp_day_stats)
 
             # initialise the time of last rain
             self.last_rain_ts = self.calc_last_rain_stamp()
@@ -1774,9 +1777,23 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # get time for debug timing
         t1 = time.time()
+        # if we have the first packet from a new day we need to reset the Buffer
+        # objects stats
+        if self.day_span is not None:
+            # we have a day_span so this i snot our first time, check to see if
+            # our packet timestamp belongs to the following day
+            if packet['dateTime'] > self.day_span.stop:
+                # we have a packet from a new day, so reset the Buffer stats
+                self.buffer.start_of_day_reset()
+                # and reset our day_span
+                self.day_span = weeutil.weeutil.archiveDaySpan(packet['dateTime'])
+        else:
+            # we don't have a day_span, it must be the first packet since we
+            # started, so initialise a day_span
+            self.day_span = weeutil.weeutil.archiveDaySpan(packet['dateTime'])
         # convert our incoming packet
         _conv_packet = weewx.units.to_std_system(packet,
-                                                 self.day_stats.unit_system)
+                                                 self.stats_unit_system)
         # update the packet cache with this packet
         self.packet_cache.update(_conv_packet, _conv_packet['dateTime'])
         # update the buffer with the converted packet
@@ -2168,7 +2185,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         # now populate all fields in the field map
         for field in self.field_map:
             data[field] = self.get_field_value(field, packet)
-
         return data
 
     def process_new_archive_record(self, record):
@@ -2181,10 +2197,6 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.windSpeedAvg_vt = weewx.units.as_value_tuple(record, 'windSpeed')
         else:
             self.windSpeedAvg_vt = ValueTuple(None, 'km_per_hour', 'group_speed')
-        # refresh our day (archive record based) stats to date in case we have
-        # jumped to the next day
-        self.day_stats = self.db_manager._get_day_summary(record['dateTime'])
-        self.apptemp_day_stats = self.apptemp_manager._get_day_summary(record['dateTime'])
 
     def calc_last_rain_stamp(self):
         """Calculate the timestamp of the last rain.
