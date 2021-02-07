@@ -10,12 +10,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.5.0                                        Date: 5 July 2020
+Version: 0.5.0                                        Date: 7 February 2021
 
 Revision History
 
-    13 January 2020     v0.5.0
-        - bumped version only
+    7 February 2021     v0.5.0
+        - changed WeeWX required version to 4.0.0
     23 November 2019    v0.4.2
         - bumped version only
     20 November 2019    v0.4.1
@@ -80,7 +80,7 @@ import weewx
 from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
-REQUIRED_VERSION = "4.0.0b1"
+REQUIRED_VERSION = "4.0.0"
 RTGD_VERSION = "0.5.0"
 
 
@@ -91,7 +91,7 @@ def loader():
 class RtgdInstaller(ExtensionInstaller):
     def __init__(self):
         if StrictVersion(weewx.__version__) < StrictVersion(REQUIRED_VERSION):
-            msg = "%s requires weeWX %s or greater, found %s" % ('Rtgd ' + RTGD_VERSION,
+            msg = "%s requires WeeWX %s or greater, found %s" % ('Rtgd ' + RTGD_VERSION,
                                                                  REQUIRED_VERSION,
                                                                  weewx.__version__)
             raise weewx.UnsupportedFeature(msg)
