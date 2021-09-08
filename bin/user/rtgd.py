@@ -15,12 +15,12 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
-this program.  If not, see http://www.gnu.org/licenses/.
+this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.0a2                                        Date: 7 February 2021
+Version: 0.5.0b1                                        Date: 8 September 2021
 
   Revision History
-    ?? January 2020     v0.5.0
+    ?? ?????? 2021      v0.5.0
         - added ability to rsync gauge-data.txt to an rsync capable server,
           thanks to John Kline
         - reworked buffering of loop data, now use dedicated scalar and vector
@@ -221,10 +221,10 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # If rsync_server is specified, do not specify a remote_server_url.
     #
     # Note: The rsync feature will only work in WeeWX v.4 and above.  In earlier
-    # versions, rsyncing of single files is not supported by WeeWX's rsync
+    # versions, rsyncing of single files is not supported by WeeWX' rsync
     # help function.
     #
-    # To use rysnc, passwordless ssh using public/private key must be
+    # To use rsync, passwordless ssh using public/private key must be
     # configured for authentication from the user account that weewx runs under on
     # this computer to the user account on the remote machine with write access to
     # the destination directory (rsync_remote_rtgd_dir).
@@ -610,7 +610,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.0a2'
+RTGD_VERSION = '0.5.0b1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1941,7 +1941,10 @@ class RealtimeGaugeDataThread(threading.Thread):
                     pass
             else:
                 # no aggregate so get the value from the packet as a ValueTuple
-                _raw_vt = as_value_tuple(packet, source)
+                if source in packet:
+                    _raw_vt = as_value_tuple(packet, source)
+                else:
+                    _raw_vt = ValueTuple(None, result_units, _getUnitGroup(source))
                 # convert to the output units
                 _conv_raw = convert(_raw_vt, result_units).value
                 if _conv_raw is None:
@@ -1962,7 +1965,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                 packet_unit_dict[source] = {'units': units,
                                             'group': unit_group}
         # add in units and group details for fields windSpeed and rain to
-        # facilitate non-field map based field caclculations
+        # facilitate non-field map based field calculations
         for source in ('windSpeed', 'rain'):
             if source not in packet_unit_dict:
                 (units, unit_group) = getStandardUnitType(packet_unit_system,
@@ -2218,7 +2221,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             # TimeSpan for the archive day containing that ts.
             last_rain_tspan = weeutil.weeutil.archiveDaySpan(last_rain_ts+1)
             try:
-                _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive WHERE rain > 0 AND dateTime > ? AND dateTime <= ?",
+                _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive "
+                                              "WHERE rain > 0 AND dateTime > ? AND dateTime <= ?",
                                               last_rain_tspan)
                 last_rain_ts = _row[0]
             except (IndexError, TypeError):
@@ -2552,7 +2556,7 @@ class Buffer(dict):
                     seed_func = seed_functions.get(obs, Buffer.seed_scalar)
                     seed_func(self, additional_day_stats, obs,
                               history=obs in HIST_MANIFEST)
-        # timestamp of the last packet containign windSpeed, used for windrun
+        # timestamp of the last packet containing windSpeed, used for windrun
         # calcs
         self.last_windSpeed_ts = None
 
@@ -3169,7 +3173,7 @@ class WUSource(ThreadedSource):
         self.max_tries = to_int(wu_config_dict.get('max_tries', 3))
         # Get API call lockout period. This is the minimum period between API
         # calls for the same feature. This prevents an error condition making
-        # multiple rapid API calls and thus breac the API usage conditions.
+        # multiple rapid API calls and thus breach the API usage conditions.
         self.lockout_period = to_int(wu_config_dict.get('api_lockout_period',
                                                         60))
         # initialise container for timestamp of last WU api call
@@ -3357,14 +3361,14 @@ class WUSource(ThreadedSource):
                 except KeyError:
                     # couldn't find a key for one of the fields, log it and
                     # force use of night index
-                    log.info("Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
-                                                                                                     self.forecast_text))
+                    log.info("Unable to locate 'dayOrNight' field "
+                             "for %s '%s' forecast narrative" % (_period_str, self.forecast_text))
                     day_index = None
                 except ValueError:
                     # could not get an index for 'D', log it and force use of
                     # night index
-                    log.info("Unable to locate 'D' index for %s '%s' forecast narrative" % (_period_str,
-                                                                                            self.forecast_text))
+                    log.info("Unable to locate 'D' index "
+                             "for %s '%s' forecast narrative" % (_period_str, self.forecast_text))
                     day_index = None
             # we have a day_index but is it for today or some later day
             if day_index is not None and day_index <= 1:
@@ -3377,24 +3381,26 @@ class WUSource(ThreadedSource):
                 except KeyError:
                     # couldn't find a key for one of the fields, log it and
                     # return None
-                    log.info("Unable to locate 'dayOrNight' field for %s '%s' forecast narrative" % (_period_str,
-                                                                                                     self.forecast_text))
+                    log.info("Unable to locate 'dayOrNight' field "
+                             "for %s '%s' forecast narrative" % (_period_str, self.forecast_text))
                     return None
                 except ValueError:
                     # could not get an index for 'N', log it and return None
-                    log.info("Unable to locate 'N' index for %s '%s' forecast narrative" % (_period_str,
-                                                                                            self.forecast_text))
+                    log.info("Unable to locate 'N' index "
+                             "for %s '%s' forecast narrative" % (_period_str, self.forecast_text))
                     return None
             # if we made it here we have an index to use so get the required
             # narrative
             try:
                 return _response_json['daypart'][0]['narrative'][_index]
             except KeyError:
-                # if we can'f find a field log the error and return None
-                log.info("Unable to locate 'narrative' field for '%s' forecast narrative" % self.forecast_text)
+                # if we can't find a field log the error and return None
+                log.info("Unable to locate 'narrative' field "
+                         "for '%s' forecast narrative" % self.forecast_text)
             except ValueError:
-                # if we can'f find an index log the error and return None
-                log.info("Unable to locate 'narrative' index for '%s' forecast narrative" % self.forecast_text)
+                # if we can't find an index log the error and return None
+                log.info("Unable to locate 'narrative' index "
+                         "for '%s' forecast narrative" % self.forecast_text)
 
             return None
 
@@ -3444,7 +3450,7 @@ class WeatherUndergroundAPIForecast(object):
                        Refer https://docs.google.com/document/d/1RY44O8ujbIA_tjlC4vYKHKzwSwEmNxuGw5sEJ9dYjG4/edit#
             location:  Location argument. String.
             units:     Units to use in the returned data. String, must be one
-                       of 'e', 'm', 's' or'h'.
+                       of 'e', 'm', 's' or 'h'.
                        Refer https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.k9ghwen9fj7l
             language:  Language to return the response in. String, must be one
                        of the WU API supported language_setting codes
@@ -3657,7 +3663,9 @@ class Zambretti(object):
                 return self.UNAVAILABLE_MESSAGE
             # make the query
             # SQL query to get the latest Zambretti forecast code
-            sql = "SELECT dateTime,zcode FROM %s WHERE method = 'Zambretti' ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
+            sql = "SELECT dateTime,zcode FROM %s "\
+                  "WHERE method = 'Zambretti' "\
+                  "ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
             # execute the query, wrap in try..except just in case
             for count in range(self.max_tries):
                 try:
@@ -3751,7 +3759,7 @@ class DarkskySource(ThreadedSource):
         self.max_tries = to_int(darksky_config_dict.get('max_tries', 3))
         # Get API call lockout period. This is the minimum period between API
         # calls for the same feature. This prevents an error condition making
-        # multiple rapid API calls and thus breac the API usage conditions.
+        # multiple rapid API calls and thus breach the API usage conditions.
         self.lockout_period = to_int(darksky_config_dict.get('api_lockout_period',
                                                              60))
         # initialise container for timestamp of last API call
