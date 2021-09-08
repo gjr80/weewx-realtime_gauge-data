@@ -8,6 +8,7 @@ v0.5.0
 - fields beaufort and currentSolarMax is no longer directly calculated by rtgd
   but are now populated from WeeWX fields beaufort and maxSolarRad respectively
 - field lastRainTipISO is now populated
+- rtgd now logs the rtgd version number on WeeWX startup
 v0.4.2
 - fix error in some expressions that include > and < where operands could be
   None

@@ -983,10 +983,10 @@ DEFAULT_FIELD_MAP = {'temp': {
                      }
                      }
 
+
 # ============================================================================
 #                     Exceptions that could get thrown
 # ============================================================================
-
 
 class MissingApiKey(IOError):
     """Raised when an API key cannot be found for an external service"""
@@ -995,7 +995,6 @@ class MissingApiKey(IOError):
 # ============================================================================
 #                          class RealtimeGaugeData
 # ============================================================================
-
 
 class RealtimeGaugeData(StdService):
     """Service that generates gauge-data.txt in near realtime.
@@ -1010,6 +1009,8 @@ class RealtimeGaugeData(StdService):
         # initialize my superclass
         super(RealtimeGaugeData, self).__init__(engine, config_dict)
 
+        # log my version number
+        log.info('version is %s' % RTGD_VERSION)
         self.rtgd_ctl_queue = queue.Queue()
         # get the RealtimeGaugeData config dictionary
         rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
@@ -1205,7 +1206,6 @@ class RealtimeGaugeData(StdService):
 #                            class HttpPostExport
 # ============================================================================
 
-
 class HttpPostExport(object):
     """Class to handle HTTP posting of gauge-data.txt.
 
@@ -1314,7 +1314,6 @@ class HttpPostExport(object):
 #                            class RsyncExport
 # ============================================================================
 
-
 class RsyncExport(object):
     """Class to handle rsync of gauge-data.txt.
 
@@ -1383,7 +1382,6 @@ class RsyncExport(object):
 # ============================================================================
 #                       class RealtimeGaugeDataThread
 # ============================================================================
-
 
 class RealtimeGaugeDataThread(threading.Thread):
     """Thread that generates gauge-data.txt in near realtime."""
@@ -2269,7 +2267,6 @@ class RealtimeGaugeDataThread(threading.Thread):
 #                           class ObsBuffer
 # ============================================================================
 
-
 class ObsBuffer(object):
     """Base class to buffer an obs."""
 
@@ -2355,7 +2352,6 @@ class ObsBuffer(object):
 # ============================================================================
 #                             class VectorBuffer
 # ============================================================================
-
 
 class VectorBuffer(ObsBuffer):
     """Class to buffer vector obs."""
@@ -2475,7 +2471,6 @@ class VectorBuffer(ObsBuffer):
 #                             class ScalarBuffer
 # ============================================================================
 
-
 class ScalarBuffer(ObsBuffer):
     """Class to buffer scalar obs."""
 
@@ -2528,7 +2523,6 @@ class ScalarBuffer(ObsBuffer):
 # ============================================================================
 #                               class Buffer
 # ============================================================================
-
 
 class Buffer(dict):
     """Class to buffer various loop packet obs.
@@ -2661,10 +2655,10 @@ class Buffer(dict):
             _vt = ValueTuple(val, unit, 'group_distance')
             return weewx.units.convertStd(_vt, self['windrun'].units).value
 
+
 # ============================================================================
 #                            Configuration dictionaries
 # ============================================================================
-
 
 init_dict = ListOfDicts({'wind': VectorBuffer})
 add_functions = ListOfDicts({'windSpeed': Buffer.add_wind_value})
@@ -2674,7 +2668,6 @@ seed_functions = ListOfDicts({'wind': Buffer.seed_vector})
 # ============================================================================
 #                              class ObsTuple
 # ============================================================================
-
 
 # A observation during some period can be represented by the value of the
 # observation and the time at which it was observed. This can be represented
@@ -2709,7 +2702,6 @@ class ObsTuple(tuple):
 #                              class VectorTuple
 # ============================================================================
 
-
 # A vector value can be represented as a magnitude and direction. This can be
 # represented in a 2 way tuple called an vector tuple. A vector tuple is useful
 # because its contents can be accessed using named attributes.
@@ -2737,7 +2729,6 @@ class VectorTuple(tuple):
 # ============================================================================
 #                            Class CachedPacket
 # ============================================================================
-
 
 class CachedPacket(object):
     """Class to cache loop packets.
@@ -2843,7 +2834,6 @@ class CachedPacket(object):
 #                            Utility Functions
 # ============================================================================
 
-
 def degree_to_compass(x):
     """Convert degrees to ordinal compass point.
 
@@ -2948,7 +2938,6 @@ def calc_windrose(now, db_manager, period, points):
 # ============================================================================
 #                           class ThreadedSource
 # ============================================================================
-
 
 class ThreadedSource(threading.Thread):
     """Base class for a threaded scroller text block.
@@ -3068,7 +3057,6 @@ class ThreadedSource(threading.Thread):
 #                             class Source
 # ============================================================================
 
-
 class Source(object):
     """base class for a non-threaded scroller text block."""
 
@@ -3107,7 +3095,6 @@ class Source(object):
 # ============================================================================
 #                              class WUSource
 # ============================================================================
-
 
 class WUSource(ThreadedSource):
     """Thread that obtains WU API forecast text and places it in a queue.
@@ -3409,7 +3396,6 @@ class WUSource(ThreadedSource):
 #                    class WeatherUndergroundAPIForecast
 # ============================================================================
 
-
 class WeatherUndergroundAPIForecast(object):
     """Obtain a forecast from the Weather Underground API.
 
@@ -3526,7 +3512,6 @@ class WeatherUndergroundAPIForecast(object):
 #                           class ZambrettiSource
 # ============================================================================
 
-
 class ZambrettiSource(ThreadedSource):
     """Thread that obtains Zambretti forecast text and places it in a queue.
 
@@ -3587,7 +3572,6 @@ class ZambrettiSource(ThreadedSource):
 # ============================================================================
 #                              class Zambretti
 # ============================================================================
-
 
 class Zambretti(object):
     """Class to extract Zambretti forecast text.
@@ -3696,7 +3680,6 @@ class Zambretti(object):
 # ============================================================================
 #                           class DarkskyThread
 # ============================================================================
-
 
 class DarkskySource(ThreadedSource):
     """Thread that obtains Darksky forecast data and places it in a queue.
@@ -3879,7 +3862,6 @@ class DarkskySource(ThreadedSource):
 #                         class DarkskyForecastAPI
 # ============================================================================
 
-
 class DarkskyForecastAPI(object):
     """Query the Darksky API and return the API response.
 
@@ -4027,7 +4009,6 @@ class DarkskyForecastAPI(object):
 #                             class FileSource
 # ============================================================================
 
-
 class FileSource(ThreadedSource):
     """Thread to return a single line of text from a file.
 
@@ -4118,7 +4099,6 @@ class FileSource(ThreadedSource):
 # ============================================================================
 #                             class TextSource
 # ============================================================================
-
 
 class TextSource(Source):
     """Class to return user specified text string."""
