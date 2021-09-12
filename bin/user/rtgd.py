@@ -17,7 +17,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.0b1                                        Date: 8 September 2021
+Version: 0.5.0b2                                        Date: ?? ???????? 2021
 
   Revision History
     ?? ?????? 2021      v0.5.0
@@ -1843,111 +1843,6 @@ class RealtimeGaugeDataThread(threading.Thread):
             for key, value in package.items():
                 setattr(self, key, value)
 
-    def rsync_data(self, packetTime):
-        # Don't upload if more than rsync_skip_if_older_than seconds behind.
-        if self.rsync_skip_if_older_than != 0:
-            now = datetime.datetime.now()
-            age = now - packetTime
-            if age.total_seconds() > self.rsync_skip_if_older_than:
-                loginf("rsync_data",
-                    "skipping packet (%s) with age: %d" % (packetTime, age.total_seconds()))
-                return
-        rsync_upload = weeutil.rsyncupload.RsyncUpload(
-            local_root=self.rtgd_path_file,
-            remote_root=self.rsync_dest_path_file,
-            server=self.rsync_server,
-            user=self.rsync_user,
-            port=self.rsync_port,
-            ssh_options=self.rsync_ssh_options,
-            compress=self.rsync_compress,
-            delete=False,
-            log_success=self.rsync_log_success,
-            timeout=self.rsync_timeout)
-        try:
-            rsync_upload.run()
-        except IOError as e:
-            (cl, unused_ob, unused_tr) = sys.exc_info()
-            log.error("rtgd.rsync_data: Caught exception %s: %s" % (cl, e))
-
-    def post_data(self, data):
-        """Post data to a remote URL via HTTP POST.
-
-        This code is modelled on the WeeWX RESTful API, but rather then
-        retrying a failed post the failure is logged and then ignored. If
-        remote posts are not working then the user should set debug=1 and
-        restart WeeWX to see what the log says.
-
-        The data to be posted is sent as a JSON string.
-
-        Inputs:
-            data: dict to sent as JSON string
-        """
-
-        # get a Request object
-        req = urllib.request.Request(self.remote_server_url)
-        # set our content type to json
-        req.add_header('Content-Type', 'application/json')
-        # POST the data but wrap in a try..except so we can trap any errors
-        try:
-            response = self.post_request(req, json.dumps(data,
-                                                         separators=(',', ':'),
-                                                         sort_keys=True))
-            if 200 <= response.code <= 299:
-                # No exception thrown and we got a good response code, but did
-                # we get self.response back in a return message? Check for
-                # self.response, if its there then we can return. If it's
-                # not there then log it and return.
-                if self.response is not None:
-                    if self.response in response:
-                        # did get 'success' so log it and continue
-                        if weewx.debug == 2:
-                            log.debug("Successfully posted data")
-                    else:
-                        # it's possible the POST was successful if a response
-                        # code of 200 was received if under python3, check
-                        # response code and give it the benefit of the doubt
-                        # but log it anyway
-                        if response.code == 200:
-                            log.debug("Data may have been posted successfully. "
-                                      "Response message was not received but a valid response code was received.")
-                        else:
-                            log.debug("Failed to post data: Unexpected response")
-                return
-            # we received a bad response code, log it and continue
-            log.debug("Failed to post data: Code %s" % response.code())
-        except (urllib.error.URLError, socket.error,
-                http_client.BadStatusLine, http_client.IncompleteRead) as e:
-            # an exception was thrown, log it and continue
-            log.debug("Failed to post data: %s" % e)
-
-    def post_request(self, request, payload):
-        """Post a Request object.
-
-        Inputs:
-            request: urllib2 Request object
-            payload: the data to sent
-
-        Returns:
-            The urllib2.urlopen() response
-        """
-
-        # Under python 3 POST data should be bytes or an iterable of bytes and
-        # not of type str. So attempt to convert the POST data to bytes, if it
-        # already is of type bytes an error will be thrown under python 3, be
-        # prepared to catch this error.
-        try:
-            payload_b = payload.encode('utf-8')
-        except TypeError:
-            payload_b = payload
-
-        # Do the POST. Python 2.5 and earlier do not have a "timeout" parameter
-        # so we used to be prepared to catch the TypeError, but we no longer
-        # support python 2.5 so we can omit the exception.
-        _response = urllib.request.urlopen(request,
-                                           data=payload_b,
-                                           timeout=self.timeout)
-        return _response
-
     def write_data(self, data):
         """Write the gauge-data.txt file.
 
@@ -2569,6 +2464,7 @@ class VectorBuffer(ObsBuffer):
             _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
             result = _direction if _direction >= 0.0 else _direction + 360.0
         return result
+
 
 # ============================================================================
 #                             class ScalarBuffer
