@@ -33,6 +33,7 @@ Version: 0.5.0b2                                        Date: ?? ???????? 2021
           now populated from WeeWX field maxSolarRad
         - field lastRainTipISO is now populated
         - removed deprecated field Tbeaufort
+        - rtgd now logs the rtgd version number on WeeWX startup
     23 November 2019    v0.4.2
         - fix error in some expressions including > and < where operands could
           be None
