@@ -10,11 +10,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.5.0                                        Date: 7 February 2021
+Version: 0.5.0b1                                        Date: ?? January 2020
 
 Revision History
 
-    7 February 2021     v0.5.0
+    ?? ????? 2021       v0.5.0
+        - fix incorrect date format
         - changed WeeWX required version to 4.0.0
     23 November 2019    v0.4.2
         - bumped version only
@@ -104,7 +105,7 @@ class RtgdInstaller(ExtensionInstaller):
             report_services=['user.rtgd.RealtimeGaugeData'],
             config={
                 'RealtimeGaugeData': {
-                    'date_format': '%Y.%m.%d %H:%M',
+                    'date_format': '%Y-%m-%d %H:%M',
                     'rtgd_path': '/home/weewx/public_html',
                     'scroller_source': 'text|file|WU|DS|Zambretti',
                     'StringFormats': {
