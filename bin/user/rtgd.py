@@ -27,10 +27,10 @@ Version: 0.5.0b1                                        Date: 8 September 2021
           buffer objects similar in operation to the WeeWX accumulators
         - implemented a field_map config item allowing certain JSON output field
           properties to be controlled by the user
-        - fields beaufort and currentSolarMax is no longer directly calculated
-          by rtgd but are now populated from WeeWX fields beaufort and
-          maxSolarRad respectively
+        - field currentSolarMax is no longer directly calculated by rtgd but is
+          now populated from WeeWX field maxSolarRad
         - field lastRainTipISO is now populated
+        - removed deprecated field Tbeaufort
     23 November 2019    v0.4.2
         - fix error in some expressions including > and < where operands could
           be None
@@ -948,10 +948,6 @@ DEFAULT_FIELD_MAP = {'temp': {
                          'aggregate': 'sum',
                          'aggregate_period': 'day',
                          'format': '%.1f'
-                     },
-                     'Tbeaufort': {
-                         'source': 'beaufort',
-                         'format': '%.0f'
                      },
                      'UV': {
                          'source': 'UV',
