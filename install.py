@@ -17,6 +17,9 @@ Revision History
     ?? ????? 2021       v0.5.0
         - fix incorrect date format
         - changed WeeWX required version to 4.0.0
+        - config now provided via triple quote string to allow inclusion of
+          comments
+        - revised default config included during install
     23 November 2019    v0.4.2
         - bumped version only
     20 November 2019    v0.4.1
@@ -76,13 +79,96 @@ Revision History
         - initial implementation
 """
 
-import weewx
-
+# python imports
+import configobj
 from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
+# import StringIO, use six.moves due to python2/python3 differences
+from six.moves import StringIO
+
+# WeeWX imports
+import weewx
+
 REQUIRED_VERSION = "4.0.0"
 RTGD_VERSION = "0.5.0"
+
+# define our config as a multiline string so we can preserve comments
+rtgd_config = """
+[RealtimeGaugeData]
+    # This section is for the RTGD service.
+
+    # date format to be used in gauge-data.txt. Default is %Y.%m.%d %H:%M
+    date_format = %Y-%m-%d %H:%M
+    
+    # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
+    # empty HTML_ROOT is used, if setting omitted altogether /var/tmp is used.
+    rtgd_path = /home/weewx/public_html
+    
+    # Scrolling text display or 'forecast' field source. Case insensitive. 
+    # All except Zambretti require a corresponding [[ ]] stanza. Uncomment and 
+    # select one entry to enable.
+    # scroller_source = text|file|WU|DS|Zambretti
+    
+    # formats for gauge-data.txt fields by unit type
+    [[StringFormats]]
+        degree_C = %.1f
+        degree_F = %.1f
+        degree_compass = %.0f
+        foot = %.0f
+        hPa = %.1f
+        inHg = %.2f
+        inch = %.2f
+        inch_per_hour = %.2f
+        km_per_hour = %.1f
+        km = %.1f
+        mbar = %.1f
+        meter = %.0f
+        meter_per_second = %.1f
+        mile = %.1f
+        mile_per_hour = %.1f
+        mm = %.1f
+        mm_per_hour = %.1f
+        percent = %.0f
+        uv_index = %.1f
+        watt_per_meter_squared = %.0f
+    
+    # Units to be used in gauge-data.txt. Note not all available WeeWX units 
+    # are supported for each group. 
+    [[Groups]]
+        group_altitude = foot   # Supported options are 'meter' or 'foot'
+        group_pressure = hPa    # Supported options are 'inHg', 'mbar', or 'hPa'
+        group_rain = mm         # Supported options are 'inch' or 'mm'
+        group_speed = km_per_hour   # Supported options are 'mile_per_hour', 
+                                    # 'km_per_hour' or 'meter_per_second'
+        group_temperature = degree_C    # Supported options are 'degree_F' or 
+                                        # 'degree_C'
+        
+    # Settings to be used for Darksky forecast block. Uncomment to use.
+    [[DS]]
+        # DarkSky API key
+        # api_key = xxxxxxxxxxxxxxxx
+        
+    # Settings to be used for Weather Underground forecast block. Uncomment 
+    # to use.
+    [[WU]]
+        # WU API key to be used when calling the WU API
+        # api_key = xxxxxxxxxxxxxxxx        
+
+    # Settings to be used for user specified text block. Uncomment to use.
+    [[Text]]
+        # user specified text to populate the 'forecast' field
+        # text = enter text here
+
+    # Settings to be used for first line of text file block. Uncomment to use.
+    [[File]]
+        # Path and file name of file to use as block for the 'forecast' 
+        # field. Must be a text file, first line only of file is read.
+        # file = path/to/file/file_name
+"""
+
+# construct our config dict
+rtgd_dict = configobj.ConfigObj(StringIO(rtgd_config))
 
 
 def loader():
@@ -103,44 +189,6 @@ class RtgdInstaller(ExtensionInstaller):
             author="Gary Roderick",
             author_email="gjroderick<@>gmail.com",
             report_services=['user.rtgd.RealtimeGaugeData'],
-            config={
-                'RealtimeGaugeData': {
-                    'date_format': '%Y-%m-%d %H:%M',
-                    'rtgd_path': '/home/weewx/public_html',
-                    'scroller_source': 'text|file|WU|DS|Zambretti',
-                    'StringFormats': {
-                        'degree_C': '%.1f',
-                        'degree_F': '%.1f',
-                        'degree_compass': '%.0f',
-                        'foot': '%.0f',
-                        'hPa': '%.1f',
-                        'inHg': '%.2f',
-                        'inch': '%.2f',
-                        'inch_per_hour': '%.2f',
-                        'km_per_hour': '%.1f',
-                        'km': '%.1f',
-                        'mbar': '%.1f',
-                        'meter': '%.0f',
-                        'meter_per_second': '%.1f',
-                        'mile': '%.1f',
-                        'mile_per_hour': '%.1f',
-                        'mm': '%.1f',
-                        'mm_per_hour': '%.1f',
-                        'percent': '%.0f',
-                        'uv_index': '%.1f',
-                        'watt_per_meter_squared': '%.0f'
-                    },
-                    'Groups': {
-                        'group_altitude': 'foot',
-                        'group_pressure': 'hPa',
-                        'group_rain': 'mm',
-                        'group_speed': 'km_per_hour',
-                        'group_temperature': 'degree_C'
-                    },
-                    'DS': {
-                        'api_key': 'xxxxxxxxxxxxxxxx'
-                    }
-                }
-            },
-            files=[('bin/user', ['bin/user/rtgd.py'])]
+            files=[('bin/user', ['bin/user/rtgd.py'])],
+            config = rtgd_dict
         )
