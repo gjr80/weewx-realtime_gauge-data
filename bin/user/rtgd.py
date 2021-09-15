@@ -17,10 +17,10 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.0b2                                        Date: ?? ???????? 2021
+Version: 0.5.0                                          Date: 15 September 2021
 
   Revision History
-    ?? ?????? 2021      v0.5.0
+    15 September 2021   v0.5.0
         - added ability to rsync gauge-data.txt to an rsync capable server,
           thanks to John Kline
         - fixed bug that caused rtgd to abort if the first loop packet did not
@@ -613,7 +613,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.0b2'
+RTGD_VERSION = '0.5.0'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 

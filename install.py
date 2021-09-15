@@ -10,11 +10,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.5.0b2                                        Date: ?? ??????? 2021
+Version: 0.5.0                                          Date: 15 September 2021
 
 Revision History
 
-    ?? ????? 2021       v0.5.0
+    15 September 2021   v0.5.0
         - fix incorrect date format
         - changed WeeWX required version to 4.0.0
         - config now provided via triple quote string to allow inclusion of
@@ -110,8 +110,34 @@ rtgd_config = """
     # select one entry to enable.
     # scroller_source = text|file|WU|DS|Zambretti
     
-    # formats for gauge-data.txt fields by unit type
+    [[DS]]
+        # Settings to be used for Darksky forecast block. Uncomment to use.
+        
+        # DarkSky API key
+        # api_key = xxxxxxxxxxxxxxxx
+        
+    [[WU]]
+        # Settings to be used for Weather Underground forecast block. Uncomment 
+        # to use.
+    
+        # WU API key to be used when calling the WU API
+        # api_key = xxxxxxxxxxxxxxxx        
+
+    [[Text]]
+        # Settings to be used for user specified text block. Uncomment to use.
+        
+        # user specified text to populate the 'forecast' field
+        # text = enter text here
+
+    [[File]]
+        # Settings to be used for first line of text file block. Uncomment to use.
+        
+        # Path and file name of file to use as block for the 'forecast' 
+        # field. Must be a text file, first line only of file is read.
+        # file = path/to/file/file_name
+
     [[StringFormats]]
+        # formats for gauge-data.txt fields by unit type
         degree_C = %.1f
         degree_F = %.1f
         degree_compass = %.0f
@@ -133,38 +159,22 @@ rtgd_config = """
         uv_index = %.1f
         watt_per_meter_squared = %.0f
     
-    # Units to be used in gauge-data.txt. Note not all available WeeWX units 
-    # are supported for each group. 
+
     [[Groups]]
-        group_altitude = foot   # Supported options are 'meter' or 'foot'
-        group_pressure = hPa    # Supported options are 'inHg', 'mbar', or 'hPa'
-        group_rain = mm         # Supported options are 'inch' or 'mm'
-        group_speed = km_per_hour   # Supported options are 'mile_per_hour', 
-                                    # 'km_per_hour' or 'meter_per_second'
-        group_temperature = degree_C    # Supported options are 'degree_F' or 
-                                        # 'degree_C'
+        # Units to be used in gauge-data.txt. Note not all available WeeWX units 
+        # are supported for each group.         
         
-    # Settings to be used for Darksky forecast block. Uncomment to use.
-    [[DS]]
-        # DarkSky API key
-        # api_key = xxxxxxxxxxxxxxxx
-        
-    # Settings to be used for Weather Underground forecast block. Uncomment 
-    # to use.
-    [[WU]]
-        # WU API key to be used when calling the WU API
-        # api_key = xxxxxxxxxxxxxxxx        
-
-    # Settings to be used for user specified text block. Uncomment to use.
-    [[Text]]
-        # user specified text to populate the 'forecast' field
-        # text = enter text here
-
-    # Settings to be used for first line of text file block. Uncomment to use.
-    [[File]]
-        # Path and file name of file to use as block for the 'forecast' 
-        # field. Must be a text file, first line only of file is read.
-        # file = path/to/file/file_name
+        # Supported options for group_altitude are 'meter' or 'foot'
+        group_altitude = foot
+        # Supported options for group_pressure are 'inHg', 'mbar', or 'hPa'
+        group_pressure = hPa
+        # Supported options for group_rain are 'inch' or 'mm'
+        group_rain = mm
+        # Supported options for group_speed are 'mile_per_hour', 'km_per_hour' 
+        # or 'meter_per_second'
+        group_speed = km_per_hour
+        # Supported options for group_temperature are 'degree_F' or 'degree_C'
+        group_temperature = degree_C
 """
 
 # construct our config dict
