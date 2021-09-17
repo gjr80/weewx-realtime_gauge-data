@@ -1,0 +1,45 @@
+## Copyright 2021 Gary Roderick
+## Distributed under terms of GPLv3.  See LICENSE.txt for your rights.
+#errorCatcher Echo
+#encoding UTF-8
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>$station.location SteelSeries Weather Gauges</title>
+    <link rel="icon" type="image/png" href="favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="seasons.css"/>
+    <link rel="stylesheet" href="ssg/css/gauges-ss.css">
+    <script src="seasons.js"></script>
+    <style>
+#gauges_widget th {
+  font-weight: normal;
+  text-align: right;
+}
+#gauges_widget .widget_title {
+  margin-bottom: 25px;
+}
+#gauges_widget .label {
+  font-size: 100%;
+}
+#gauges_widget .data {
+  font-size: 100%;
+}
+    </style>
+  </head>
+
+  <body>
+    #include "../Seasons/titlebar.inc"
+
+    <div id="contents">
+      <p><a href="index.html">&#10096; Current Conditions</a></p>
+
+      <div id="widget_group">
+        #include "ssgauges.inc"
+      </div>
+
+      #include "../Seasons/identifier.inc"
+    </div>
+
+  </body>
+</html>
