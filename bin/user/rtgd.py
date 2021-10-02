@@ -578,6 +578,7 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
 """
 
 # python imports
+import copy
 import datetime
 import errno
 import json
@@ -622,7 +623,16 @@ COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                   'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N']
 
 # default units to use
-DEFAULT_UNITS = weewx.units.MetricUnits
+# Default to Metric with speed in 'km_per_hour' and rain in 'mm'.
+# weewx.units.MetricUnits is close but we need to change the rain units (we
+# could use MetricWX but then we would need to change the speed units!)
+# start by making a deepcopy
+_UNITS = copy.deepcopy(weewx.units.MetricUnits)
+# now set the group_rain and group_rainrate units
+_UNITS['group_rain'] = 'mm'
+_UNITS['group_rainrate'] = 'mm_per_hour'
+# now assign to our defaults
+DEFAULT_UNITS = _UNITS
 
 # map WeeWX unit names to unit names supported by the SteelSeries Weather
 # Gauges
@@ -1474,9 +1484,13 @@ class RealtimeGaugeDataThread(threading.Thread):
         # set up output units dict
         # first get the Groups config from our config dict
         _config_units_dict = rtgd_config_dict.get('Groups', {})
+        # group_rainrate needs special attention; it needs to match group_rain.
+        # If group_rain does not exist omit group_rainrate as it will be
+        # picked up from the defaults.
+        if 'group_rain' in _config_units_dict:
+            _config_units_dict['group_rainrate'] = "%s_per_hour" % (_config_units_dict['group_rain'],)
         # add the Groups config to the chainmap and set the units_dict property
         self.units_dict = ListOfDicts(_config_units_dict, DEFAULT_UNITS)
-
         # setup the field map
         _field_map = rtgd_config_dict.get('FieldMap', DEFAULT_FIELD_MAP)
         # update the field map with any extensions
