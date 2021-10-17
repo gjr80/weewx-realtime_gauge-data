@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.0                                          Date: 15 September 2021
+Version: 0.5.0                                          Date: 17 October 2021
 
   Revision History
+    17 October 2021     v0.5.1
+        - fixed bug where the default metric rain rate units used cm per hour
+          rather than mm per hour
     15 September 2021   v0.5.0
         - added ability to rsync gauge-data.txt to an rsync capable server,
           thanks to John Kline
@@ -614,7 +617,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.0'
+RTGD_VERSION = '0.5.1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
