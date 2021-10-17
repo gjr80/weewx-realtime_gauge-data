@@ -1,3 +1,6 @@
+v0.5.1
+- fixed bug where the default metric rain rate units used cm per hour rather
+  than mm per hour
 v0.5.0
 - added ability to rsync gauge-data.txt to an rsync capable server, thanks to
   John Kline
