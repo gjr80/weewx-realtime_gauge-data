@@ -699,7 +699,7 @@ DEFAULT_FIELD_MAP = {'temp': {
                      },
                      'tempTH': {
                          'source': 'outTemp',
-                         'aggregate': 'min',
+                         'aggregate': 'max',
                          'aggregate_period': 'day',
                          'format': '%.1f'
                      },
