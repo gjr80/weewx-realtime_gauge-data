@@ -1,3 +1,5 @@
+v0.5.2
+- fixed bug where tempTH contained today's outTemp minimum rather than maximum
 v0.5.1
 - fixed bug where the default metric rain rate units used cm per hour rather
   than mm per hour
