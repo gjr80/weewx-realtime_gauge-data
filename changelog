@@ -1,3 +1,7 @@
+v0.5.3
+- fixed bug where incorrect output field name is used for inside temperature
+  and associated aggregates/times
+- added inside humidity and associated aggregates/times to gauge-data.txt
 v0.5.2
 - fixed bug where tempTH contained today's outTemp minimum rather than maximum
 v0.5.1

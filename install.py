@@ -10,10 +10,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.5.2                                          Date: 22 October 2021
+Version: 0.5.3                                          Date: 11 April 2022
 
 Revision History
-
+    11 April 2022       v0.5.3
+        - bumped version only
     22 October 2021     v0.5.2
         - bumped version only
     17 October 2021     v0.5.1
@@ -95,7 +96,7 @@ from six.moves import StringIO
 import weewx
 
 REQUIRED_VERSION = "4.0.0"
-RTGD_VERSION = "0.5.2"
+RTGD_VERSION = "0.5.3"
 
 # define our config as a multiline string so we can preserve comments
 rtgd_config = """
