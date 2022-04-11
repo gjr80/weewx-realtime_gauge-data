@@ -3,7 +3,7 @@ rtgd.py
 
 A WeeWX service to generate a loop based gauge-data.txt.
 
-Copyright (C) 2017-2021 Gary Roderick             gjroderick<at>gmail.com
+Copyright (C) 2017-2022 Gary Roderick             gjroderick<at>gmail.com
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,9 +17,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.2                                          Date: 22 October 2021
+Version: 0.5.3                                          Date: 11 April 2022
 
   Revision History
+    11 April 2022       v0.5.3
+        - fixed bug where incorrect output field name is used for inside
+          temeprature and associated aggregates/times
+        - added inside humidity and associated aggregates/times to output
     22 October 2021     v0.5.2
         - fixed bug where tempTH contained today's outTemp minimum rather than
           maximum
@@ -620,7 +624,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.2'
+RTGD_VERSION = '0.5.3'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -661,8 +665,8 @@ GROUP_DIST = {'mile_per_hour':      'mile',
 # list of obs that we will attempt to buffer
 MANIFEST = ['outTemp', 'barometer', 'outHumidity', 'rain', 'rainRate',
             'humidex', 'windchill', 'heatindex', 'windSpeed', 'inTemp',
-            'appTemp', 'dewpoint', 'windDir', 'UV', 'radiation', 'wind',
-            'windGust', 'windGustDir', 'windrun']
+            'inHumidity', 'appTemp', 'dewpoint', 'windDir', 'UV', 'radiation',
+            'wind', 'windGust', 'windGustDir', 'windrun']
 
 # obs for which we need a history
 HIST_MANIFEST = ['windSpeed', 'windDir', 'windGust', 'wind']
@@ -725,29 +729,29 @@ DEFAULT_FIELD_MAP = {'temp': {
                          'grace_period': '300',
                          'format': '%.1f'
                      },
-                     'inTemp': {
+                     'intemp': {
                          'source': 'inTemp',
                          'format': '%.1f'
                      },
-                     'inTempTL': {
+                     'intempTL': {
                          'source': 'inTemp',
                          'aggregate': 'min',
                          'aggregate_period': 'day',
                          'format': '%.1f'
                      },
-                     'inTempTH': {
+                     'intempTH': {
                          'source': 'inTemp',
                          'aggregate': 'max',
                          'aggregate_period': 'day',
                          'format': '%.1f'
                      },
-                     'TinTempTL': {
+                     'TintempTL': {
                          'source': 'inTemp',
                          'aggregate': 'mintime',
                          'aggregate_period': 'day',
                          'format': '%H:%M'
                      },
-                     'TinTempTH': {
+                     'TintempTH': {
                          'source': 'inTemp',
                          'aggregate': 'maxtime',
                          'aggregate_period': 'day',
@@ -777,6 +781,34 @@ DEFAULT_FIELD_MAP = {'temp': {
                      },
                      'ThumTH': {
                          'source': 'outHumidity',
+                         'aggregate': 'maxtime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'inhum': {
+                         'source': 'inHumidity',
+                         'format': '%.1f'
+                     },
+                     'inhumTL': {
+                         'source': 'inHumidity',
+                         'aggregate': 'min',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'inhumTH': {
+                         'source': 'inHumidity',
+                         'aggregate': 'max',
+                         'aggregate_period': 'day',
+                         'format': '%.1f'
+                     },
+                     'TinhumTL': {
+                         'source': 'inHumidity',
+                         'aggregate': 'mintime',
+                         'aggregate_period': 'day',
+                         'format': '%H:%M'
+                     },
+                     'TinhumTH': {
+                         'source': 'inHumidity',
                          'aggregate': 'maxtime',
                          'aggregate_period': 'day',
                          'format': '%H:%M'
