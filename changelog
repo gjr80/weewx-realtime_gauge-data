@@ -1,3 +1,6 @@
+v0.5.4
+- added the inadvertently omitted humidex field
+- added field TrrateTM
 v0.5.3
 - fixed bug where incorrect output field name is used for inside temperature
   and associated aggregates/times
