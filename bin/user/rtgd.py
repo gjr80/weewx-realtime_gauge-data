@@ -17,9 +17,16 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.4                                          Date: 13 April 2022
+Version: 0.5.5                                          Date: 17 April 2022
 
   Revision History
+    17 April 2022       v0.5.5
+        - fixed bug in date and dateFormat fields that resulted in the
+          incorrect 'last rainfall' date and time being displayed on rainfall
+          gauge mouseovers
+        - as a result of the date and dateFormat bug fix date_format and
+          time_format config options are now limited to a number of fixed
+          formats
     13 April 2022       v0.5.4
         - added the inadvertently omitted humidex field
         - added field TrrateTM
@@ -209,8 +216,14 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
 3.  Add the following stanza to weewx.conf:
 
 [RealtimeGaugeData]
-    # Date format to be used in gauge-data.txt. Default is %Y.%m.%d %H:%M
-    date_format = %Y.%m.%d %H:%M
+    # Date format to be used in gauge-data.txt. Must be either %d/%m/%Y,
+    # %m/%d/%Y or %Y/%m/%d. Separator may be forward slash '/' or a
+    # hyphen '-'. Default is %Y/%m/%d.
+    date_format = %Y/%m/%d
+
+    # Time format to be used in gauge-data.txt. May be %H:%M or %h:%M.
+    # Default is %H:%M
+    time_format = %H:%M
 
     # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
     # empty default is HTML_ROOT. If setting omitted altogether default is
@@ -628,7 +641,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.4'
+RTGD_VERSION = '0.5.5'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1490,9 +1503,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.wr_points = 16
 
         # get our groups and format strings
-        self.date_format = rtgd_config_dict.get('date_format',
-                                                '%Y-%m-%d %H:%M')
-        self.time_format = '%H:%M'
+        self.date_format = rtgd_config_dict.get('date_format', '%Y/%m/%d')
+        self.time_format = rtgd_config_dict.get('time_format', '%H:%M')
         self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
                                                          'degree_C')
         self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
@@ -2063,10 +2075,11 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # timeUTC - UTC date/time in format YYYY,mm,dd,HH,MM,SS
         data['timeUTC'] = datetime.datetime.utcfromtimestamp(ts).strftime("%Y,%m,%d,%H,%M,%S")
-        # date - date in (default) format Y.m.d HH:MM
-        data['date'] = time.strftime(self.date_format, time.localtime(ts))
+        # date and time - date and time must be space separated
+        data['date'] = ' '.join([time.strftime(self.date_format, time.localtime(ts)),
+                                 time.strftime(self.time_format, time.localtime(ts))])
         # dateFormat - date format
-        data['dateFormat'] = self.date_format.replace('%', '')
+        data['dateFormat'] = self.date_format.replace('%', '').replace('-', '').lower()
         # SensorContactLost - 1 if the station has lost contact with its remote
         # sensors "Fine Offset only" 0 if contact has been established
         data['SensorContactLost'] = self.flag_format % self.lost_contact_flag
@@ -2118,7 +2131,7 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # LastRainTipISO - date and time of last rainfall
         if self.last_rain_ts is not None:
-            _last_rain_tip_iso = time.strftime(self.date_format,
+            _last_rain_tip_iso = time.strftime(' '.join([self.date_format, self.time_format]),
                                                time.localtime(self.last_rain_ts))
         else:
             _last_rain_tip_iso = "1/1/1900 00:00"
