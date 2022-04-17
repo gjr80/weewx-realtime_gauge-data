@@ -1,3 +1,8 @@
+v0.5.5
+- fixed bug in date and dateFormat fields that resulted in the incorrect 'last
+  rainfall' date and time being displayed on rainfall gauge mouseovers
+- as a result of the date and dateFormat bug fix date_format and time_format
+  config options are now limited to a number of fixed formats
 v0.5.4
 - added the inadvertently omitted humidex field
 - added field TrrateTM
