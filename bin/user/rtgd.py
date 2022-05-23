@@ -1423,7 +1423,6 @@ class RsyncExport(object):
     def export(self, data, dateTime):
         """Rsync the data."""
 
-        log.info("export: data: %r" % data)
         packet_time = datetime.datetime.fromtimestamp(dateTime)
         self.rsync_data(packet_time)
 
