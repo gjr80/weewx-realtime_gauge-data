@@ -33,7 +33,7 @@ Version: 0.5.5                                          Date: 17 April 2022
         - reformatted DEFAULT_FIELD_MAP
     11 April 2022       v0.5.3
         - fixed bug where incorrect output field name is used for inside
-          temeprature and associated aggregates/times
+          temperature and associated aggregates/times
         - added inside humidity and associated aggregates/times to output
     22 October 2021     v0.5.2
         - fixed bug where tempTH contained today's outTemp minimum rather than
@@ -255,12 +255,12 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # help function.
     #
     # To use rsync, passwordless ssh using public/private key must be
-    # configured for authentication from the user account that weewx runs under on
+    # configured for authentication from the user account that WeeWX runs under on
     # this computer to the user account on the remote machine with write access to
     # the destination directory (rsync_remote_rtgd_dir).
     #
     # If you run logwatch on your system, the following lines will show in the
-    # weewx section when they are non-zero.  The first line includes any
+    # WeeWX section when they are non-zero.  The first line includes any
     # reporting files rsynced (if that is configured).  The others report timeouts
     # and write errors.  Small numbers are expected here as timeouts are purposely
     # defaulted to 1 second.  If taking to long to send, it's better to skip it
@@ -652,8 +652,8 @@ COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
 
 # default units to use
 # Default to Metric with speed in 'km_per_hour' and rain in 'mm'.
-# weewx.units.MetricUnits is close but we need to change the rain units (we
-# could use MetricWX but then we would need to change the speed units!)
+# weewx.units.MetricUnits is close, but we need to change the rain units (we
+# could use MetricWX, but then we would need to change the speed units!)
 # start by making a deepcopy
 _UNITS = copy.deepcopy(weewx.units.MetricUnits)
 # now set the group_rain and group_rainrate units
@@ -1226,12 +1226,12 @@ class RealtimeGaugeData(StdService):
         if hasattr(self, 'rtgd_ctl_queue') and hasattr(self, 'rtgd_thread'):
             if self.rtgd_ctl_queue and self.rtgd_thread.is_alive():
                 # Put a None in the rtgd_ctl_queue to signal the thread to
-                # shutdown
+                # shut down
                 self.rtgd_ctl_queue.put(None)
         if hasattr(self, 'source_ctl_queue') and hasattr(self, 'source_thread'):
             if self.source_ctl_queue and self.source_thread.is_alive():
                 # Put a None in the source_ctl_queue to signal the thread to
-                # shutdown
+                # shut down
                 self.source_ctl_queue.put(None)
         if hasattr(self, 'rtgd_thread') and self.rtgd_thread.is_alive():
             # Wait up to 15 seconds for the thread to exit:
@@ -1465,7 +1465,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # Initialize my superclass:
         threading.Thread.__init__(self)
 
-        # setup a few thread things
+        # set up a few thread things
         self.setName('RtgdThread')
         self.setDaemon(True)
 
@@ -1555,7 +1555,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             _config_units_dict['group_rainrate'] = "%s_per_hour" % (_config_units_dict['group_rain'],)
         # add the Groups config to the chainmap and set the units_dict property
         self.units_dict = ListOfDicts(_config_units_dict, DEFAULT_UNITS)
-        # setup the field map
+        # set up the field map
         _field_map = rtgd_config_dict.get('FieldMap', DEFAULT_FIELD_MAP)
         # update the field map with any extensions
         _extensions = rtgd_config_dict.get('FieldMapExtensions', {})
@@ -1739,7 +1739,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                 log.debug("windrose data calculated")
             elif weewx.debug >= 3:
                 log.debug("windrose data calculated: %s" % (self.rose,))
-            # setup our loop cache and set some starting wind values
+            # set up our loop cache and set some starting wind values
             _ts = self.db_manager.lastGoodStamp()
             if _ts is not None:
                 _rec = self.db_manager.getRecord(_ts)
@@ -2066,7 +2066,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # construct a dict to hold our results
         data = dict()
 
-        # obtain 10 minute average wind direction
+        # obtain 10-minute average wind direction
         avg_bearing_10 = self.buffer['wind'].history_vec_avg.dir
 
         # First we populate all non-field map calculated fields and then
@@ -2105,7 +2105,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             press_l_vt = ValueTuple(850, 'hPa', self.packet_unit_dict['barometer']['group'])
         press_l = convert(press_l_vt, self.pres_group).value
         data['pressL'] = self.pres_format % press_l
-        # pressH - all time high barometer
+        # pressH - all-time high barometer
         if self.max_barometer is not None:
             press_h_vt = ValueTuple(self.max_barometer,
                                     self.packet_unit_dict['barometer']['units'],
@@ -2187,8 +2187,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         if avg_bearing_10 is not None:
             # First obtain a list of wind direction history over the last
             # 10 minutes, but we want the direction to be in -180 to
-            # 180 degrees range rather than from 0 to 360 degrees. Also the
-            # values must be relative to the 10 minute average wind direction.
+            # 180 degrees range rather than from 0 to 360 degrees. Also, the
+            # values must be relative to the 10-minute average wind direction.
             # Wrap in a try.except just in case.
             try:
                 _offset_dir = [self.to_plusminus(obs.value.dir-avg_bearing_10) for obs in self.buffer['wind'].history]
@@ -2280,9 +2280,9 @@ class RealtimeGaugeDataThread(threading.Thread):
     def calc_last_rain_stamp(self):
         """Calculate the timestamp of the last rain.
 
-        Searching a large archive for the last rainfall could be time consuming
-        so first search the daily summaries for the day of last rain and then
-        search that day for the actual timestamp.
+        Searching a large archive for the last rainfall could be
+        time-consuming, so first search the daily summaries for the day of last
+        rain and then search that day for the actual timestamp.
         """
 
         _row = self.db_manager.getSql("SELECT MAX(dateTime) FROM archive_day_rain WHERE sum > 0")
@@ -2372,7 +2372,7 @@ class ObsBuffer(object):
     def trim_history(self, ts):
         """Trim any old data from the history list."""
 
-        # calc ts of oldest sample we want to retain
+        # calc ts of the oldest sample we want to retain
         oldest_ts = ts - MAX_AGE
         # set history_full property
         self.history_full = min([a.ts for a in self.history if a.ts is not None]) <= oldest_ts
@@ -2509,7 +2509,7 @@ class VectorBuffer(ObsBuffer):
     def history_vec_avg(self):
         """The history average vector.
 
-        The period over which the average is calculated is the the history
+        The period over which the average is calculated is the history
         retention period (nominally 10 minutes).
         """
 
@@ -2531,7 +2531,7 @@ class VectorBuffer(ObsBuffer):
     def history_vec_dir(self):
         """The history vector average direction.
 
-        The period over which the average is calculated is the the history
+        The period over which the average is calculated is the history
         retention period (nominally 10 minutes).
         """
 
@@ -2838,10 +2838,10 @@ class CachedPacket(object):
     def __init__(self, rec):
         """Initialise our cache object.
 
-        The cache needs to be initialised to include all of the fields required
-        by method calculate(). We could initialise all field values to None
-        (method calculate() will interpret the None values to be '0' in most
-        cases). The result on the gauge display may be misleading. We can get
+        The cache needs to be initialised to include all fields required by the
+        calculate() method. We could initialise all field values to None
+        (calculate() will interpret the None values to be '0' in most cases).
+        The result on the gauge display may be misleading. We can get
         ballpark values for all fields by priming them with values from the
         last archive record. As the archive may have many more fields than rtgd
         requires, only prime those fields that rtgd requires.
@@ -2944,18 +2944,25 @@ def calc_trend(obs_type, now_vt, target_units, db_manager, then_ts, grace=0):
 
     Returns:
         Change in value over trend period. Can be positive, 0, negative or
-        None. Result will be in 'group' units.
+        None. Result will be in 'target_units' units.
     """
 
+    # if the 'now' value is None return None
     if now_vt.value is None:
         return None
+    # get the 'then' record
     then_record = db_manager.getRecord(then_ts, grace)
+    # if there is no 'then' record return None
     if then_record is None:
         return None
     else:
-        if obs_type not in then_record:
+        # return None if obs_type is not in the 'then' record, or if it is in
+        # the 'then' record but it is None
+        if then_record.get(obs_type) is None:
             return None
         else:
+            # otherwise calculate the difference between the 'now' and 'then'
+            # values but make sure the correct units are used
             then_vt = weewx.units.as_value_tuple(then_record, obs_type)
             now = convert(now_vt, target_units).value
             then = convert(then_vt, target_units).value
@@ -2963,7 +2970,7 @@ def calc_trend(obs_type, now_vt, target_units, db_manager, then_ts, grace=0):
 
 
 def calc_windrose(now, db_manager, period, points):
-    """Calculate a SteelSeries Weather Gauges windrose array.
+    """Calculate a SteelSeries Weather Gauges' windrose array.
 
     Calculate an array representing the 'amount of wind' from each of the 8 or
     16 compass points. The value for each compass point is determined by
@@ -3046,7 +3053,7 @@ class ThreadedSource(threading.Thread):
         # Initialize my superclass
         threading.Thread.__init__(self)
 
-        # setup a some thread things
+        # set up a some thread things
         self.setDaemon(True)
         # thread name needs to be set in the child class __init__() eg:
         #   self.setName('RtgdDarkskyThread')
@@ -3151,7 +3158,8 @@ class Source(object):
         Unlike most other block class Source does not run in a thread but 
         rather is a simple non-threaded class that provides a result once and 
         then does nothing else. The start() method has been defined as the 
-        entry point so we can be 'started' just like a threading.Thread object.
+        entry point, so we can be 'started' just like a threading.Thread
+        object.
         """
 
         # get the scroller text string
@@ -3350,7 +3358,7 @@ class WUSource(ThreadedSource):
                     self.last_call_ts = now
                 return _response
         else:
-            # API call limiter kicked in so say so
+            # the API call limiter kicked in so say so
             log.info("Tried to make a WU API call within %d sec of the previous call." % (self.lockout_period, ))
             log.info("        WU API call limit reached. API call skipped.")
         return None
@@ -3363,13 +3371,13 @@ class WUSource(ThreadedSource):
 
         - the full day narrative
         - the day time narrative, and
-        - the night time narrative.
+        - the nighttime narrative.
 
-        WU claims that night time is for 7pm to 7am and day time is for 7am to
-        7pm though anecdotally it appears that the day time forecast disappears
+        WU claims that nighttime is for 7pm to 7am and day time is for 7am to
+        7pm though anecdotally it appears that the daytime forecast disappears
         late afternoon and reappears early morning. If day-night forecast text
-        is selected we will look for a day time forecast up until 7pm with a
-        fallback to the night time forecast. From 7pm to midnight the nighttime
+        is selected we will look for a daytime forecast up until 7pm with a
+        fallback to the nighttime forecast. From 7pm to midnight the nighttime
         forecast will be used. If day forecast text is selected then we will
         use the higher level full day forecast text.
 
@@ -3402,7 +3410,7 @@ class WUSource(ThreadedSource):
                           "'%s' forecast narrative" % self.forecast_text)
                 return None
         else:
-            # we want the day time or night time narrative, but which, WU
+            # we want the day time or nighttime narrative, but which, WU
             # starts dropping the day narrative late in the afternoon and it
             # does not return until the early hours of the morning. If possible
             # use day time up until 7pm but be prepared to fall back to night
@@ -3415,9 +3423,9 @@ class WUSource(ThreadedSource):
                 _period_str = 'daytime'
             else:
                 _period_str = 'nighttime'
-            # day_index is the index of the day time forecast for today, it
+            # day_index is the index of the daytime forecast for today, it
             # will either be 0 (ie the first entry) or None if today's day
-            # forecast is not present. If it is None then the night time
+            # forecast is not present. If it is None then the nighttime
             # forecast is used. Start by assuming there is no day forecast.
             day_index = None
             if _hour < 19:
@@ -3608,8 +3616,8 @@ class ZambrettiSource(ThreadedSource):
 
     ZambrettiSource methods:
 
-        run.               Control fetching the forecast and monitor the control
-                           queue.
+        run.            Control fetching the forecast and monitor the control
+                        queue.
     """
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
@@ -3678,7 +3686,7 @@ class Zambretti(object):
         # initialise container for timestamp of last db query
         self.last_query_ts = None
         
-        # flag as to whether the WeeWX forecasting extension is installed
+        # flag indicating whether the WeeWX forecasting extension is installed
         self.forecasting_installed = False
         
         # Get a db manager for the forecast database and import the Zambretti
@@ -3698,6 +3706,7 @@ class Zambretti(object):
             # if we made it this far the forecast extension is installed and we
             # can do business
             self.forecasting_installed = True
+        # TODO. Should catch import error
         except Exception as e:
             # Something went wrong so log the error. Our forecasting_installed 
             # flag will not have been set so it is safe to continue but there 
@@ -3893,7 +3902,7 @@ class DarkskySource(ThreadedSource):
                     self.last_call_ts = now
                 return _response
         else:
-            # API call limiter kicked in so say so
+            # the API call limiter kicked in so say so
             log.info("Tried to make an Darksky API call within %d sec of the previous call." % (self.lockout_period, ))
             log.info("Darksky API call limit reached. API call skipped.")
         return None
