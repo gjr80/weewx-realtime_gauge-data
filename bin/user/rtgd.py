@@ -3,7 +3,7 @@ rtgd.py
 
 A WeeWX service to generate a loop based gauge-data.txt.
 
-Copyright (C) 2017-2021 Gary Roderick             gjroderick<at>gmail.com
+Copyright (C) 2017-2022 Gary Roderick             gjroderick<at>gmail.com
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,9 +17,27 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.0                                          Date: 17 October 2021
+Version: 0.5.5                                          Date: 17 April 2022
 
   Revision History
+    17 April 2022       v0.5.5
+        - fixed bug in date and dateFormat fields that resulted in the
+          incorrect 'last rainfall' date and time being displayed on rainfall
+          gauge mouseovers
+        - as a result of the date and dateFormat bug fix date_format and
+          time_format config options are now limited to a number of fixed
+          formats
+    13 April 2022       v0.5.4
+        - added the inadvertently omitted humidex field
+        - added field TrrateTM
+        - reformatted DEFAULT_FIELD_MAP
+    11 April 2022       v0.5.3
+        - fixed bug where incorrect output field name is used for inside
+          temeprature and associated aggregates/times
+        - added inside humidity and associated aggregates/times to output
+    22 October 2021     v0.5.2
+        - fixed bug where tempTH contained today's outTemp minimum rather than
+          maximum
     17 October 2021     v0.5.1
         - fixed bug where the default metric rain rate units used cm per hour
           rather than mm per hour
@@ -198,8 +216,14 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
 3.  Add the following stanza to weewx.conf:
 
 [RealtimeGaugeData]
-    # Date format to be used in gauge-data.txt. Default is %Y.%m.%d %H:%M
-    date_format = %Y.%m.%d %H:%M
+    # Date format to be used in gauge-data.txt. Must be either %d/%m/%Y,
+    # %m/%d/%Y or %Y/%m/%d. Separator may be forward slash '/' or a
+    # hyphen '-'. Default is %Y/%m/%d.
+    date_format = %Y/%m/%d
+
+    # Time format to be used in gauge-data.txt. May be %H:%M or %h:%M.
+    # Default is %H:%M
+    time_format = %H:%M
 
     # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
     # empty default is HTML_ROOT. If setting omitted altogether default is
@@ -322,7 +346,7 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     # The scroller_source config option is case insensitive. A corresponding
     # second level config section (ie [[ ]]) is required for the block to be 
     # used. Refer to step 4 below for details. If the scroller_source config 
-    # option is omitted or left blank the 'forecast' filed will be blank and no 
+    # option is omitted or left blank the 'forecast' field will be blank and no
     # scroller text will be displayed.
     scroller_source = text|file|WU|DS|Zambretti
 
@@ -617,7 +641,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.1'
+RTGD_VERSION = '0.5.5'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -658,8 +682,8 @@ GROUP_DIST = {'mile_per_hour':      'mile',
 # list of obs that we will attempt to buffer
 MANIFEST = ['outTemp', 'barometer', 'outHumidity', 'rain', 'rainRate',
             'humidex', 'windchill', 'heatindex', 'windSpeed', 'inTemp',
-            'appTemp', 'dewpoint', 'windDir', 'UV', 'radiation', 'wind',
-            'windGust', 'windGustDir', 'windrun']
+            'inHumidity', 'appTemp', 'dewpoint', 'windDir', 'UV', 'radiation',
+            'wind', 'windGust', 'windGustDir', 'windrun']
 
 # obs for which we need a history
 HIST_MANIFEST = ['windSpeed', 'windDir', 'windGust', 'wind']
@@ -687,313 +711,350 @@ ARCHIVE_STATIONS = ['Vantage']
 LOOP_STATIONS = ['FineOffsetUSB']
 
 # default field map
-DEFAULT_FIELD_MAP = {'temp': {
-                         'source': 'outTemp',
-                         'format': '%.1f'
-                     },
-                     'tempTL': {
-                         'source': 'outTemp',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'tempTH': {
-                         'source': 'outTemp',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TtempTL': {
-                         'source': 'outTemp',
-                         'aggregate': 'mintime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'TtempTH': {
-                         'source': 'outTemp',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'temptrend': {
-                         'source': 'outTemp',
-                         'aggregate': 'trend',
-                         'aggregate_period': '3600',
-                         'grace_period': '300',
-                         'format': '%.1f'
-                     },
-                     'inTemp': {
-                         'source': 'inTemp',
-                         'format': '%.1f'
-                     },
-                     'inTempTL': {
-                         'source': 'inTemp',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'inTempTH': {
-                         'source': 'inTemp',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TinTempTL': {
-                         'source': 'inTemp',
-                         'aggregate': 'mintime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'TinTempTH': {
-                         'source': 'inTemp',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'hum': {
-                         'source': 'outHumidity',
-                         'format': '%.1f'
-                     },
-                     'humTL': {
-                         'source': 'outHumidity',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'humTH': {
-                         'source': 'outHumidity',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'ThumTL': {
-                         'source': 'outHumidity',
-                         'aggregate': 'mintime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'ThumTH': {
-                         'source': 'outHumidity',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'dew': {
-                         'source': 'dewpoint',
-                         'format': '%.1f'
-                     },
-                     'dewpointTL': {
-                         'source': 'dewpoint',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'dewpointTH': {
-                         'source': 'dewpoint',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TdewpointTL': {
-                         'source': 'dewpoint',
-                         'aggregate': 'mintime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'TdewpointTH': {
-                         'source': 'dewpoint',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'wchill': {
-                         'source': 'windchill',
-                         'format': '%.1f'
-                     },
-                     'wchillTL': {
-                         'source': 'windchill',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TwchillTL': {
-                         'source': 'windchill',
-                         'aggregate': 'mintime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'heatindex': {
-                         'source': 'heatindex',
-                         'format': '%.1f'
-                     },
-                     'heatindexTH': {
-                         'source': 'heatindex',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TheatindexTH': {
-                         'source': 'heatindex',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'apptemp': {
-                         'source': 'appTemp',
-                         'format': '%.1f'
-                     },
-                     'apptempTL': {
-                         'source': 'appTemp',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'apptempTH': {
-                         'source': 'appTemp',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TapptempTL': {
-                         'source': 'appTemp',
-                         'aggregate': 'mintime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'TapptempTH': {
-                         'source': 'appTemp',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'press': {
-                         'source': 'barometer',
-                         'format': '%.1f'
-                     },
-                     'pressTL': {
-                         'source': 'barometer',
-                         'aggregate': 'min',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'pressTH': {
-                         'source': 'barometer',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TpressTL': {
-                         'source': 'barometer',
-                         'aggregate': 'mintime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'TpressTH': {
-                         'source': 'barometer',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'presstrendval': {
-                         'source': 'barometer',
-                         'aggregate': 'trend',
-                         'aggregate_period': '3600',
-                         'grace_period': '300',
-                         'format': '%.1f'
-                     },
-                     'rfall': {
-                         'source': 'rain',
-                         'aggregate': 'sum',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'rrate': {
-                         'source': 'rainRate',
-                         'format': '%.1f'
-                     },
-                     'rrateTM': {
-                         'source': 'rainRate',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     # 'hourlyrainTH': {},
-                     # 'ThourlyrainTH': {},
-                     'wlatest': {
-                         'source': 'windSpeed',
-                         'format': '%.1f'
-                     },
-                     'windTM': {
-                         'source': 'windSpeed',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'wgust': {
-                         'source': 'windGust',
-                         'format': '%.1f'
-                     },
-                     'wgustTM': {
-                         'source': 'windGust',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'TwgustTM': {
-                         'source': 'windGust',
-                         'aggregate': 'maxtime',
-                         'aggregate_period': 'day',
-                         'format': '%H:%M'
-                     },
-                     'bearing': {
-                         'source': 'windDir',
-                         'format': '%.1f'
-                     },
-                     'avgbearing': {
-                         'source': 'windDir',
-                         'format': '%.1f'
-                     },
-                     'bearingTM': {
-                         'source': 'wind',
-                         'aggregate': 'max_dir',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'windrun': {
-                         'source': 'windrun',
-                         'aggregate': 'sum',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'UV': {
-                         'source': 'UV',
-                         'format': '%.1f'
-                     },
-                     'UVTH': {
-                         'source': 'UV',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'SolarRad': {
-                         'source': 'radiation',
-                         'format': '%.1f'
-                     },
-                     'SolarRadTM': {
-                         'source': 'radiation',
-                         'aggregate': 'max',
-                         'aggregate_period': 'day',
-                         'format': '%.1f'
-                     },
-                     'CurrentSolarMax': {
-                         'source': 'maxSolarRad',
-                         'format': '%.1f'
-                     },
-                     'cloudbasevalue': {
-                         'source': 'cloudbase',
-                         'format': '%.1f'
-                     }
-                     }
+DEFAULT_FIELD_MAP = {
+    'temp': {
+        'source': 'outTemp',
+        'format': '%.1f'
+    },
+    'tempTL': {
+        'source': 'outTemp',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'tempTH': {
+        'source': 'outTemp',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TtempTL': {
+        'source': 'outTemp',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'TtempTH': {
+        'source': 'outTemp',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'temptrend': {
+        'source': 'outTemp',
+        'aggregate': 'trend',
+        'aggregate_period': '3600',
+        'grace_period': '300',
+        'format': '%.1f'
+    },
+    'intemp': {
+        'source': 'inTemp',
+        'format': '%.1f'
+    },
+    'intempTL': {
+        'source': 'inTemp',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'intempTH': {
+        'source': 'inTemp',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TintempTL': {
+        'source': 'inTemp',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'TintempTH': {
+        'source': 'inTemp',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'hum': {
+        'source': 'outHumidity',
+        'format': '%.1f'
+    },
+    'humTL': {
+        'source': 'outHumidity',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'humTH': {
+        'source': 'outHumidity',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'ThumTL': {
+        'source': 'outHumidity',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'ThumTH': {
+        'source': 'outHumidity',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'inhum': {
+        'source': 'inHumidity',
+        'format': '%.1f'
+    },
+    'inhumTL': {
+        'source': 'inHumidity',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'inhumTH': {
+        'source': 'inHumidity',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TinhumTL': {
+        'source': 'inHumidity',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'TinhumTH': {
+        'source': 'inHumidity',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'dew': {
+        'source': 'dewpoint',
+        'format': '%.1f'
+    },
+    'dewpointTL': {
+        'source': 'dewpoint',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'dewpointTH': {
+        'source': 'dewpoint',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TdewpointTL': {
+        'source': 'dewpoint',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'TdewpointTH': {
+        'source': 'dewpoint',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'wchill': {
+        'source': 'windchill',
+        'format': '%.1f'
+    },
+    'wchillTL': {
+        'source': 'windchill',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TwchillTL': {
+        'source': 'windchill',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'heatindex': {
+        'source': 'heatindex',
+        'format': '%.1f'
+    },
+    'heatindexTH': {
+        'source': 'heatindex',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TheatindexTH': {
+        'source': 'heatindex',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'apptemp': {
+        'source': 'appTemp',
+        'format': '%.1f'
+    },
+    'apptempTL': {
+        'source': 'appTemp',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'apptempTH': {
+        'source': 'appTemp',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TapptempTL': {
+        'source': 'appTemp',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'TapptempTH': {
+        'source': 'appTemp',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'humidex': {
+        'source': 'humidex',
+        'format': '%.1f'
+    },
+    'press': {
+        'source': 'barometer',
+        'format': '%.1f'
+    },
+    'pressTL': {
+        'source': 'barometer',
+        'aggregate': 'min',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'pressTH': {
+        'source': 'barometer',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TpressTL': {
+        'source': 'barometer',
+        'aggregate': 'mintime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'TpressTH': {
+        'source': 'barometer',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'presstrendval': {
+        'source': 'barometer',
+        'aggregate': 'trend',
+        'aggregate_period': '3600',
+        'grace_period': '300',
+        'format': '%.1f'
+    },
+    'rfall': {
+        'source': 'rain',
+        'aggregate': 'sum',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'rrate': {
+        'source': 'rainRate',
+        'format': '%.1f'
+    },
+    'rrateTM': {
+        'source': 'rainRate',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TrrateTM': {
+        'source': 'rainRate',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'wlatest': {
+        'source': 'windSpeed',
+        'format': '%.1f'
+    },
+    'windTM': {
+        'source': 'windSpeed',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'wgust': {
+        'source': 'windGust',
+        'format': '%.1f'
+    },
+    'wgustTM': {
+        'source': 'windGust',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'TwgustTM': {
+        'source': 'windGust',
+        'aggregate': 'maxtime',
+        'aggregate_period': 'day',
+        'format': '%H:%M'
+    },
+    'bearing': {
+        'source': 'windDir',
+        'format': '%.1f'
+    },
+    'avgbearing': {
+        'source': 'windDir',
+        'format': '%.1f'
+    },
+    'bearingTM': {
+        'source': 'wind',
+        'aggregate': 'max_dir',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'windrun': {
+        'source': 'windrun',
+        'aggregate': 'sum',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'UV': {
+        'source': 'UV',
+        'format': '%.1f'
+    },
+    'UVTH': {
+        'source': 'UV',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'SolarRad': {
+        'source': 'radiation',
+        'format': '%.1f'
+    },
+    'SolarRadTM': {
+        'source': 'radiation',
+        'aggregate': 'max',
+        'aggregate_period': 'day',
+        'format': '%.1f'
+    },
+    'CurrentSolarMax': {
+        'source': 'maxSolarRad',
+        'format': '%.1f'
+    },
+    'cloudbasevalue': {
+        'source': 'cloudbase',
+        'format': '%.1f'
+    }
+}
 
 
 # ============================================================================
@@ -1442,9 +1503,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             self.wr_points = 16
 
         # get our groups and format strings
-        self.date_format = rtgd_config_dict.get('date_format',
-                                                '%Y-%m-%d %H:%M')
-        self.time_format = '%H:%M'
+        self.date_format = rtgd_config_dict.get('date_format', '%Y/%m/%d')
+        self.time_format = rtgd_config_dict.get('time_format', '%H:%M')
         self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
                                                          'degree_C')
         self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
@@ -2015,10 +2075,11 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # timeUTC - UTC date/time in format YYYY,mm,dd,HH,MM,SS
         data['timeUTC'] = datetime.datetime.utcfromtimestamp(ts).strftime("%Y,%m,%d,%H,%M,%S")
-        # date - date in (default) format Y.m.d HH:MM
-        data['date'] = time.strftime(self.date_format, time.localtime(ts))
+        # date and time - date and time must be space separated
+        data['date'] = ' '.join([time.strftime(self.date_format, time.localtime(ts)),
+                                 time.strftime(self.time_format, time.localtime(ts))])
         # dateFormat - date format
-        data['dateFormat'] = self.date_format.replace('%', '')
+        data['dateFormat'] = self.date_format.replace('%', '').replace('-', '').lower()
         # SensorContactLost - 1 if the station has lost contact with its remote
         # sensors "Fine Offset only" 0 if contact has been established
         data['SensorContactLost'] = self.flag_format % self.lost_contact_flag
@@ -2070,7 +2131,7 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # LastRainTipISO - date and time of last rainfall
         if self.last_rain_ts is not None:
-            _last_rain_tip_iso = time.strftime(self.date_format,
+            _last_rain_tip_iso = time.strftime(' '.join([self.date_format, self.time_format]),
                                                time.localtime(self.last_rain_ts))
         else:
             _last_rain_tip_iso = "1/1/1900 00:00"

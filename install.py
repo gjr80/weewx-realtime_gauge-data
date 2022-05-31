@@ -10,10 +10,18 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.5.1                                          Date: 17 October 2021
+Version: 0.5.5                                          Date: 17 April 2022
 
 Revision History
-
+    17 April 2022       v0.5.5
+        - change to date_format config option
+        - added time_format config option
+    13 April 2022       v0.5.4
+        - bumped version only
+    11 April 2022       v0.5.3
+        - bumped version only
+    22 October 2021     v0.5.2
+        - bumped version only
     17 October 2021     v0.5.1
         - bumped version only
     15 September 2021   v0.5.0
@@ -93,15 +101,21 @@ from six.moves import StringIO
 import weewx
 
 REQUIRED_VERSION = "4.0.0"
-RTGD_VERSION = "0.5.1"
+RTGD_VERSION = "0.5.5"
 
 # define our config as a multiline string so we can preserve comments
 rtgd_config = """
 [RealtimeGaugeData]
     # This section is for the RTGD service.
 
-    # date format to be used in gauge-data.txt. Default is %Y.%m.%d %H:%M
-    date_format = %Y-%m-%d %H:%M
+    # Date format to be used in gauge-data.txt. Must be either %d/%m/%Y,
+    # %m/%d/%Y or %Y/%m/%d. Separator may be forward slash '/' or a
+    # hyphen '-'. Default is %Y/%m/%d.
+    date_format = %Y/%m/%d
+
+    # Time format to be used in gauge-data.txt. May be %H:%M or %h:%M.
+    # Default is %H:%M
+    time_format = %H:%M
     
     # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
     # empty HTML_ROOT is used, if setting omitted altogether /var/tmp is used.
