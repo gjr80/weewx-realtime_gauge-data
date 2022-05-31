@@ -291,14 +291,15 @@ https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_serv
     #                              and move on to the next if this data is older
     #                              than 4 seconds.
     # Use either the post method or the rsync method, not both.
-    #rsync_server = emerald.johnkline.com
-    #rsync_user = root
-    #rsync_remote_rtgd_dir = /home/weewx/gauge-data
-    #rsync_compress = False
-    #rsync_log_success = False
-    #rsync_ssh_options = "-o ConnectTimeout=1"
-    #rsync_timeout = 1
-    #rsync_skip_if_older_than = 4
+    # [[Rsync]]
+    #   rsync_server = emerald.johnkline.com
+    #   rsync_user = root
+    #   rsync_remote_rtgd_dir = /home/weewx/gauge-data
+    #   rsync_compress = False
+    #   rsync_log_success = False
+    #   rsync_ssh_options = "-o ConnectTimeout=1"
+    #   rsync_timeout = 1
+    #   rsync_skip_if_older_than = 4
 
     # Minimum interval (seconds) between file generation. Ideally
     # gauge-data.txt would be generated on receipt of every loop packet (there
@@ -1300,7 +1301,7 @@ class HttpPostExport(object):
         # response text from remote URL if post was successful
         self.response = post_config_dict.get('response_text', None)
 
-    def export(self, data):
+    def export(self, data, dateTime):
         """Post the data."""
 
         self.post_data(data)
@@ -1419,10 +1420,10 @@ class RsyncExport(object):
         self.rsync_skip_if_older_than = to_int(rsync_config_dict.get('rsync_skip_if_older_than',
                                                                      4))
 
-    def export(self, data):
+    def export(self, data, dateTime):
         """Rsync the data."""
 
-        packet_time = datetime.datetime.fromtimestamp(data['dateTime'])
+        packet_time = datetime.datetime.fromtimestamp(dateTime)
         self.rsync_data(packet_time)
 
     def rsync_data(self, packet_time):
@@ -1900,7 +1901,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                     self.last_write = time.time()
                     # export gauge-data.txt if we have an exporter object
                     if self.exporter:
-                        self.exporter.export(data)
+                        self.exporter.export(data, packet['dateTime'])
                     # log the generation
                     if weewx.debug == 2:
                         log.info("gauge-data.txt (%s) generated in %.5f seconds" % (cached_packet['dateTime'],
