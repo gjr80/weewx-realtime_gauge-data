@@ -1009,15 +1009,18 @@ DEFAULT_FIELD_MAP = {
     },
     'bearing': {
         'source': 'windDir',
+        'default': 0,
         'format': '%.1f'
     },
     'avgbearing': {
-        'source': 'windDir',
+        'source': 'wind',
+        'aggregate': 'vecdir',
+        'aggregate_period': 600,
         'format': '%.1f'
     },
     'bearingTM': {
         'source': 'wind',
-        'aggregate': 'max_dir',
+        'aggregate': 'maxdir',
         'aggregate_period': 'day',
         'format': '%.1f'
     },
@@ -1585,9 +1588,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # get max cache age
         self.max_cache_age = rtgd_config_dict.get('max_cache_age', 600)
 
-        # initialise last wind directions for use when respective direction is
-        # None. We need latest and average
-        self.last_dir = 0
+        # initialise last average wind direction
         self.last_average_dir = 0
 
         # Are we updating windrun using archive data only or archive and loop
@@ -1869,6 +1870,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # convert our incoming packet
         _conv_packet = weewx.units.to_std_system(packet,
                                                  self.stats_unit_system)
+        log.info("received packet with windDir=%s" % _conv_packet.get("windDir", "no field"))
         # update the packet cache with this packet
         self.packet_cache.update(_conv_packet, _conv_packet['dateTime'])
         # update the buffer with the converted packet
@@ -1950,7 +1952,55 @@ class RealtimeGaugeDataThread(threading.Thread):
         os.rename(self.rtgd_path_file_tmp, self.rtgd_path_file)
 
     def get_field_value(self, field, packet):
-        """Obtain the value for an output field."""
+        """Obtain the value for an output field.
+
+
+        A limited set of aggregates is supported for each observation. Each aggregate Supported aggregates and aggregate periods are:
+            min. Minimum value of an observation over the aggregate period. 
+                 Supported aggregate periods are:
+                    day. The minimum value seen so far today.
+                    xxx. The minimum value seen in the last xxx seconds where
+                         xxx is a number in seconds (up to the maximum buffer
+                         history size - nominally 600 seconds).
+            mintime. The time of the minimum value. Aggregate periods supported
+                     are as for min.
+            max. Maximum value of an observation over the aggregate period. 
+                 Supported aggregate periods are:
+                    day. The maximum value seen so far today.
+                    xxx. The maximum value seen in the last xxx seconds where
+                         xxx is a number in seconds (up to the maximum buffer
+                         history size - nominally 600 seconds).
+            mintime. The time of the maximum value. Aggregate periods supported
+                     are as for max.
+            sum: The sum of the values seen so far today.
+            last: The last value seen. Aggregate period is not applicable.
+            lasttime: The time of the last value seen. Aggregate period is not
+                      applicable.
+            trend: The difference in value over the aggregate period. Aggregate
+                   period is a number in seconds (up to the maximum buffer
+                   history size - nominally 600 seconds).
+            count: The number of non-None values over the aggregate period.
+                   Aggregate period is a number in seconds (up to the maximum
+                   buffer history size - nominally 600 seconds).
+            maxdir: For vector observations (eg 'wind') the direction at the
+                    time the maximum value was seen today.
+            vecavg: For vector observations (eg 'wind') the vector average 
+                    magnitude of an observation over the aggregate period. 
+                    Supported aggregate periods are:
+                    day. The vector average magnitude so far today.
+                    xxx. The vector average magnitude over the last xxx seconds 
+                         where xxx is a number in seconds (up to the maximum 
+                         buffer history size - nominally 600 seconds).
+            vecdir: For vector observations (eg 'wind') the vector average 
+                    direction of an observation over the aggregate period. 
+                    Supported aggregate periods are:
+                    day. The vector average direction so far today.
+                    xxx. The vector average direction over the last xxx seconds 
+                         where xxx is a number in seconds (up to the maximum 
+                         buffer history size - nominally 600 seconds).
+
+
+        """
 
         # prime our result
         result = None
@@ -1966,17 +2016,30 @@ class RealtimeGaugeDataThread(threading.Thread):
             # result units
             result_units = self.units_dict[result_group]
             # do we have an aggregate
-            if this_field_map.get('aggregate') is not None and this_field_map.get('aggregate_period') is not None:
-                # We have an aggregate. Aggregates we know about are min, max,
-                # sum, last and trend.
+            if this_field_map.get('aggregate') is not None:
+                # and this_field_map.get('aggregate_period') is not None:
+                # We have an aggregate. We support a limited set of aggregates
+                # with a limited set of aggregate periods. Aggregates we know
+                # about and the supported aggregate periods are:
+                # min:
+                # max:
+                # sum:
+                # last:
+                # trend:
+
                 agg = this_field_map['aggregate'].lower()
-                aggregate_period = this_field_map['aggregate_period'].lower()
-                # Trend requires ome special processing so pull it out first.
+                _agg_period = this_field_map('aggregate_period')
+                try:
+                    aggregate_period = int(_agg_period)
+                except (TypeError, ValueError):
+                    # Likely we encountered None (TypeError) or a string that
+                    # could not be converted to an int (ValueError). In either
+                    # case set aggregate_period to None.
+                    aggregate_period = None
+                # Some aggregates require special handling, try them first
                 if agg == 'trend':
-                    try:
-                        trend_period = int(aggregate_period)
-                    except TypeError:
-                        trend_period = 3600
+                    # if no aggregate period was specified default to 3600 seconds
+                    trend_period = aggregate_period if aggregate_period is not None else 3600
                     grace_period = int(this_field_map.get('grace', 300))
                     # obtain the current value as a ValueTuple
                     _current_vt = as_value_tuple(packet, source)
@@ -1991,7 +2054,14 @@ class RealtimeGaugeDataThread(threading.Thread):
                     if _trend is None:
                         _trend = convert(this_field_map['default'], result_units).value
                     result = this_field_map['format'] % _trend
-                if aggregate_period == 'day':
+                elif agg == 'maxdir':
+                    pass
+                elif agg == 'vecavg':
+                    pass
+                elif agg == 'vecdir':
+                    pass
+                elif agg in ('min', 'max', 'last', 'sum'):
+                    # aggregate_period == 'day':
                     # aggregate since start of today
                     # is it an aggregate that has units?
                     if agg in ('min', 'max', 'last', 'sum'):
@@ -2005,12 +2075,14 @@ class RealtimeGaugeDataThread(threading.Thread):
                         if _conv_raw is None:
                             _conv_raw = convert(this_field_map['default'], result_units).value
                         result = this_field_map['format'] % _conv_raw
-                    elif agg in ('mintime', 'maxtime', 'lasttime'):
-                        # its a time so get the time as a localtime and format
-                        _raw = time.localtime(getattr(self.buffer[source], agg))
-                        result = time.strftime(this_field_map['format'], _raw)
-                    else:
-                        pass
+                elif agg in ('mintime', 'maxtime', 'lasttime'):
+                    # its a time so get the time as a localtime and format
+                    _raw = time.localtime(getattr(self.buffer[source], agg))
+                    result = time.strftime(this_field_map['format'], _raw)
+                elif agg in ('count'):
+                    # its a time so get the time as a localtime and format
+                    _raw = time.localtime(getattr(self.buffer[source], agg))
+                    result = time.strftime(this_field_map['format'], _raw)
                 else:
                     # afraid we don't know what to do
                     pass
@@ -2168,17 +2240,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         wgust = convert(wgust_vt, self.wind_group).value
         data['wgust'] = self.wind_format % wgust
 
-        # bearing - wind bearing (degrees)
-        bearing = packet['windDir']
-        bearing = bearing if bearing is not None else self.last_dir
-        # save this bearing to use next time if there is no windDir, this way
-        # our wind dir needle will always how the last non-None windDir rather
-        # than return to 0
-        self.last_dir = bearing
-        data['bearing'] = self.dir_format % bearing
-
         # avgbearing - 10-minute average wind bearing (degrees)
         data['avgbearing'] = self.dir_format % avg_bearing_10 if avg_bearing_10 is not None else self.dir_format % 0.0
+        log.info("data[avgbearing]=%s" % (data['avgbearing'],))
 
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
@@ -2444,7 +2508,7 @@ class VectorBuffer(ObsBuffer):
             self.min = stats.min
             self.mintime = stats.mintime
             self.max = stats.max
-            self.max_dir = stats.max_dir
+            self.maxdir = stats.maxdir
             self.maxtime = stats.maxtime
             self.sum = stats.sum
             self.xsum = stats.xsum
@@ -2453,7 +2517,7 @@ class VectorBuffer(ObsBuffer):
             self.count = stats.count
         else:
             (self.min, self.mintime,
-             self.max, self.max_dir,
+             self.max, self.maxdir,
              self.maxtime, self.sum,
              self.xsum, self.ysum,
              self.sumtime, self.count) = VectorBuffer.default_init
@@ -2468,7 +2532,7 @@ class VectorBuffer(ObsBuffer):
                     self.mintime = ts
                 if self.max is None or val.mag > self.max:
                     self.max = val.mag
-                    self.max_dir = val.dir
+                    self.maxdir = val.dir
                     self.maxtime = ts
             self.sum += val.mag
             if self.lasttime:
@@ -2488,7 +2552,7 @@ class VectorBuffer(ObsBuffer):
         """Reset the vector obs buffer."""
 
         (self.min, self.mintime,
-         self.max, self.max_dir,
+         self.max, self.maxdir,
          self.maxtime, self.sum,
          self.xsum, self.ysum,
          self.sumtime, self.count) = VectorBuffer.default_init
@@ -2704,6 +2768,8 @@ class Buffer(dict):
                 _value = weewx.units.convertStd(_vt, self['wind'].units).value
             self['wind'].add_value(VectorTuple(_value, packet.get('windDir')),
                                    packet['dateTime'])
+            log.info("wind.history=%s" % (self['wind'].history,))
+            log.info("wind.history_vec_avg=%s" % (self["wind"].history_vec_avg,))
 
     def start_of_day_reset(self):
         """Reset our buffer stats at the end of an archive period.
