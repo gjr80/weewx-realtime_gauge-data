@@ -2055,31 +2055,90 @@ class RealtimeGaugeDataThread(threading.Thread):
                         _trend = convert(this_field_map['default'], result_units).value
                     result = this_field_map['format'] % _trend
                 elif agg == 'maxdir':
-                    pass
+                    # only applicable to vectors, so we need to be prepared to
+                    # handle an AttributeError when obtaining the maxdir
+                    # attribute
+                    # first try to get the maxdir attribute for the field
+                    try:
+                        _maxdir = getattr(self.buffer[source], agg)
+                    except AttributeError:
+                        # maxdir attribute does not exist, set the result to
+                        # None
+                        _maxdir = None
+                    # if the result is None look for and use a default if it
+                    # exists otherwise we will return None
+                    if _maxdir is None:
+                        if 'default' in this_field_map:
+                            # we have a default so format it and use it
+                            result = this_field_map['format'] % float(this_field_map['default'])
+                        else:
+                            # we do not have a default so we will return None
+                            result = None
+                    else:
+                        # we have a non-None result so format it appropriately
+                        result = this_field_map['format'] % _maxdir
                 elif agg == 'vecavg':
-                    pass
+                    # only applicable to vectors, so we need to be prepared to
+                    # handle an AttributeError when obtaining the relevant
+                    # attribute
+                    try:
+                        if aggregate_period == 'day':
+                            _vecavg = getattr(self.buffer[source], 'day_vec_avg').mag
+                        else:
+                            _vecavg = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).mag
+                    except (AttributeError, TypeError):
+                        _vecavg = None
+                    # if the result is None look for and use a default if it
+                    # exists otherwise we will return None
+                    if _vecavg is None:
+                        if 'default' in this_field_map:
+                            # we have a default so format it and use it
+                            result = this_field_map['format'] % float(this_field_map['default'])
+                        else:
+                            # we do not have a default so we will return None
+                            result = None
+                    else:
+                        # we have a non-None result so format it appropriately
+                        result = this_field_map['format'] % _vecavg
                 elif agg == 'vecdir':
-                    pass
+                    # only applicable to vectors, so we need to be prepared to
+                    # handle an AttributeError when obtaining the relevant
+                    # attribute
+                    try:
+                        if aggregate_period == 'day':
+                            _vecdir = getattr(self.buffer[source], 'day_vec_avg').dir
+                        else:
+                            _vecdir = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).dir
+                    except (AttributeError, TypeError):
+                        _vecdir = None
+                    # if the result is None look for and use a default if it
+                    # exists otherwise we will return None
+                    if _vecdir is None:
+                        if 'default' in this_field_map:
+                            # we have a default so format it and use it
+                            result = this_field_map['format'] % float(this_field_map['default'])
+                        else:
+                            # we do not have a default so we will return None
+                            result = None
+                    else:
+                        # we have a non-None result so format it appropriately
+                        result = this_field_map['format'] % _vecdir
                 elif agg in ('min', 'max', 'last', 'sum'):
-                    # aggregate_period == 'day':
-                    # aggregate since start of today
-                    # is it an aggregate that has units?
-                    if agg in ('min', 'max', 'last', 'sum'):
-                        # it has units so obtain as a ValueTuple, convert as
-                        # required and check for None
-                        _raw_vt = ValueTuple(getattr(self.buffer[source], agg),
-                                             self.packet_unit_dict[source]['units'],
-                                             self.packet_unit_dict[source]['group'])
-                        # convert to the output units
-                        _conv_raw = convert(_raw_vt, result_units).value
-                        if _conv_raw is None:
-                            _conv_raw = convert(this_field_map['default'], result_units).value
-                        result = this_field_map['format'] % _conv_raw
+                    # it has units so obtain as a ValueTuple, convert as
+                    # required and check for None
+                    _raw_vt = ValueTuple(getattr(self.buffer[source], agg),
+                                         self.packet_unit_dict[source]['units'],
+                                         self.packet_unit_dict[source]['group'])
+                    # convert to the output units
+                    _conv_raw = convert(_raw_vt, result_units).value
+                    if _conv_raw is None:
+                        _conv_raw = convert(this_field_map['default'], result_units).value
+                    result = this_field_map['format'] % _conv_raw
                 elif agg in ('mintime', 'maxtime', 'lasttime'):
                     # its a time so get the time as a localtime and format
                     _raw = time.localtime(getattr(self.buffer[source], agg))
                     result = time.strftime(this_field_map['format'], _raw)
-                elif agg in ('count'):
+                elif agg == 'count':
                     # its a time so get the time as a localtime and format
                     _raw = time.localtime(getattr(self.buffer[source], agg))
                     result = time.strftime(this_field_map['format'], _raw)
@@ -2569,8 +2628,7 @@ class VectorBuffer(ObsBuffer):
         _direction = _direction if _direction >= 0.0 else _direction + 360.0
         return VectorTuple(_magnitude, _direction)
 
-    @property
-    def history_vec_avg(self):
+    def history_vec_avg(self, period=0):
         """The history average vector.
 
         The period over which the average is calculated is the history
@@ -2579,35 +2637,39 @@ class VectorBuffer(ObsBuffer):
 
         # TODO. Check the maths here, time ?
         result = VectorTuple(None, None)
-        if self.use_history and len(self.history) > 0:
-            xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
-                   ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
-            xsum = sum(x for x, y in xy)
-            ysum = sum(y for x, y in xy)
-            oldest_ts = min(ob.ts for ob in self.history)
-            _magnitude = math.sqrt((xsum**2 + ysum**2) / (time.time() - oldest_ts)**2)
-            _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
-            _direction = _direction if _direction >= 0.0 else _direction + 360.0
-            result = VectorTuple(_magnitude, _direction)
+        if self.use_history:
+            since_ts = time.time() - period
+            history_vec = [ob for ob in self.history and ob.ts > since_ts]
+            if len(history_vec) > 0:
+                xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
+                       ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in history_vec]
+                xsum = sum(x for x, y in xy)
+                ysum = sum(y for x, y in xy)
+                oldest_ts = min(ob.ts for ob in history_vec)
+                _magnitude = math.sqrt((xsum**2 + ysum**2) / (time.time() - oldest_ts)**2)
+                _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
+                _direction = _direction if _direction >= 0.0 else _direction + 360.0
+                result = VectorTuple(_magnitude, _direction)
         return result
 
-    @property
-    def history_vec_dir(self):
-        """The history vector average direction.
-
-        The period over which the average is calculated is the history
-        retention period (nominally 10 minutes).
-        """
-
-        result = None
-        if self.use_history and len(self.history) > 0:
-            xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
-                   ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
-            xsum = sum(x for x, y in xy)
-            ysum = sum(y for x, y in xy)
-            _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
-            result = _direction if _direction >= 0.0 else _direction + 360.0
-        return result
+    #TODO. Delete this before release
+#    @property
+#    def history_vec_dir(self):
+#        """The history vector average direction.
+#
+#        The period over which the average is calculated is the history
+#        retention period (nominally 10 minutes).
+#        """
+#
+#        result = None
+#        if self.use_history and len(self.history) > 0:
+#            xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
+#                   ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
+#            xsum = sum(x for x, y in xy)
+#            ysum = sum(y for x, y in xy)
+#            _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
+#            result = _direction if _direction >= 0.0 else _direction + 360.0
+#        return result
 
 
 # ============================================================================
@@ -2768,8 +2830,6 @@ class Buffer(dict):
                 _value = weewx.units.convertStd(_vt, self['wind'].units).value
             self['wind'].add_value(VectorTuple(_value, packet.get('windDir')),
                                    packet['dateTime'])
-            log.info("wind.history=%s" % (self['wind'].history,))
-            log.info("wind.history_vec_avg=%s" % (self["wind"].history_vec_avg,))
 
     def start_of_day_reset(self):
         """Reset our buffer stats at the end of an archive period.
