@@ -2100,11 +2100,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                     except AttributeError:
                         _result = None
                 elif agg == 'count':
-                    # it's a count so just get the value and format
-                    try:
-                        _result = getattr(self.buffer[source], agg)
-                    except AttributeError:
-                        _result = None
+                    # it's a count so just get the value
+                    _result = getattr(self.buffer[source], agg)
             else:
                 # there is no aggregate so just get the value from the packet,
                 # convert if required and then format it
@@ -2636,25 +2633,6 @@ class VectorBuffer(ObsBuffer):
                 _direction = _direction if _direction >= 0.0 else _direction + 360.0
                 result = VectorTuple(_magnitude, _direction)
         return result
-
-    #TODO. Delete this before release
-#    @property
-#    def history_vec_dir(self):
-#        """The history vector average direction.
-#
-#        The period over which the average is calculated is the history
-#        retention period (nominally 10 minutes).
-#        """
-#
-#        result = None
-#        if self.use_history and len(self.history) > 0:
-#            xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
-#                   ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in self.history]
-#            xsum = sum(x for x, y in xy)
-#            ysum = sum(y for x, y in xy)
-#            _direction = 90.0 - math.degrees(math.atan2(ysum, xsum))
-#            result = _direction if _direction >= 0.0 else _direction + 360.0
-#        return result
 
 
 # ============================================================================
