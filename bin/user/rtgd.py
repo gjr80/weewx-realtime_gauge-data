@@ -24,7 +24,7 @@ Version: 0.6.0                                          Date: 3 November 2022
         - fixed bug whereby 10 minute average wind bearing always matched
           current wind bearing
         - significant rewrite of get_field_value() method in preparation for
-          full implementation o field map
+          full implementation of field map
     17 April 2022       v0.5.5
         - fixed bug in date and dateFormat fields that resulted in the
           incorrect 'last rainfall' date and time being displayed on rainfall
