@@ -17,9 +17,14 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.5.5                                          Date: 17 April 2022
+Version: 0.6.0                                          Date: 3 November 2022
 
   Revision History
+    3 November 2022     v0.6.0
+        - fixed bug whereby 10 minute average wind bearing always matched
+          current wind bearing
+        - significant rewrite of get_field_value() method in preparation for
+          full implementation o field map
     17 April 2022       v0.5.5
         - fixed bug in date and dateFormat fields that resulted in the
           incorrect 'last rainfall' date and time being displayed on rainfall
@@ -642,7 +647,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.5.5'
+RTGD_VERSION = '0.6.0'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
