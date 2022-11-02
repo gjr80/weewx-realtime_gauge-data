@@ -1998,8 +1998,6 @@ class RealtimeGaugeDataThread(threading.Thread):
                     xxx. The vector average direction over the last xxx seconds 
                          where xxx is a number in seconds (up to the maximum 
                          buffer history size - nominally 600 seconds).
-
-
         """
 
         # prime our result
@@ -2138,7 +2136,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                 else:
                     # we do not have a default so use None
                     result = None
-            return result
+        return result
 
     def get_packet_units(self, packet):
         """Given a packet obtain unit details for each field map source."""
