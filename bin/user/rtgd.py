@@ -2017,18 +2017,9 @@ class RealtimeGaugeDataThread(threading.Thread):
             result_units = self.units_dict[result_group]
             # do we have an aggregate
             if this_field_map.get('aggregate') is not None:
-                # and this_field_map.get('aggregate_period') is not None:
-                # We have an aggregate. We support a limited set of aggregates
-                # with a limited set of aggregate periods. Aggregates we know
-                # about and the supported aggregate periods are:
-                # min:
-                # max:
-                # sum:
-                # last:
-                # trend:
-
+                # we have an aggregate
                 agg = this_field_map['aggregate'].lower()
-                _agg_period = this_field_map('aggregate_period')
+                _agg_period = this_field_map.get('aggregate_period')
                 try:
                     aggregate_period = int(_agg_period)
                 except (TypeError, ValueError):
@@ -2060,103 +2051,94 @@ class RealtimeGaugeDataThread(threading.Thread):
                     # attribute
                     # first try to get the maxdir attribute for the field
                     try:
-                        _maxdir = getattr(self.buffer[source], agg)
+                        _result = getattr(self.buffer[source], agg)
                     except AttributeError:
                         # maxdir attribute does not exist, set the result to
                         # None
-                        _maxdir = None
-                    # if the result is None look for and use a default if it
-                    # exists otherwise we will return None
-                    if _maxdir is None:
-                        if 'default' in this_field_map:
-                            # we have a default so format it and use it
-                            result = this_field_map['format'] % float(this_field_map['default'])
-                        else:
-                            # we do not have a default so we will return None
-                            result = None
-                    else:
-                        # we have a non-None result so format it appropriately
-                        result = this_field_map['format'] % _maxdir
+                        _result = None
                 elif agg == 'vecavg':
                     # only applicable to vectors, so we need to be prepared to
                     # handle an AttributeError when obtaining the relevant
                     # attribute
                     try:
                         if aggregate_period == 'day':
-                            _vecavg = getattr(self.buffer[source], 'day_vec_avg').mag
+                            _result = getattr(self.buffer[source], 'day_vec_avg').mag
                         else:
-                            _vecavg = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).mag
+                            _result = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).mag
                     except (AttributeError, TypeError):
-                        _vecavg = None
-                    # if the result is None look for and use a default if it
-                    # exists otherwise we will return None
-                    if _vecavg is None:
-                        if 'default' in this_field_map:
-                            # we have a default so format it and use it
-                            result = this_field_map['format'] % float(this_field_map['default'])
-                        else:
-                            # we do not have a default so we will return None
-                            result = None
-                    else:
-                        # we have a non-None result so format it appropriately
-                        result = this_field_map['format'] % _vecavg
+                        _result = None
                 elif agg == 'vecdir':
                     # only applicable to vectors, so we need to be prepared to
                     # handle an AttributeError when obtaining the relevant
                     # attribute
                     try:
                         if aggregate_period == 'day':
-                            _vecdir = getattr(self.buffer[source], 'day_vec_avg').dir
+                            _result = getattr(self.buffer[source], 'day_vec_avg').dir
                         else:
-                            _vecdir = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).dir
+                            _result = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).dir
                     except (AttributeError, TypeError):
-                        _vecdir = None
-                    # if the result is None look for and use a default if it
-                    # exists otherwise we will return None
-                    if _vecdir is None:
-                        if 'default' in this_field_map:
-                            # we have a default so format it and use it
-                            result = this_field_map['format'] % float(this_field_map['default'])
-                        else:
-                            # we do not have a default so we will return None
-                            result = None
-                    else:
-                        # we have a non-None result so format it appropriately
-                        result = this_field_map['format'] % _vecdir
+                        _result = None
                 elif agg in ('min', 'max', 'last', 'sum'):
-                    # it has units so obtain as a ValueTuple, convert as
-                    # required and check for None
-                    _raw_vt = ValueTuple(getattr(self.buffer[source], agg),
-                                         self.packet_unit_dict[source]['units'],
-                                         self.packet_unit_dict[source]['group'])
-                    # convert to the output units
-                    _conv_raw = convert(_raw_vt, result_units).value
-                    if _conv_raw is None:
-                        _conv_raw = convert(this_field_map['default'], result_units).value
-                    result = this_field_map['format'] % _conv_raw
+                    # the aggregate has units that may need converting so
+                    # obtain as a ValueTuple, convert as required and check for
+                    # None
+                    try:
+                        _result_vt = ValueTuple(getattr(self.buffer[source], agg),
+                                                self.packet_unit_dict[source]['units'],
+                                                self.packet_unit_dict[source]['group'])
+                        # convert to the output units
+                        _result = convert(_result_vt, result_units).value
+                    except AttributeError:
+                        _result = None
                 elif agg in ('mintime', 'maxtime', 'lasttime'):
-                    # its a time so get the time as a localtime and format
-                    _raw = time.localtime(getattr(self.buffer[source], agg))
-                    result = time.strftime(this_field_map['format'], _raw)
+                    # it's a time so get the time as a localtime and format
+                    try:
+                        _result = time.localtime(getattr(self.buffer[source], agg))
+                    except AttributeError:
+                        _result = None
                 elif agg == 'count':
-                    # its a time so get the time as a localtime and format
-                    _raw = time.localtime(getattr(self.buffer[source], agg))
-                    result = time.strftime(this_field_map['format'], _raw)
-                else:
-                    # afraid we don't know what to do
-                    pass
+                    # it's a count so just get the value and format
+                    try:
+                        _result = getattr(self.buffer[source], agg)
+                    except AttributeError:
+                        _result = None
             else:
-                # no aggregate so get the value from the packet as a ValueTuple
+                # there is no aggregate so just get the value from the packet,
+                # convert if required and then format it
                 if source in packet:
+                    # the data is in the packet so get it as a ValueTuple
+                    # because we will be converting it
                     _raw_vt = as_value_tuple(packet, source)
+                    # obtain the converted value
+                    _result = convert(_raw_vt, result_units).value
                 else:
-                    _raw_vt = ValueTuple(None, result_units, _getUnitGroup(source))
-                # convert to the output units
-                _conv_raw = convert(_raw_vt, result_units).value
-                if _conv_raw is None:
-                    _conv_raw = convert(this_field_map['default'], result_units).value
-                result = this_field_map['format'] % _conv_raw
-        return result
+                    # the data is not in the packet, so use None
+                    _result = None
+            if _result is not None:
+                # we have a non-None result so just format it
+                # if we have a 'time' it needs special treatment
+                if agg in ('mintime', 'maxtime', 'lasttime'):
+                    result = time.strftime(this_field_map['format'], _result)
+                else:
+                    result = this_field_map['format'] % _result
+            else:
+                # we have a None result, look for a default
+                if 'default' in this_field_map:
+                    default_list = weeutil.weeutil.to_list(this_field_map['default'])
+                    if len(default_list) == 2:
+                        # we have a default with units so convert and format it
+                        default_vt = ValueTuple(default_list[0],
+                                                default_list[1],
+                                                self.packet_unit_dict[source]['group'])
+                        _conv = weeutil.weeutil.convert(default_vt, result_units).value
+                    else:
+                        # we just have a default value
+                        _conv = float(default_list[0])
+                    result = this_field_map['format'] % _conv
+                else:
+                    # we do not have a default so use None
+                    result = None
+            return result
 
     def get_packet_units(self, packet):
         """Given a packet obtain unit details for each field map source."""
