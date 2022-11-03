@@ -2152,8 +2152,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # we have a None result, look for a default
                 if 'default' in this_field_map:
                     # we have a default, defaults are already a ValueTuple so we can just use it as is
-                    _conv_default = weeutil.weeutil.convert(this_field_map['default'],
-                                                            result_units).value
+                    _conv_default = weewx.units.convert(this_field_map['default'],
+                                                        result_units).value
                     result = this_field_map['format'] % _conv_default
                 else:
                     # we do not have a default so use None
