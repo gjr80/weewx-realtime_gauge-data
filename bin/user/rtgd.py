@@ -1574,19 +1574,19 @@ class RealtimeGaugeDataThread(threading.Thread):
         for field in list(_field_map.items()):
             field_config = field[1]
             _group = _getUnitGroup(field_config['source'])
-            _default = field_config.get('default', None)
+            _default = weeutil.weeutil.to_list(field_config.get('default', None))
             if _default is None:
                 # no default specified so use 0 in output units
                 _vt = ValueTuple(0, self.units_dict[_group], _group)
             elif len(_default) == 1:
                 # just a value so use it in output units
-                _vt = ValueTuple(float(_default), self.units_dict[_group], _group)
+                _vt = ValueTuple(float(_default[0]), self.units_dict[_group], _group)
             elif len(_default) == 2:
                 # we have a value and units so use that value in those units
                 _vt = ValueTuple(float(_default[0]), self.units_dict[_group], _default[1])
             elif len(_default) == 3:
                 # we already have a ValueTuple so nothing to do
-                _vt = _default
+                _vt = ValueTuple(_default)
             _field_map[field[0]]['default'] = _vt
         self.field_map = _field_map
 
@@ -1875,7 +1875,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         # convert our incoming packet
         _conv_packet = weewx.units.to_std_system(packet,
                                                  self.stats_unit_system)
-        log.info("received packet with windDir=%s" % _conv_packet.get("windDir", "no field"))
         # update the packet cache with this packet
         self.packet_cache.update(_conv_packet, _conv_packet['dateTime'])
         # update the buffer with the converted packet
@@ -2018,6 +2017,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             result_group = this_field_map['group'] if 'group' in this_field_map else _getUnitGroup(source)
             # result units
             result_units = self.units_dict[result_group]
+            # initialise agg to None
+            agg = None
             # do we have an aggregate
             if this_field_map.get('aggregate') is not None:
                 # we have an aggregate
@@ -2038,16 +2039,16 @@ class RealtimeGaugeDataThread(threading.Thread):
                     # obtain the current value as a ValueTuple
                     _current_vt = as_value_tuple(packet, source)
                     # calculate the trend
-                    _trend = calc_trend(obs_type=source,
-                                        now_vt=_current_vt,
-                                        target_units=result_units,
-                                        db_manager=self.db_manager,
-                                        then_ts=packet['dateTime'] - trend_period,
-                                        grace=grace_period)
-                    # if the trend result is None use the specified default
-                    if _trend is None:
-                        _trend = convert(this_field_map['default'], result_units).value
-                    result = this_field_map['format'] % _trend
+                    _result = calc_trend(obs_type=source,
+                                         now_vt=_current_vt,
+                                         target_units=result_units,
+                                         db_manager=self.db_manager,
+                                         then_ts=packet['dateTime'] - trend_period,
+                                         grace=grace_period)
+#                    # if the trend result is None use the specified default
+#                    if _trend is None:
+#                        _trend = convert(this_field_map['default'], result_units).value
+#                    result = this_field_map['format'] % _trend
                 elif agg == 'maxdir':
                     # only applicable to vectors, so we need to be prepared to
                     # handle an AttributeError when obtaining the maxdir
@@ -2116,7 +2117,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                     _result = None
             if _result is not None:
                 # we have a non-None result so just format it
-                # if we have a 'time' it needs special treatment
+                # if we have an aggregate that returned a 'time' it needs
+                # special treatment
                 if agg in ('mintime', 'maxtime', 'lasttime'):
                     result = time.strftime(this_field_map['format'], _result)
                 else:
@@ -2180,7 +2182,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         data = dict()
 
         # obtain 10-minute average wind direction
-        avg_bearing_10 = self.buffer['wind'].history_vec_avg.dir
+        avg_bearing_10 = self.buffer['wind'].history_vec_avg(period=600).dir
 
         # First we populate all non-field map calculated fields and then
         # iterate over the field map populating the field map based fields.
@@ -2283,7 +2285,6 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # avgbearing - 10-minute average wind bearing (degrees)
         data['avgbearing'] = self.dir_format % avg_bearing_10 if avg_bearing_10 is not None else self.dir_format % 0.0
-        log.info("data[avgbearing]=%s" % (data['avgbearing'],))
 
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
@@ -2549,7 +2550,7 @@ class VectorBuffer(ObsBuffer):
             self.min = stats.min
             self.mintime = stats.mintime
             self.max = stats.max
-            self.maxdir = stats.maxdir
+            self.maxdir = stats.max_dir
             self.maxtime = stats.maxtime
             self.sum = stats.sum
             self.xsum = stats.xsum
@@ -2621,7 +2622,7 @@ class VectorBuffer(ObsBuffer):
         result = VectorTuple(None, None)
         if self.use_history:
             since_ts = time.time() - period
-            history_vec = [ob for ob in self.history and ob.ts > since_ts]
+            history_vec = [ob for ob in self.history if ob.ts > since_ts]
             if len(history_vec) > 0:
                 xy = [(ob.value.mag * math.cos(math.radians(90.0 - ob.value.dir)),
                        ob.value.mag * math.sin(math.radians(90.0 - ob.value.dir))) for ob in history_vec]
