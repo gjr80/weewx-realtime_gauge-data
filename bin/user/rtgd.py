@@ -2150,19 +2150,11 @@ class RealtimeGaugeDataThread(threading.Thread):
                     result = this_field_map['format'] % _result
             else:
                 # we have a None result, look for a default
-                # TODO. is this 'default' processing consistent with 'default' pre-processing?
                 if 'default' in this_field_map:
-                    default_list = weeutil.weeutil.to_list(this_field_map['default'])
-                    if len(default_list) == 2:
-                        # we have a default with units so convert and format it
-                        default_vt = ValueTuple(default_list[0],
-                                                default_list[1],
-                                                self.packet_unit_dict[source]['group'])
-                        _conv = weeutil.weeutil.convert(default_vt, result_units).value
-                    else:
-                        # we just have a default value
-                        _conv = float(default_list[0])
-                    result = this_field_map['format'] % _conv
+                    # we have a default, defaults are already a ValueTuple so we can just use it as is
+                    _conv_default = weeutil.weeutil.convert(this_field_map['default'],
+                                                            result_units).value
+                    result = this_field_map['format'] % _conv_default
                 else:
                     # we do not have a default so use None
                     result = None
