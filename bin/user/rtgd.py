@@ -1958,9 +1958,13 @@ class RealtimeGaugeDataThread(threading.Thread):
     def get_field_value(self, field, packet):
         """Obtain the value for an output field.
 
+        Obtain the field value given using the field map entry for the field.
+        Results are unit converted and formatted as per the field map.
 
-        A limited set of aggregates is supported for each observation. Each aggregate Supported aggregates and aggregate periods are:
-            min. Minimum value of an observation over the aggregate period. 
+        A limited set of aggregates is supported for each observation. Some
+        aggregates support a limited range of aggregate periods. Details on
+        each aggregate are provided below:
+            min. Minimum value of an observation over the aggregate period.
                  Supported aggregate periods are:
                     day. The minimum value seen so far today.
                     xxx. The minimum value seen in the last xxx seconds where
@@ -2031,29 +2035,29 @@ class RealtimeGaugeDataThread(threading.Thread):
                     # could not be converted to an int (ValueError). In either
                     # case set aggregate_period to None.
                     aggregate_period = None
-                # Some aggregates require special handling, try them first
+                # obtain the raw aggregate value, any unit conversion and
+                # formatting will be done later
                 if agg == 'trend':
                     # if no aggregate period was specified default to 3600 seconds
                     trend_period = aggregate_period if aggregate_period is not None else 3600
+                    # the largest difference in time that is acceptable when
+                    # finding the historical record for calculating the trend
                     grace_period = int(this_field_map.get('grace', 300))
                     # obtain the current value as a ValueTuple
                     _current_vt = as_value_tuple(packet, source)
-                    # calculate the trend
+                    # calculate the trend, no need to convert the result as
+                    # calc_trend() does that
                     _result = calc_trend(obs_type=source,
                                          now_vt=_current_vt,
                                          target_units=result_units,
                                          db_manager=self.db_manager,
                                          then_ts=packet['dateTime'] - trend_period,
                                          grace=grace_period)
-#                    # if the trend result is None use the specified default
-#                    if _trend is None:
-#                        _trend = convert(this_field_map['default'], result_units).value
-#                    result = this_field_map['format'] % _trend
                 elif agg == 'maxdir':
                     # only applicable to vectors, so we need to be prepared to
-                    # handle an AttributeError when obtaining the maxdir
-                    # attribute
-                    # first try to get the maxdir attribute for the field
+                    # handle an AttributeError if we have a scalar obs
+                    # try to get the maxdir attribute for the field, no need
+                    # for unit conversion
                     try:
                         _result = getattr(self.buffer[source], agg)
                     except AttributeError:
@@ -2062,50 +2066,71 @@ class RealtimeGaugeDataThread(threading.Thread):
                         _result = None
                 elif agg == 'vecavg':
                     # only applicable to vectors, so we need to be prepared to
-                    # handle an AttributeError when obtaining the relevant
-                    # attribute
+                    # handle an AttributeError if we have a scalar obs
+                    # Try to get the applicable attribute, which attribute is
+                    # used depends on the aggregate period. Note that unit
+                    # conversion is needed.
                     try:
                         if aggregate_period == 'day':
-                            _result = getattr(self.buffer[source], 'day_vec_avg').mag
+                            # we are after a 'day' value, so we need the
+                            # mag property of the day_vec_avg property of the
+                            # vector buffer
+                            _res = getattr(self.buffer[source], 'day_vec_avg').mag
                         else:
-                            _result = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).mag
-                    except (AttributeError, TypeError):
-                        _result = None
-                elif agg == 'vecdir':
-                    # only applicable to vectors, so we need to be prepared to
-                    # handle an AttributeError when obtaining the relevant
-                    # attribute
-                    try:
-                        if aggregate_period == 'day':
-                            _result = getattr(self.buffer[source], 'day_vec_avg').dir
-                        else:
-                            _result = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).dir
-                    except (AttributeError, TypeError):
-                        _result = None
-                elif agg in ('min', 'max', 'last', 'sum'):
-                    # the aggregate has units that may need converting so
-                    # obtain as a ValueTuple, convert as required and check for
-                    # None
-                    try:
-                        _result_vt = ValueTuple(getattr(self.buffer[source], agg),
+                            # we are after some other aggregate period so look
+                            # in our buffers history by calling the
+                            # history_vec_avg() function with the aggregate
+                            # period as an argument
+                            _res = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).mag
+                        _res_vt = ValueTuple(_res,
                                                 self.packet_unit_dict[source]['units'],
                                                 self.packet_unit_dict[source]['group'])
                         # convert to the output units
-                        _result = convert(_result_vt, result_units).value
-                    except AttributeError:
+                        _result = convert(_res_vt, result_units).value
+                    except (AttributeError, TypeError):
+                        # either the attribute does not exist or we have an
+                        # unsupported aggregate period, either set the result
+                        # to None
                         _result = None
-                elif agg in ('mintime', 'maxtime', 'lasttime'):
-                    # it's a time so get the time as a localtime and format
+                elif agg == 'vecdir':
+                    # only applicable to vectors, so we need to be prepared to
+                    # handle an AttributeError if we have a scalar obs
+                    # as the result is a direction (or None) there is no need
+                    # for unit conversion
                     try:
-                        _result = time.localtime(getattr(self.buffer[source], agg))
-                    except AttributeError:
+                        if aggregate_period == 'day':
+                            # we are after a 'day' value so we need the
+                            # dir property of the day_vec_avg property of the
+                            # vector buffer
+                            _result = getattr(self.buffer[source], 'day_vec_avg').dir
+                        else:
+                            # we are after some other aggregate period so look
+                            # in our buffers history by calling the
+                            # history_vec_avg() function with the aggregate
+                            # period as an argument
+                            _result = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).dir
+                    except (AttributeError, TypeError):
+                        # either the attribute does not exist or we have an
+                        # unsupported aggregate period, either set the result
+                        # to None
                         _result = None
+                elif agg in ('min', 'max', 'last', 'sum'):
+                    # these aggregates may need unit conversion so obtain a
+                    # ValueTuple and convert as required
+                    _result_vt = ValueTuple(getattr(self.buffer[source], agg),
+                                            self.packet_unit_dict[source]['units'],
+                                            self.packet_unit_dict[source]['group'])
+                    # convert to the output units
+                    _result = convert(_result_vt, result_units).value
+                elif agg in ('mintime', 'maxtime', 'lasttime'):
+                    # it's a time so get the time as a localtime
+                    _result = time.localtime(getattr(self.buffer[source], agg))
                 elif agg == 'count':
                     # it's a count so just get the value
                     _result = getattr(self.buffer[source], agg)
             else:
-                # there is no aggregate so just get the value from the packet,
-                # convert if required and then format it
+                # there is no aggregate so just get the value from the packet
+                # and convert as required
                 if source in packet:
                     # the data is in the packet so get it as a ValueTuple
                     # because we will be converting it
@@ -2125,6 +2150,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                     result = this_field_map['format'] % _result
             else:
                 # we have a None result, look for a default
+                # TODO. is this 'default' processing consistent with 'default' pre-processing?
                 if 'default' in this_field_map:
                     default_list = weeutil.weeutil.to_list(this_field_map['default'])
                     if len(default_list) == 2:
@@ -2283,8 +2309,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         wgust = convert(wgust_vt, self.wind_group).value
         data['wgust'] = self.wind_format % wgust
 
-        # avgbearing - 10-minute average wind bearing (degrees)
-        data['avgbearing'] = self.dir_format % avg_bearing_10 if avg_bearing_10 is not None else self.dir_format % 0.0
+#        # avgbearing - 10-minute average wind bearing (degrees)
+#        data['avgbearing'] = self.dir_format % avg_bearing_10 if avg_bearing_10 is not None else self.dir_format % 0.0
 
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
@@ -2601,7 +2627,10 @@ class VectorBuffer(ObsBuffer):
 
     @property
     def day_vec_avg(self):
-        """The day average vector."""
+        """The day average vector.
+
+        Returns a VectorTuple. Direction is in the range >=0 to <360 degrees.
+        """
 
         try:
             _magnitude = math.sqrt((self.xsum**2 + self.ysum**2) / self.sumtime**2)
