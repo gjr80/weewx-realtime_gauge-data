@@ -1591,7 +1591,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.field_map = _field_map
 
         # get max cache age
-        self.max_cache_age = rtgd_config_dict.get('max_cache_age', 600)
+        self.max_cache_age = to_int(rtgd_config_dict.get('max_cache_age', 600))
 
         # initialise last average wind direction
         self.last_average_dir = 0
