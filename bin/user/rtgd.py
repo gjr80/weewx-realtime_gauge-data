@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.0                                          Date: 3 November 2022
+Version: 0.6.1                                          Date: 4 November 2022
 
   Revision History
+    4 November 2022     v0.6.1
+        - fixed issue where a user specified max_cache_age config option is
+          used as a string instead of an integer
     3 November 2022     v0.6.0
         - fixed bug whereby 10 minute average wind bearing always matched
           current wind bearing
@@ -647,7 +650,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.0'
+RTGD_VERSION = '0.6.1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 

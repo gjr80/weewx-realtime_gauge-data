@@ -35,21 +35,21 @@ The *Realtime gauge-data* extension can be installed manually or automatically u
 1.  Download the latest *Realtime gauge-data* extension from the *Realtime gauge-data* extension [releases page](https://github.com/gjr80/weewx-realtime_gauge-data/releases) into a directory accessible from the WeeWX machine.
 
 
-       $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.0/rtgd-0.6.0.tar.gz
+       $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.1/rtgd-0.6.1.tar.gz
 
     where $DOWNLOAD_ROOT is the path to the directory where the *Realtime gauge-data* extension is to be downloaded.
 
 2.  Install the *Realtime gauge-data* extension downloaded at step 1 using the *wee_extension* utility:
 
-        $ wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.6.0.tar.gz
+        $ wee_extension --install=$DOWNLOAD_ROOT/rtgd-0.6.1.tar.gz
 
     This will result in output similar to the following:
 
-        Request to install '/var/tmp/rtgd-0.6.0.tar.gz'
-        Extracting from tar archive /var/tmp/rtgd-0.6.0.tar.gz
+        Request to install '/var/tmp/rtgd-0.6.1.tar.gz'
+        Extracting from tar archive /var/tmp/rtgd-0.6.1.tar.gz
         Saving installer file to /home/weewx/bin/user/installer/Rtgd
         Saved configuration dictionary. Backup copy at /home/weewx/weewx.conf.20190101124410
-        Finished installing extension '/var/tmp/rtgd-0.6.0.tar.gz'
+        Finished installing extension '/var/tmp/rtgd-0.6.1.tar.gz'
 
 3.  Restart WeeWX:
 
@@ -69,13 +69,13 @@ This will result in the *gauge-data.txt* file being generated on receipt of each
 
 1.  Download the latest *Realtime gauge-data* extension from the Realtime gauge-data [releases page](https://github.com/gjr80/weewx-realtime_gauge-data/releases) into a directory accessible from the WeeWX machine.
 
-        $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.0/rtgd-0.6.0.tar.gz
+        $ wget -P $DOWNLOAD_ROOT https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.1/rtgd-0.6.1.tar.gz
 
     where $DOWNLOAD_ROOT is the path to the directory where the *Realtime gauge-data* extension is to be downloaded.
 
 2.  Unpack the extension as follows:
 
-        $ tar xvfz rtgd-0.6.0.tar.gz
+        $ tar xvfz rtgd-0.6.1.tar.gz
 
 3.  Copy files from within the resulting directory as follows:
 
