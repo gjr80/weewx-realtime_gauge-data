@@ -1,6 +1,7 @@
 v0.6.1
 - fixed issue where a user specified max_cache_age config option is used as a
   string instead of an integer
+- simplified installation instructions contained in the readme
 v0.6.0
 - fixed bug whereby 10 minute average wind bearing always matched current wind
   bearing
