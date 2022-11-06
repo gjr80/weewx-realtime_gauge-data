@@ -99,7 +99,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     header('HTTP/1.0 405 Method Not Allowed');
     exit('<h1>405 Method Not Allowed</h1>');  
 }
-// oops.. malformed POST request.. let'em know with a 400 response code
+// oops.. malformed POST request.. let them know with a 400 response code
 header('HTTP/1.0 400 Bad Request');
 exit('<h1>400 Bad Request</h1>');  
 ?>
