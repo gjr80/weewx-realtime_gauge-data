@@ -215,386 +215,36 @@ work by Alec Bennett. Refer https://github.com/wrybread/weewx-realtime_gauge-dat
 
 Abbreviated instructions for use:
 
-1.  Install the SteelSeries Weather Gauges for WeeWX and confirm correct
-operation of the gauges with WeeWX. Refer to
-https://github.com/mcrossley/SteelSeries-Weather-Gauges/tree/master/weather_server/WeeWX
+1.  Install the Realtime gauge-data extension using the wee_extension utility:
 
-2.  Put this file in $BIN_ROOT/user.
+    - download the latest Realtime gauge-data extension package:
 
-3.  Add the following stanza to weewx.conf:
+        $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.1/rtgd-0.6.1.tar.gz
 
-[RealtimeGaugeData]
-    # Date format to be used in gauge-data.txt. Must be either %d/%m/%Y,
-    # %m/%d/%Y or %Y/%m/%d. Separator may be forward slash '/' or a
-    # hyphen '-'. Default is %Y/%m/%d.
-    date_format = %Y/%m/%d
+    - install the Realtime gauge-data extension:
 
-    # Time format to be used in gauge-data.txt. May be %H:%M or %h:%M.
-    # Default is %H:%M
-    time_format = %H:%M
+        $ wee_extension --install=/var/tmp/rtgd-0.6.1.tar.gz
 
-    # Path to gauge-data.txt. Relative paths are relative to HTML_ROOT. If
-    # empty default is HTML_ROOT. If setting omitted altogether default is
-    # /var/tmp
-    rtgd_path = /home/weewx/public_html
+        Note: Depending on your system/installation the above command may need
+              to be prefixed with 'sudo'.
 
-    # File name (only) of file produced by rtgd. Optional, default is
-    # gauge-data.txt.
-    rtgd_file_name = gauge-data.txt
+        Note: Depending on your WeeWX installation wee_extension may need to be
+              prefixed with the path to wee_extension.
 
-    # Remote URL to which the gauge-data.txt data will be posted via HTTP POST.
-    # Optional, omit to disable HTTP POST.
-    # If remote_server_url is specified, do not specify an rsync server.
-    remote_server_url = http://remote/address
+2.  Restart the WeeWX daemon:
 
-    # timeout in seconds for remote URL posts. Optional, default is 2
-    timeout = 1
+        $ sudo /etc/init.d/weewx restart
 
-    # Text returned from remote URL indicating success. Optional, default is no
-    # response text.
-    response_text = success
+    or
 
-    # Remote host to which the gauge-data.txt data will be synced via rsync.
-    # Optional, omit to disable rsync to remote host.
-    # If rsync_server is specified, do not specify a remote_server_url.
-    #
-    # Note: The rsync feature will only work in WeeWX v.4 and above.  In earlier
-    # versions, rsyncing of single files is not supported by WeeWX' rsync
-    # help function.
-    #
-    # To use rsync, passwordless ssh using public/private key must be
-    # configured for authentication from the user account that WeeWX runs under on
-    # this computer to the user account on the remote machine with write access to
-    # the destination directory (rsync_remote_rtgd_dir).
-    #
-    # If you run logwatch on your system, the following lines will show in the
-    # WeeWX section when they are non-zero.  The first line includes any
-    # reporting files rsynced (if that is configured).  The others report timeouts
-    # and write errors.  Small numbers are expected here as timeouts are purposely
-    # defaulted to 1 second.  If taking to long to send, it's better to skip it
-    # and send the next (as in fresher) gauge-data.txt file.
-    #
-    #    rsync: files uploaded                          27206
-    #    rsync: gauge-data: IO timeout-data                 7
-    #    rsync: gauge-data: connection timeouts            11
-    #    rsync: gauge-data: write errors                    1
-    #
-    #
-    # Fill out the following fields:
-    #   rsync_server             : The server to which gauge-data.txt will be copied.
-    #   rsync_user               : The userid on rsync_server with write
-    #                              permission to rsync_remote_rtgd_dir.
-    #   rsync_remote_rtgd_dir    : The directory on rsync_server where
-    #                              gauge-data.txt will be copied.
-    #   rsync_compress           : True to compress the file before sending.
-    #                              Default is False.
-    #   rsync_log_success        : True to write success with timing messages to
-    #                              the log (for debugging).  Default is False.
-    #   rsync_ssh_options        : ssh options Default is '-o ConnectTimeout=1'
-    #                              (When connecting, time out in 1 second.)
-    #   rsync_timeout            : I/O timeout. Default is 1.  (When sending,
-    #                              timeout in 1 second.)
-    #   rsync_skip_if_older_than : Don't bother to rsync if greater than this
-    #                              number of seconds.  Default is 4.  (Skip this
-    #                              and move on to the next if this data is older
-    #                              than 4 seconds.
-    # Use either the post method or the rsync method, not both.
-    # [[Rsync]]
-    #   rsync_server = emerald.johnkline.com
-    #   rsync_user = root
-    #   rsync_remote_rtgd_dir = /home/weewx/gauge-data
-    #   rsync_compress = False
-    #   rsync_log_success = False
-    #   rsync_ssh_options = "-o ConnectTimeout=1"
-    #   rsync_timeout = 1
-    #   rsync_skip_if_older_than = 4
+        $ sudo service weewx restart
 
-    # Minimum interval (seconds) between file generation. Ideally
-    # gauge-data.txt would be generated on receipt of every loop packet (there
-    # is no point in generating more frequently than this); however, in some
-    # cases the user may wish to generate gauge-data.txt less frequently. The
-    # min_interval option sets the minimum time between successive
-    # gauge-data.txt generations. Generation will be skipped on arrival of a
-    # loop packet if min_interval seconds have NOT elapsed since the last
-    # generation. If min_interval is 0 or omitted generation will occur on
-    # every loop packet (as will be the case if min_interval < station loop
-    # period). Optional, default is 0.
-    min_interval =
+    or
 
-    # Number of compass points to include in WindRoseData, normally
-    # 8 or 16. Optional, default 16.
-    windrose_points = 16
+        $ sudo systemctl restart weewx
 
-    # Period over which to calculate WindRoseData in seconds. Optional, default
-    # is 86400 (24 hours).
-    windrose_period = 86400
+3.  Confirm that gauge-data.txt is being generated regularly.
 
-    # Binding to use for appTemp data. Optional, default 'wx_binding'.
-    apptemp_binding = wx_binding
-
-    # The SteelSeries Weather Gauges displays the content of the gauge-data.txt
-    # 'forecast' field in the scrolling text display. The RTGD service can
-    # populate the 'forecast' field from a number of sources. The available 
-    # sources are:
-    #
-    # 1. a user specified text
-    # 2. the first line of a text file
-    # 3. Weather Underground forecast from the Weather Underground API
-    # 4. Darksky forecast from the Darksky API
-    # 5. Zambretti forecast from the WeeWX forecast extension
-    #
-    # The block to be used is specified using the scroller_source config 
-    # option. The scroller_source should be set to one of the following strings 
-    # to use the indicated block:
-    # 1. text - to use user specified text
-    # 2. file - to user the first line of a text file
-    # 3. Weather Underground - to use a Weather Underground forecast
-    # 4. Darksky - to use a Darksky forecast
-    # 5. Zambretti - to use a Zambretti forecast
-    # 
-    # The scroller_source config option is case insensitive. A corresponding
-    # second level config section (ie [[ ]]) is required for the block to be 
-    # used. Refer to step 4 below for details. If the scroller_source config 
-    # option is omitted or left blank the 'forecast' field will be blank and no
-    # scroller text will be displayed.
-    scroller_source = text|file|WU|DS|Zambretti
-
-    # Update windrun value each loop period or just on each archive period.
-    # Optional, default is False.
-    windrun_loop = false
-
-    # Stations that provide partial packets are supported through a cache that
-    # caches packet data. max_cache_age is the maximum age  in seconds for
-    # which cached data is retained. Optional, default is 600 seconds.
-    max_cache_age = 600
-
-    # It is possible to ignore the sensor contact check result for the station
-    # and always set the gauge-data.txt SensorContactLost field to 0 (sensor
-    # contact not lost). This option should be used with care as it may mask a
-    # legitimate sensor lost contact state. Optional, default is False.
-    ignore_lost_contact = False
-
-    [[StringFormats]]
-        # String formats. Optional.
-        degree_C = %.1f
-        degree_F = %.1f
-        degree_compass = %.0f
-        hPa = %.1f
-        inHg = %.2f
-        inch = %.2f
-        inch_per_hour = %.2f
-        km_per_hour = %.1f
-        km = %.1f
-        mbar = %.1f
-        meter = %.0f
-        meter_per_second = %.1f
-        mile_per_hour = %.1f
-        mile = %.1f
-        mm = %.1f
-        mm_per_hour = %.1f
-        percent = %.0f
-        uv_index = %.1f
-        watt_per_meter_squared = %.0f
-
-    [[Groups]]
-        # Groups. Optional. Note not all available WeeWX units are supported
-        # for each group.
-        group_altitude = foot        # Options are 'meter' or 'foot'
-        group_pressure = hPa         # Options are 'inHg', 'mbar', or 'hPa'
-        group_rain = mm              # Options are 'inch' or 'mm'
-        group_speed = km_per_hour    # Options are 'mile_per_hour',
-                                       'km_per_hour' or 'meter_per_second'
-        group_temperature = degree_C # Options are 'degree_F' or 'degree_C'
-
-4.  If the scroller_source config option has been set add a second level config
-stanza for the specified block. Config stanzas for each of the supported 
-sources are:
-
-    -   user specified text:
-
-        # Specify settings to be used for user specified text block
-        [[Text]]
-            # user specified text to populate the 'forecast' field
-            text = enter text here
-
-    -   first line of text file:
-
-        # Specify settings to be used for first line of text file block
-        [[File]]
-            # Path and file name of file to use as block for the 'forecast' 
-            # field. Must be a text file, first line only of file is read.
-            file = path/to/file/file_name
-
-            # Interval (in seconds) between between file reads. Default is 1800.
-            interval = 1800
-
-    -   Weather Underground forecast
-    
-        # Specify settings to be used for Weather Underground forecast block
-        [[WU]]
-            # WU API key to be used when calling the WU API
-            api_key = xxxxxxxxxxxxxxxx
-
-            # Interval (in seconds) between forecast downloads. Default
-            # is 1800.
-            interval = 1800
-
-            # Minimum period (in seconds) between  API calls. This prevents
-            # conditions where a misbehaving program could call the WU API
-            # repeatedly thus violating the API usage conditions.
-            # Default is 60.
-            api_lockout_period = 60
-
-            # Maximum number attempts to obtain an API response. Default is 3.
-            max_tries = 3
-
-            # Forecast type to be used. Must be one of the following:
-            #   3day - 3 day forecast
-            #   5day - 5 day forecast
-            #   7day - 7 day forecast
-            #   10day - 10 day forecast
-            #   15day - 15 day forecast
-            # A user's content licensing agreement with The Weather Company
-            # will determine which forecasts are available for a given API
-            # key. The 5 day forecast is commonly available as a free service
-            # for PWS owners. Default is 5day.
-            forecast_type = 3day|5day|7day|10day|15day
-
-            # The location to be used for the forecast. Must be one of:
-            #   geocode - uses latitude/longitude to source the forecast
-            #   iataCode - uses and IATA code to source the forecast
-            #   icaoCode - uses an ICAO code to source the forecast
-            #   placeid - uses a Place ID to source the forecast
-            #   postalKey - uses a post code to source the forecast. Only
-            #               supported in US, UK, France, Germany and Italy.
-            # The format used for each of the location settings is:
-            #   geocode
-            #   iataCode, <code>
-            #   icaoCode, <code>
-            #   placeid, <place ID>
-            #   postalKey, <country code>, <postal code>
-            # Where:
-            #   <code> is the code concerned
-            #   <place ID> is the place ID
-            #   <country code> is the two letter country code (refer https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.d5imu8qa7ywg)
-            #   <postal code> is the postal code
-            # The default is geocode, If gecode is used then the station
-            # latitude and longitude are used.
-            location = enter location
-
-            # Units to be used in the forecast text. Must be one of the following:
-            #   e - English units
-            #   m - Metric units
-            #   s - SI units
-            #   h - Hybrid(UK) units
-            # Refer to https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.ek9jds3g3p9i
-            # Default is m.
-            units = e|m|s|h
-
-            # Language to be used in the forecast text. Refer to
-            # https://docs.google.com/document/d/13HTLgJDpsb39deFzk_YCQ5GoGoZCO_cRYzIxbwvgJLI/edit#heading=h.9ph8uehobq12
-            # for available languages and the corresponding language code.
-            # Default is en-GB
-            language = language code
-
-    -   Darksky forecast
-
-        # Specify settings to be used for Darksky forecast block
-        [[DS]]
-            # Key used to access Darksky API. String. Mandatory.
-            api_key = xxxxxxxxxxxxxxxx
-
-            # Latitude to use for forecast. Decimal degrees, negative for 
-            # southern hemisphere. Optional. Default is station latitude.
-            latitude = yy.yyyyy
-
-            # Longitude to use for forecast. Decimal degrees, negative for 
-            # western hemisphere. Optional. Default is station longitude.
-            longitude = zz.zzzz
-
-            # Darksky forecast text to use. String either minutely, hourly or 
-            # daily. Optional. Default is hourly. Refer Darksky API 
-            # documentation at 
-            # https://darksky.net/dev/docs#forecast-request
-            block = minutely|hourly|daily
-
-            # Language to use. String. Optional. Default is en (English).
-            # Available language codes are listed in the Darksky API
-            # documentation at https://darksky.net/dev/docs#forecast-request
-            language = en
-
-            # Units to use in forecast text. String either auto, us, si, ca or
-            # uk2. Optional. Default is ca. Available units codes are
-            # explained in the Darksky API documentation at
-            # https://darksky.net/dev/docs#forecast-request
-            units = auto|us|si|ca|uk2
-
-            # Interval (in seconds) between forecast downloads. Optional. 
-            # Default is 1800.
-            interval = 1800
-
-            # Maximum number attempts to obtain an API response. Optional. 
-            # Default is 3.
-            max_tries = 3
-
-    -   Zambretti forecast
-
-        # Specify settings to be used for Zambretti forecast block
-        [[Zambretti]]
-            # Interval (in seconds) between forecast updates. Optional. 
-            # Default is 1800.
-            # Note. In order to use the Zambretti forecast block the WeeWX
-            # forecast extension must be installed and the Zambretti forecast
-            # enabled. RTGD reads the current Zambretti forecast every interval 
-            # seconds. The forecast extension controls how often the Zambretti 
-            # forecast is updated.
-            interval = 1800
-        
-            # Maximum number attempts to obtain the forecast. Optional. Default
-            # is 3.
-            max_tries = 3
-
-            # Time to wait (in seconds) between attempts to read the forecast. 
-            # Optional. Default is 3.
-            retry_wait = 3
-
-5.  Add the RealtimeGaugeData service to the list of report services under
-[Engines] [[WxEngine]] in weewx.conf:
-
-[Engines]
-    [[WxEngine]]
-        report_services = ..., user.rtgd.RealtimeGaugeData
-
-6.  If you intend to save the realtime generated gauge-data.txt in the same
-location as the ss skin generated gauge-data.txt then you must disable the
-skin generated gauge-data.txt by commenting out the [[[data]]] entry and all
-subordinate settings under [CheetahGenerator] [[ToDate]] in
-$SKIN_ROOT/ss/skin.conf:
-
-[CheetahGenerator]
-    encoding = html_entities
-    [[ToDate]]
-        [[[index]]]
-            template = index.html.tmpl
-        # [[[data]]]
-        #     template = gauge-data.txt.tmpl
-
-7.  Edit $SKIN_ROOT/ss/scripts/gauges.js and change the realTimeURL_weewx
-setting (circa line 68) to refer to the location of the realtime generated
-gauge-data.txt. Change the realtimeInterval setting (circa line 37) to reflect
-the update period of the realtime gauge-data.txt in seconds. This setting
-controls the count down timer and update frequency of the SteelSeries Weather
-Gauges.
-
-8.  Delete the file $HTML_ROOT/ss/scripts/gauges.js.
-
-9.  Stop/start WeeWX
-
-10.  Confirm that gauge-data.txt is being generated regularly as per the period
-and nth_loop settings under [RealtimeGaugeData] in weewx.conf.
-
-11.  Confirm the SteelSeries Weather Gauges are being updated each time
-gauge-data.txt is generated.
 
 To do:
     - hourlyrainTH and ThourlyrainTH. Need to populate these fields, presently
@@ -2086,8 +1736,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                             # period as an argument
                             _res = getattr(self.buffer[source], 'history_vec_avg')(int(aggregate_period)).mag
                         _res_vt = ValueTuple(_res,
-                                                self.packet_unit_dict[source]['units'],
-                                                self.packet_unit_dict[source]['group'])
+                                             self.packet_unit_dict[source]['units'],
+                                             self.packet_unit_dict[source]['group'])
                         # convert to the output units
                         _result = convert(_res_vt, result_units).value
                     except (AttributeError, TypeError):
@@ -2303,9 +1953,6 @@ class RealtimeGaugeDataThread(threading.Thread):
         # convert to output units
         wgust = convert(wgust_vt, self.wind_group).value
         data['wgust'] = self.wind_format % wgust
-
-#        # avgbearing - 10-minute average wind bearing (degrees)
-#        data['avgbearing'] = self.dir_format % avg_bearing_10 if avg_bearing_10 is not None else self.dir_format % 0.0
 
         # BearingRangeFrom10 - The 'lowest' bearing in the last 10 minutes
         # BearingRangeTo10 - The 'highest' bearing in the last 10 minutes
