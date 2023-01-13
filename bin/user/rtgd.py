@@ -280,6 +280,7 @@ import time
 from operator import itemgetter
 
 # Python 2/3 compatibility shims
+import six
 from six.moves import http_client
 from six.moves import queue
 from six.moves import urllib
@@ -1216,18 +1217,29 @@ class RealtimeGaugeDataThread(threading.Thread):
             _config_units_dict['group_rainrate'] = "%s_per_hour" % (_config_units_dict['group_rain'],)
         # add the Groups config to the chainmap and set the units_dict property
         self.units_dict = ListOfDicts(_config_units_dict, DEFAULT_UNITS)
-        # set up the field map
-        _field_map = rtgd_config_dict.get('FieldMap', DEFAULT_FIELD_MAP)
-        # update the field map with any extensions
+
+        # Get the field map from our config, if it does not exist use the
+        # default. Use a deepcopy of the defaults as we will possibly be
+        # modifying the field map.
+        _field_map = rtgd_config_dict['FieldMap'] if 'FieldMap' in rtgd_config_dict else copy.deepcopy(DEFAULT_FIELD_MAP)
+        # get any extensions
         _extensions = rtgd_config_dict.get('FieldMapExtensions', {})
-        # update the field map with any extensions
+        # and update the field map with the extensions
         _field_map.update(_extensions)
 
-        # convert any defaults to ValueTuples
-        for field in list(_field_map.items()):
-            field_config = field[1]
+        # make a deepcopy of the extended field map as we will be iterating
+        # over it and possibly making changes
+        updated_field_map = copy.deepcopy(_field_map)
+        # iterate over each field map config entry and convert any default
+        # values in the field map to ValueTuples
+        for field, field_config in six.iteritems(_field_map):
+            # obtain the unit group for this field
             _group = _getUnitGroup(field_config['source'])
+            # Obtain the default; the default could be a scalar, a scalar and a
+            # unit or a scalar with unit and unit group. If no default was
+            # specified it will be None.
             _default = weeutil.weeutil.to_list(field_config.get('default', None))
+            # create a ValueTuple based on the default
             if _default is None:
                 # no default specified so use 0 in output units
                 _vt = ValueTuple(0, self.units_dict[_group], _group)
@@ -1238,10 +1250,15 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # we have a value and units so use that value in those units
                 _vt = ValueTuple(float(_default[0]), self.units_dict[_group], _default[1])
             elif len(_default) == 3:
-                # we already have a ValueTuple so nothing to do
+                # we already have all the elements of a ValueTuple so no
+                # calculations just creating of the ValueTuple object
                 _vt = ValueTuple(_default)
-            _field_map[field[0]]['default'] = _vt
-        self.field_map = _field_map
+            # update the default in the config for this field in the field map,
+            # but make sure we update our copy of the field map not the version
+            # we aer iterating over
+            updated_field_map[field]['default'] = _vt
+        # finally set our field map property
+        self.field_map = updated_field_map
 
         # get max cache age
         self.max_cache_age = to_int(rtgd_config_dict.get('max_cache_age', 600))
