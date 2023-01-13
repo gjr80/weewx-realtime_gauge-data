@@ -3,7 +3,7 @@ rtgd.py
 
 A WeeWX service to generate a loop based gauge-data.txt.
 
-Copyright (C) 2017-2022 Gary Roderick             gjroderick<at>gmail.com
+Copyright (C) 2017-2023 Gary Roderick             gjroderick<at>gmail.com
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.1                                          Date: 4 November 2022
+Version: 0.6.2                                          Date: 13 January 2023
 
   Revision History
+    13 January 2023     v0.6.2
+        - fix unhandled TypeError that occurs if the WeeWX engine restarts as a
+          result of a recoverable error, issue #30 refers
     4 November 2022     v0.6.1
         - fixed issue where a user specified max_cache_age config option is
           used as a string instead of an integer
@@ -219,11 +222,11 @@ Abbreviated instructions for use:
 
     - download the latest Realtime gauge-data extension package:
 
-        $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.1/rtgd-0.6.1.tar.gz
+        $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.2/rtgd-0.6.2.tar.gz
 
     - install the Realtime gauge-data extension:
 
-        $ wee_extension --install=/var/tmp/rtgd-0.6.1.tar.gz
+        $ wee_extension --install=/var/tmp/rtgd-0.6.2.tar.gz
 
         Note: Depending on your system/installation the above command may need
               to be prefixed with 'sudo'.
@@ -301,7 +304,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.1'
+RTGD_VERSION = '0.6.2b1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
