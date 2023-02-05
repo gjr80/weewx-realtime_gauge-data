@@ -720,6 +720,65 @@ DEFAULT_FIELD_MAP = {
 
 
 # ============================================================================
+#                                 class Debug
+# ============================================================================
+
+class Debug(object):
+    """Class to handle debug options."""
+
+    def __init__(self, config_dict):
+
+        self.debug_pressure = to_bool(config_dict.get('debug_pressure', False))
+        self.debug_temperature = to_bool(config_dict.get('debug_temperature', False))
+        self.debug_humidity = to_bool(config_dict.get('debug_humidity', False))
+        self.debug_speed = to_bool(config_dict.get('debug_speed', False))
+        self.debug_direction = to_bool(config_dict.get('debug_direction', False))
+        self.debug_radiation = to_bool(config_dict.get('debug_radiation', False))
+        self.debug_uv = to_bool(config_dict.get('debug_uv', False))
+        self.debug_rain = to_bool(config_dict.get('debug_rain', False))
+
+    @property
+    def pressure(self):
+
+        return self.debug_pressure
+
+    @property
+    def temperature(self):
+
+        return self.debug_temperature
+
+    @property
+    def humidity(self):
+
+        return self.debug_humidity
+
+    @property
+    def speed(self):
+
+        return self.debug_speed
+
+    @property
+    def direction(self):
+
+        return self.debug_direction
+
+    @property
+    def radiation(self):
+
+        return self.debug_radiation
+
+    @property
+    def uv(self):
+
+        return self.debug_uv
+
+    @property
+    def rain(self):
+
+        return self.debug_rain
+
+
+# ============================================================================
 #                     Exceptions that could get thrown
 # ============================================================================
 
@@ -753,6 +812,9 @@ class RealtimeGaugeData(StdService):
                                                                   'wx_binding')
         self.db_manager = weewx.manager.open_manager(manager_dict)
 
+        # obtain any debug settings
+        self.debug = Debug(rtgd_config_dict)
+
         # get a source object that will provide the scroller text
         self.source = self.source_factory(config_dict, rtgd_config_dict, engine)
         # 'start' our block object
@@ -765,14 +827,15 @@ class RealtimeGaugeData(StdService):
                                                    manager_dict,
                                                    latitude=engine.stn_info.latitude_f,
                                                    longitude=engine.stn_info.longitude_f,
-                                                   altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
+                                                   altitude=convert(engine.stn_info.altitude_vt, 'meter').value,
+                                                   debug=self.debug)
         self.rtgd_thread.start()
 
         # are we providing month and/or year to date rain, default is no we are 
         # not
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
-        
+
         # bind our self to the relevant WeeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
@@ -1122,7 +1185,7 @@ class RealtimeGaugeDataThread(threading.Thread):
     """Thread that generates gauge-data.txt in near realtime."""
 
     def __init__(self, control_queue, result_queue, config_dict, manager_dict,
-                 latitude, longitude, altitude):
+                 latitude, longitude, altitude, debug):
         # Initialize my superclass:
         threading.Thread.__init__(self)
 
@@ -1134,6 +1197,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.result_queue = result_queue
         self.config_dict = config_dict
         self.manager_dict = manager_dict
+        self.debug = debug
 
         # get our RealtimeGaugeData config dictionary
         rtgd_config_dict = config_dict.get('RealtimeGaugeData', {})
@@ -1315,6 +1379,9 @@ class RealtimeGaugeDataThread(threading.Thread):
         # not required property will be set to None
         self.exporter = self.export_factory(rtgd_config_dict,
                                             self.rtgd_path_file)
+
+        # handle any debug settings
+
 
         # notify the user of a couple of things that we will do
         # frequency of generation
