@@ -881,6 +881,13 @@ class RealtimeGaugeData(StdService):
             log.debug("queued loop packet (%s)" % _package['payload']['dateTime'])
         elif weewx.debug >= 3:
             log.debug("queued loop packet: %s" % _package['payload'])
+        elif self.debug.pressure:
+            log.info("queued loop packet (%s): altimeter: %s barometer: %s "
+                     "pressure: %s" % (_package['payload']['dateTime'],
+                                       _package['payload'].get('altimeter'),
+                                       _package['payload'].get('barometer'),
+                                       _package['payload'].get('pressure')
+                                       ))
 
     def new_archive_record(self, event):
         """Puts archive records in the rtgd queue."""
@@ -894,6 +901,13 @@ class RealtimeGaugeData(StdService):
             log.debug("queued archive record (%s)" % _package['payload']['dateTime'])
         elif weewx.debug >= 3:
             log.debug("queued archive record: %s" % _package['payload'])
+        elif self.debug.pressure:
+            log.info("queued archive record (%s): altimeter: %s barometer: %s "
+                     "pressure: %s" % (_package['payload']['dateTime'],
+                                       _package['payload'].get('altimeter'),
+                                       _package['payload'].get('barometer'),
+                                       _package['payload'].get('pressure')
+                                       ))
         # get alltime min max baro and put in the queue
         # get the min and max values (incl usUnits)
         _minmax_baro = self.get_minmax_obs('barometer')
@@ -907,6 +921,11 @@ class RealtimeGaugeData(StdService):
                 log.debug("queued min/max barometer values")
             elif weewx.debug >= 3:
                 log.debug("queued min/max barometer values: %s" % _package['payload'])
+            elif self.debug.pressure:
+                log.info("queued barometer min/max values: min: %s max: %s " % (_package['payload'].get('min_barometer'),
+                                                                                _package['payload'].get('max_barometer')
+                                                                                ))
+
         # if required get updated month to date rainfall and put in the queue
         if self.mtd_rain:
             _tspan = weeutil.weeutil.archiveMonthSpan(event.record['dateTime']) 
@@ -1523,6 +1542,13 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 log.debug("received archive record (%s)" % _package['payload']['dateTime'])
                             elif weewx.debug >= 3:
                                 log.debug("received archive record: %s" % _package['payload'])
+                            elif self.debug.pressure:
+                                log.info("received archive record (%s): altimeter: %s barometer: %s "
+                                         "pressure: %s" % (_package['payload']['dateTime'],
+                                                           _package['payload'].get('altimeter'),
+                                                           _package['payload'].get('barometer'),
+                                                           _package['payload'].get('pressure')
+                                                           ))
                             self.process_new_archive_record(_package['payload'])
                             self.rose = calc_windrose(_package['payload']['dateTime'],
                                                       self.db_manager,
@@ -1548,6 +1574,13 @@ class RealtimeGaugeDataThread(threading.Thread):
                                     log.debug("received loop packet (%s)" % _package['payload']['dateTime'])
                                 elif weewx.debug >= 3:
                                     log.debug("received loop packet: %s" % _package['payload'])
+                                elif self.debug.pressure:
+                                    log.info("received loop packet (%s): altimeter: %s barometer: %s "
+                                             "pressure: %s" % (_package['payload']['dateTime'],
+                                                               _package['payload'].get('altimeter'),
+                                                               _package['payload'].get('barometer'),
+                                                               _package['payload'].get('pressure')
+                                                               ))
                                 self.process_packet(_package['payload'])
                                 continue
                             except Exception as e:
@@ -1609,6 +1642,13 @@ class RealtimeGaugeDataThread(threading.Thread):
                 log.debug("created cached loop packet (%s)" % cached_packet['dateTime'])
             elif weewx.debug >= 3:
                 log.debug("created cached loop packet: %s" % (cached_packet,))
+            elif self.debug.pressure:
+                log.info("cached loop packet  (%s): altimeter: %s barometer: %s "
+                         "pressure: %s" % (cached_packet['dateTime'],
+                                           cached_packet.get('altimeter'),
+                                           cached_packet.get('barometer'),
+                                           cached_packet.get('pressure')
+                                           ))
             # set our lost contact flag if applicable
             self.lost_contact_flag = self.get_lost_contact(cached_packet, 'loop')
             # get a data dict from which to construct our file
@@ -2105,6 +2145,15 @@ class RealtimeGaugeDataThread(threading.Thread):
         # now populate all fields in the field map
         for field in self.field_map:
             data[field] = self.get_field_value(field, packet)
+        # handle any debug logging
+        if self.debug.pressure:
+            log.info("gauge-data.txt (%s): press: %s presstrendval: %s "
+                     "pressure units: %s" % (data['date'],
+                                             data['press'],
+                                             data['presstrendval'],
+                                             data['pressunit']
+                                             ))
+
         return data
 
     def process_new_archive_record(self, record):
