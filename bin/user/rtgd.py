@@ -3,7 +3,7 @@ rtgd.py
 
 A WeeWX service to generate a loop based gauge-data.txt.
 
-Copyright (C) 2017-2022 Gary Roderick             gjroderick<at>gmail.com
+Copyright (C) 2017-2023 Gary Roderick             gjroderick<at>gmail.com
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.1                                          Date: 4 November 2022
+Version: 0.6.2                                          Date: 13 January 2023
 
   Revision History
+    13 January 2023     v0.6.2
+        - fix unhandled TypeError that occurs if the WeeWX engine restarts as a
+          result of a recoverable error, issue #30 refers
     4 November 2022     v0.6.1
         - fixed issue where a user specified max_cache_age config option is
           used as a string instead of an integer
@@ -219,11 +222,11 @@ Abbreviated instructions for use:
 
     - download the latest Realtime gauge-data extension package:
 
-        $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.1/rtgd-0.6.1.tar.gz
+        $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.2/rtgd-0.6.2.tar.gz
 
     - install the Realtime gauge-data extension:
 
-        $ wee_extension --install=/var/tmp/rtgd-0.6.1.tar.gz
+        $ wee_extension --install=/var/tmp/rtgd-0.6.2.tar.gz
 
         Note: Depending on your system/installation the above command may need
               to be prefixed with 'sudo'.
@@ -280,6 +283,7 @@ import time
 from operator import itemgetter
 
 # Python 2/3 compatibility shims
+import six
 from six.moves import http_client
 from six.moves import queue
 from six.moves import urllib
@@ -300,7 +304,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.1'
+RTGD_VERSION = '0.6.2b1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1299,18 +1303,29 @@ class RealtimeGaugeDataThread(threading.Thread):
             _config_units_dict['group_rainrate'] = "%s_per_hour" % (_config_units_dict['group_rain'],)
         # add the Groups config to the chainmap and set the units_dict property
         self.units_dict = ListOfDicts(_config_units_dict, DEFAULT_UNITS)
-        # set up the field map
-        _field_map = rtgd_config_dict.get('FieldMap', DEFAULT_FIELD_MAP)
-        # update the field map with any extensions
+
+        # Get the field map from our config, if it does not exist use the
+        # default. Use a deepcopy of the defaults as we will possibly be
+        # modifying the field map.
+        _field_map = rtgd_config_dict['FieldMap'] if 'FieldMap' in rtgd_config_dict else copy.deepcopy(DEFAULT_FIELD_MAP)
+        # get any extensions
         _extensions = rtgd_config_dict.get('FieldMapExtensions', {})
-        # update the field map with any extensions
+        # and update the field map with the extensions
         _field_map.update(_extensions)
 
-        # convert any defaults to ValueTuples
-        for field in list(_field_map.items()):
-            field_config = field[1]
+        # make a deepcopy of the extended field map as we will be iterating
+        # over it and possibly making changes
+        updated_field_map = copy.deepcopy(_field_map)
+        # iterate over each field map config entry and convert any default
+        # values in the field map to ValueTuples
+        for field, field_config in six.iteritems(_field_map):
+            # obtain the unit group for this field
             _group = _getUnitGroup(field_config['source'])
+            # Obtain the default; the default could be a scalar, a scalar and a
+            # unit or a scalar with unit and unit group. If no default was
+            # specified it will be None.
             _default = weeutil.weeutil.to_list(field_config.get('default', None))
+            # create a ValueTuple based on the default
             if _default is None:
                 # no default specified so use 0 in output units
                 _vt = ValueTuple(0, self.units_dict[_group], _group)
@@ -1321,10 +1336,15 @@ class RealtimeGaugeDataThread(threading.Thread):
                 # we have a value and units so use that value in those units
                 _vt = ValueTuple(float(_default[0]), self.units_dict[_group], _default[1])
             elif len(_default) == 3:
-                # we already have a ValueTuple so nothing to do
+                # we already have all the elements of a ValueTuple so no
+                # calculations just creating of the ValueTuple object
                 _vt = ValueTuple(_default)
-            _field_map[field[0]]['default'] = _vt
-        self.field_map = _field_map
+            # update the default in the config for this field in the field map,
+            # but make sure we update our copy of the field map not the version
+            # we aer iterating over
+            updated_field_map[field]['default'] = _vt
+        # finally set our field map property
+        self.field_map = updated_field_map
 
         # get max cache age
         self.max_cache_age = to_int(rtgd_config_dict.get('max_cache_age', 600))
