@@ -377,349 +377,395 @@ LOOP_STATIONS = ['FineOffsetUSB']
 DEFAULT_FIELD_MAP = {
     'temp': {
         'source': 'outTemp',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'tempTL': {
         'source': 'outTemp',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'tempTH': {
         'source': 'outTemp',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'TtempTL': {
         'source': 'outTemp',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'TtempTH': {
         'source': 'outTemp',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'temptrend': {
         'source': 'outTemp',
         'aggregate': 'trend',
         'aggregate_period': '3600',
         'grace_period': '300',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'intemp': {
         'source': 'inTemp',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'intempTL': {
         'source': 'inTemp',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'intempTH': {
         'source': 'inTemp',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'TintempTL': {
         'source': 'inTemp',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'TintempTH': {
         'source': 'inTemp',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'hum': {
         'source': 'outHumidity',
-        'format': '%.1f'
+        'group': 'group_humidity'
     },
     'humTL': {
         'source': 'outHumidity',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_humidity'
     },
     'humTH': {
         'source': 'outHumidity',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_humidity'
     },
     'ThumTL': {
         'source': 'outHumidity',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'ThumTH': {
         'source': 'outHumidity',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'inhum': {
         'source': 'inHumidity',
-        'format': '%.1f'
+        'group': 'group_humidity'
     },
     'inhumTL': {
         'source': 'inHumidity',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_humidity'
     },
     'inhumTH': {
         'source': 'inHumidity',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_humidity'
     },
     'TinhumTL': {
         'source': 'inHumidity',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'TinhumTH': {
         'source': 'inHumidity',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'dew': {
         'source': 'dewpoint',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'dewpointTL': {
         'source': 'dewpoint',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'dewpointTH': {
         'source': 'dewpoint',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'TdewpointTL': {
         'source': 'dewpoint',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'TdewpointTH': {
         'source': 'dewpoint',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'wchill': {
         'source': 'windchill',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'wchillTL': {
         'source': 'windchill',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'TwchillTL': {
         'source': 'windchill',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'heatindex': {
         'source': 'heatindex',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'heatindexTH': {
         'source': 'heatindex',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'TheatindexTH': {
         'source': 'heatindex',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'apptemp': {
         'source': 'appTemp',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'apptempTL': {
         'source': 'appTemp',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'apptempTH': {
         'source': 'appTemp',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'TapptempTL': {
         'source': 'appTemp',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'TapptempTH': {
         'source': 'appTemp',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'humidex': {
         'source': 'humidex',
-        'format': '%.1f'
+        'group': 'group_temperature'
     },
     'press': {
         'source': 'barometer',
-        'format': '%.1f'
+        'group': 'group_pressure'
     },
     'pressTL': {
         'source': 'barometer',
         'aggregate': 'min',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_pressure'
     },
     'pressTH': {
         'source': 'barometer',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_pressure'
     },
     'TpressTL': {
         'source': 'barometer',
         'aggregate': 'mintime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'TpressTH': {
         'source': 'barometer',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'presstrendval': {
         'source': 'barometer',
         'aggregate': 'trend',
         'aggregate_period': '3600',
         'grace_period': '300',
-        'format': '%.1f'
+        'group': 'group_pressure'
     },
     'rfall': {
         'source': 'rain',
         'aggregate': 'sum',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_rain'
     },
     'rrate': {
         'source': 'rainRate',
-        'format': '%.1f'
+        'group': 'group_rainrate'
     },
     'rrateTM': {
         'source': 'rainRate',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_rainrate'
     },
     'TrrateTM': {
         'source': 'rainRate',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'wlatest': {
         'source': 'windSpeed',
-        'format': '%.1f'
+        'group': 'group_speed'
     },
     'windTM': {
         'source': 'windSpeed',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_speed'
     },
     'wgust': {
         'source': 'windGust',
-        'format': '%.1f'
+        'group': 'group_speed'
     },
     'wgustTM': {
         'source': 'windGust',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_speed'
     },
     'TwgustTM': {
         'source': 'windGust',
         'aggregate': 'maxtime',
         'aggregate_period': 'day',
-        'format': '%H:%M'
+        'group': 'group_time'
     },
     'bearing': {
         'source': 'windDir',
         'default': 0,
-        'format': '%.1f'
+        'group': 'group_direction'
     },
     'avgbearing': {
         'source': 'wind',
         'aggregate': 'vecdir',
         'aggregate_period': 600,
-        'format': '%.1f'
+        'group': 'group_direction'
     },
     'bearingTM': {
         'source': 'wind',
         'aggregate': 'maxdir',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_direction'
     },
     'windrun': {
         'source': 'windrun',
         'aggregate': 'sum',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_distance'
     },
     'UV': {
         'source': 'UV',
-        'format': '%.1f'
+        'group': 'group_uv'
     },
     'UVTH': {
         'source': 'UV',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_uv'
     },
     'SolarRad': {
         'source': 'radiation',
-        'format': '%.1f'
+        'group': 'group_radiation'
     },
     'SolarRadTM': {
         'source': 'radiation',
         'aggregate': 'max',
         'aggregate_period': 'day',
-        'format': '%.1f'
+        'group': 'group_radiation'
     },
     'CurrentSolarMax': {
         'source': 'maxSolarRad',
-        'format': '%.1f'
+        'group': 'group_radiation'
     },
     'cloudbasevalue': {
         'source': 'cloudbase',
-        'format': '%.1f'
+        'group': 'group_altitude'
     }
+}
+
+DEFAULT_GROUP_MAP = {
+    'group_temperature': 'degree_C',
+    'group_humidity': 'percent',
+    'group_pressure': 'hPa',
+    'group_speed': 'km_per_hour',
+    'group_distance': 'km',
+    'group_direction': 'degree_compass',
+    'group_rain': 'mm',
+    'group_rainrate': 'mm_per_hour',
+    'group_radiation': 'watt_per_square_meter',
+    'group_uv': 'uv_index',
+    'group_altitude': 'foot',
+    'group_time': 'unix_epoch'
+}
+
+DEFAULT_FORMAT_MAP = {
+    'degree_C': '%.1f',
+    'degree_compass': '%.0f',
+    'degree_F': '%.1f',
+    'foot': '%.0f',
+    'hPa': '%.1f',
+    'hPa_per_hour': '%.3f',
+    'inch': '%.2f',
+    'inch_per_hour': '%.2f',
+    'inHg': '%.3f',
+    'inHg_per_hour': '%.5f',
+    'km': '%.1f',
+    'km_per_hour': '%.0f',
+    'knot': '%.0f',
+    'kPa': '%.2f',
+    'kPa_per_hour': '%.4f',
+    'mbar': '%.1f',
+    'mbar_per_hour': '%.4f',
+    'meter': '%.0f',
+    'meter_per_second': '%.1f',
+    'mile': '%.1f',
+    'mile_per_hour': '%.0f',
+    'mm': '%.1f',
+    'mm_per_hour': '%.1f',
+    'mmHg': '%.1f',
+    'mmHg_per_hour': '%.4f',
+    'percent': '%.0f',
+    'uv_index': '%.1f',
+    'watt_per_meter_squared': '%.0f'
 }
 
 
@@ -1168,63 +1214,85 @@ class RealtimeGaugeDataThread(threading.Thread):
         except ValueError:
             self.wr_points = 16
 
+        _group_map = copy.deepcopy(DEFAULT_FORMAT_MAP)
+        _group_map.update(rtgd_config_dict.get('Groups', {}))
+        # We have some unit constraints due to WeeWX and SteelSeries Gauges
+        # limitations. First, because WeeWX does not know how to use distance
+        # in nautical miles we need to set the distance unit to mile if speed
+        # is knot. Secondly, the SteelSeries Gauges do not know how use rain
+        # in cm, so if rain or rainRate is specified in cm or cm_per_hour we
+        # need to reset these to mm and mm_per_hour respectively.
+        if _group_map['group_speed'] == 'knot':
+            _group_map['group_distance'] = 'mile'
+        if _group_map['group_rain'] == 'cm':
+            _group_map['group_rain'] = 'mm'
+            _group_map['group_rainrate'] = 'mm_per_hour'
+        _format_map = copy.deepcopy(DEFAULT_FORMAT_MAP)
+        _format_map.update(rtgd_config_dict.get('StringFormats', {}))
+        _unit_dict = dict()
+        for group in _group_map.keys():
+            _unit_dict[group] = dict()
+            _unit_dict[group]['unit'] = _group_map[group]
+            _unit_dict[group]['format'] = _format_map.get(_group_map[group], '%.1f')
+        self.unit_dict = _unit_dict
         # get our groups and format strings
         self.date_format = rtgd_config_dict.get('date_format', '%Y/%m/%d')
         self.time_format = rtgd_config_dict.get('time_format', '%H:%M')
-        self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
-                                                         'degree_C')
-        self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
-                                                         'hPa')
-        self.pres_format = rtgd_config_dict['StringFormats'].get(self.pres_group,
-                                                                 '%.1f')
-        self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
-                                                         'km_per_hour')
+        # self.temp_group = rtgd_config_dict['Groups'].get('group_temperature',
+        #                                                  'degree_C')
+        # self.pres_group = rtgd_config_dict['Groups'].get('group_pressure',
+        #                                                  'hPa')
+        # self.pres_format = rtgd_config_dict['StringFormats'].get(self.pres_group,
+        #                                                          '%.1f')
+        # self.wind_group = rtgd_config_dict['Groups'].get('group_speed',
+        #                                                  'km_per_hour')
         # Since the SteelSeries Weather Gauges derives distance units from wind
         # speed units we cannot use knots because WeeWX does not know how to
         # use distance in nautical miles. If we have been told to use knot then
         # default to mile_per_hour.
-        if self.wind_group == 'knot':
-            self.wind_group = 'mile_per_hour'
-        self.wind_format = rtgd_config_dict['StringFormats'].get(self.wind_group,
-                                                                 '%.1f')
-        self.rain_group = rtgd_config_dict['Groups'].get('group_rain',
-                                                         'mm')
+        # if self.wind_group == 'knot':
+        #     self.wind_group = 'mile_per_hour'
+        # self.wind_format = rtgd_config_dict['StringFormats'].get(self.wind_group,
+        #                                                          '%.1f')
+        # self.rain_group = rtgd_config_dict['Groups'].get('group_rain',
+        #                                                  'mm')
         # SteelSeries Weather Gauges don't understand cm so default to mm if we
         # have been told to use cm
-        if self.rain_group == 'cm':
-            self.rain_group = 'mm'
-        self.rain_format = rtgd_config_dict['StringFormats'].get(self.rain_group,
-                                                                 '%.1f')
-        self.dir_group = 'degree_compass'
-        self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
-                                                                '%.1f')
-        self.rad_group = 'watt_per_meter_squared'
-        self.rad_format = rtgd_config_dict['StringFormats'].get(self.rad_group,
-                                                                '%.0f')
-        # SteelSeries Weather gauges derives windrun units from wind speed
-        # units, so must we
-        self.dist_group = GROUP_DIST[self.wind_group]
-        self.dist_format = rtgd_config_dict['StringFormats'].get(self.dist_group,
-                                                                 '%.1f')
-        self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
-                                                        'meter')
+        # if self.rain_group == 'cm':
+        #     self.rain_group = 'mm'
+        # self.rain_format = rtgd_config_dict['StringFormats'].get(self.rain_group,
+        #                                                          '%.1f')
+        # self.dir_group = 'degree_compass'
+        # self.dir_format = rtgd_config_dict['StringFormats'].get(self.dir_group,
+        #                                                         '%.1f')
+        # self.rad_group = 'watt_per_meter_squared'
+        # self.rad_format = rtgd_config_dict['StringFormats'].get(self.rad_group,
+        #                                                         '%.0f')
+        # # SteelSeries Weather gauges derives windrun units from wind speed
+        # # units, so must we
+        # self.dist_group = GROUP_DIST[self.wind_group]
+        # self.dist_format = rtgd_config_dict['StringFormats'].get(self.dist_group,
+        #                                                          '%.1f')
+        # self.alt_group = rtgd_config_dict['Groups'].get('group_altitude',
+        #                                                 'meter')
         self.flag_format = '%.0f'
 
-        # set up output units dict
-        # first get the Groups config from our config dict
-        _config_units_dict = rtgd_config_dict.get('Groups', {})
-        # group_rainrate needs special attention; it needs to match group_rain.
-        # If group_rain does not exist omit group_rainrate as it will be
-        # picked up from the defaults.
-        if 'group_rain' in _config_units_dict:
-            _config_units_dict['group_rainrate'] = "%s_per_hour" % (_config_units_dict['group_rain'],)
-        # add the Groups config to the chainmap and set the units_dict property
-        self.units_dict = ListOfDicts(_config_units_dict, DEFAULT_UNITS)
+        # # set up output units dict
+        # # first get the Groups config from our config dict
+        # _config_units_dict = rtgd_config_dict.get('Groups', {})
+        # # group_rainrate needs special attention; it needs to match group_rain.
+        # # If group_rain does not exist omit group_rainrate as it will be
+        # # picked up from the defaults.
+        # if 'group_rain' in _config_units_dict:
+        #     _config_units_dict['group_rainrate'] = "%s_per_hour" % (_config_units_dict['group_rain'],)
+        # # add the Groups config to the chainmap and set the units_dict property
+        # self.units_dict = ListOfDicts(_config_units_dict, DEFAULT_UNITS)
 
         # Get the field map from our config, if it does not exist use the
         # default. Use a deepcopy of the defaults as we will possibly be
         # modifying the field map.
-        _field_map = rtgd_config_dict['FieldMap'] if 'FieldMap' in rtgd_config_dict else copy.deepcopy(DEFAULT_FIELD_MAP)
+        _field_map = rtgd_config_dict['FieldMap'] if 'FieldMap' in rtgd_config_dict else copy.deepcopy(
+            DEFAULT_FIELD_MAP)
         # get any extensions
         _extensions = rtgd_config_dict.get('FieldMapExtensions', {})
         # and update the field map with the extensions
