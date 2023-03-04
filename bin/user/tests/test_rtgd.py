@@ -33,7 +33,9 @@ from unittest.mock import patch
 import six
 
 # WeeWX imports
+import weeutil
 import weewx
+import weewx.defaults
 import user.rtgd
 
 from weewx.units import ValueTuple
@@ -100,21 +102,59 @@ class ListsAndDictsTestCase(unittest.TestCase):
 
         # construct the default field map
         self.default_field_map = dict(user.rtgd.DEFAULT_FIELD_MAP)
+        # construct the default field map
+        self.default_group_map = dict(user.rtgd.DEFAULT_GROUP_MAP)
+        # construct the default field map
+        self.default_format_map = dict(user.rtgd.DEFAULT_FORMAT_MAP)
+        # get a set of WeeWX supported units, we need to build this ourself
+        # from various dicts and configs
+        _unit_set = set(weewx.defaults.defaults['Units']['StringFormats'].keys())
+        _unit_set.update(weewx.defaults.defaults['Units']['Groups'].values())
+        _unit_set.update(weewx.defaults.defaults['Units']['Labels'].keys())
+        _unit_set.update(weewx.units.conversionDict.keys())
+        self.unit_set = _unit_set
 
     def test_dicts(self):
         """Test dicts for consistency"""
 
-        # each field map entry must include 'source' and 'format' fields, test
-        # that each entry in the default field map includes these fields
+        # test the default field map
         for field, field_dict in six.iteritems(self.default_field_map):
+            # each field map entry must include a 'source' field
             self.assertIn('source',
                           field_dict.keys(),
-                          msg="A field from the default field map is does not"
+                          msg="A field in the default field map does not "
                               "include a 'source' entry")
-            self.assertIn('format',
+            # each field map entry must include a 'group' field
+            self.assertIn('group',
                           field_dict.keys(),
-                          msg="A field from the default field map is does not"
+                          msg="A field in the default field map does not "
                               "include a 'format' entry")
+            # each field map entry 'group' field must be a valid unit group
+            self.assertIn(field_dict['group'], weewx.units.USUnits.keys(),
+                          msg="A field in the default field map contains an "
+                              "invalid unit group")
+
+        # test the default group map
+        for group, unit in six.iteritems(self.default_group_map):
+            # each group map key must be a valid unit group
+            self.assertIn(group, weewx.units.USUnits.keys(),
+                          msg="A key in the default group map is not "
+                              "a valid unit group")
+            # each group map value must be a valid unit
+            self.assertIn(unit, self.unit_set,
+                          msg="A value in the default group map is not "
+                              "a valid unit")
+
+        # test the default format map
+        for unit, format_str in six.iteritems(self.default_format_map):
+            # each format map key must be a valid unit
+            self.assertIn(unit, self.unit_set,
+                          msg="A key in the default format map is not "
+                              "a valid unit")
+            # each format map value must be a string of length >= 2
+            self.assertGreaterEqual(len(format_str), 2,
+                                    msg="A value in the default format map is not "
+                                        "a valid format string")
 
 
 def suite(test_cases):
