@@ -24,8 +24,6 @@ To run the test suite:
     $ PYTHONPATH=$BIN python3 -m user.tests.test_rtgd [-v]
 """
 # python imports
-import socket
-import struct
 import unittest
 from unittest.mock import patch
 
@@ -33,7 +31,6 @@ from unittest.mock import patch
 import six
 
 # WeeWX imports
-import weeutil
 import weewx
 import weewx.defaults
 import user.rtgd
@@ -41,7 +38,7 @@ import user.rtgd
 from weewx.units import ValueTuple
 
 TEST_SUITE_NAME = "WeeWX Realtime gauge-data"
-TEST_SUITE_VERSION = "0.5.6"
+TEST_SUITE_VERSION = "0.6.2"
 
 
 class UtilitiesTestCase(unittest.TestCase):
@@ -69,7 +66,7 @@ class UtilitiesTestCase(unittest.TestCase):
                     None: None}
 
     trend_kwargs = {'obs_type': 'outTemp',
-                    'now_vt': ValueTuple(23.5, 'degree_C', 'group_temperature'),
+                    'now_vt': ValueTuple(None, 'degree_C', 'group_temperature'),
                     'target_units': 'degree_C',
                     'db_manager': None,
                     'then_ts': 1653881839,
@@ -81,7 +78,6 @@ class UtilitiesTestCase(unittest.TestCase):
         Tests:
         1. degree_to_compass()
         2. calc_trend()
-        3. bytes_to_hex()
         """
 
         # test degree_to_compass()
@@ -89,10 +85,43 @@ class UtilitiesTestCase(unittest.TestCase):
             self.assertEqual(user.rtgd.degree_to_compass(inp), outp)
 
         # test calc_trend()
+        # first get our kwargs for passing to calc_trend()
         _kwargs = dict(self.trend_kwargs)
-        # 'now' value is None
-        _kwargs['now_vt'] = ValueTuple(None, 'degree_C', 'group_temperature')
+        # first check that if now_vt has a None value we get None as the result
         self.assertIsNone(user.rtgd.calc_trend(**_kwargs))
+        # now set now_vt to a None, None, None ValueTuple
+        _kwargs['now_vt'] = ValueTuple(None, None, None)
+        # check we still get None
+        self.assertIsNone(user.rtgd.calc_trend(**_kwargs))
+        # now reset now_vt
+        _kwargs['now_vt'] = ValueTuple(23.5, 'degree_C', 'group_temperature')
+        # create a Mock object to mimic Manager.getRecord()
+        dbm_mock = unittest.mock.Mock()
+        _kwargs['db_manager'] = dbm_mock
+        # set the getRecord() return value to None, this is irrespective of any
+        # parameters passed in
+        dbm_mock.getRecord.return_value = None
+        # confirm calc_trend() returns None
+        self.assertIsNone(user.rtgd.calc_trend(**_kwargs))
+        # set the getRecord() return value to a minimal dict that does not
+        # include the obs type concerned (outTemp)
+        dbm_mock.getRecord.return_value = {'dateTime': 1653881860, 'usUnits': 16, 'outHumidity': 77}
+        # confirm calc_trend() returns None
+        self.assertIsNone(user.rtgd.calc_trend(**_kwargs))
+        # set the getRecord() return value to a minimal dict that does include
+        # the obs type concerned (outTemp)
+        dbm_mock.getRecord.return_value = {'dateTime': 1653881860, 'usUnits': 16, 'outTemp': 21.4}
+        # confirm test calc_trend() now returns 2.1
+        self.assertAlmostEqual(user.rtgd.calc_trend(**_kwargs), 2.1, places=4)
+        # set the getRecord() return value to a minimal dict that does include
+        # the obs type concerned (outTemp) but in degree_F not degree_C
+        dbm_mock.getRecord.return_value = {'dateTime': 1653881860, 'usUnits': 1, 'outTemp': 79.4}
+        # confirm test calc_trend() now returns -2.8333
+        self.assertAlmostEqual(user.rtgd.calc_trend(**_kwargs), -2.8333, places=4)
+        # this time change the target units to degree_F
+        _kwargs['target_units'] = 'degree_F'
+        # confirm test calc_trend() now returns -5.1
+        self.assertAlmostEqual(user.rtgd.calc_trend(**_kwargs), -5.1, places=4)
 
 
 class ListsAndDictsTestCase(unittest.TestCase):
