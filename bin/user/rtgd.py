@@ -297,7 +297,7 @@ import weewx.units
 import weewx.wxformulas
 
 from weewx.engine import StdService
-from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts, as_value_tuple, getUnitGroup
+from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts, as_value_tuple
 from weeutil.weeutil import to_bool, to_int
 
 # get a logger object
@@ -1259,7 +1259,8 @@ class RealtimeGaugeDataThread(threading.Thread):
         # values in the field map to ValueTuples
         for field, field_config in six.iteritems(_field_map):
             # obtain the unit group for this field
-            _group = getUnitGroup(field_config['source'], field_config.get('aggregate'))
+            _group = self.get_unit_group(field_config['source'],
+                                         field_config.get('aggregate'))
             # Obtain the default; the default could be a scalar, a scalar and a
             # unit or a scalar with unit and unit group. If no default was
             # specified it will be None.
@@ -1718,7 +1719,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             # get a few things about our result:
             # unit group
             result_group = this_field_map['group'] if 'group' in this_field_map \
-                else getUnitGroup(source, this_field_map.get('aggregate'))
+                else self.get_unit_group(source, this_field_map.get('aggregate'))
             # result units
             result_units = self.group_map[result_group]
             # initialise agg to None
@@ -1859,6 +1860,20 @@ class RealtimeGaugeDataThread(threading.Thread):
                     # we do not have a default so use None
                     result = None
         return result
+
+    @staticmethod
+    def get_unit_group(obs_type, agg_type=None):
+        """Determine the unit group of an observation and aggregation type.
+
+        WeeWX provides a similar function, but it does not support all
+        aggregates used by RTGD. Check for an handle these aggregates
+        separately, otherwise call the WeeWX function for everything else.
+        """
+
+        if agg_type == 'maxdir':
+            return 'group_direction'
+        else:
+            return weewx.units.getUnitGroup(obs_type, agg_type)
 
     def get_packet_units(self, packet):
         """Given a packet obtain unit details for each field map source."""
