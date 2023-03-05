@@ -297,7 +297,7 @@ import weewx.units
 import weewx.wxformulas
 
 from weewx.engine import StdService
-from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts, as_value_tuple, _getUnitGroup
+from weewx.units import ValueTuple, convert, getStandardUnitType, ListOfDicts, as_value_tuple, getUnitGroup
 from weeutil.weeutil import to_bool, to_int
 
 # get a logger object
@@ -766,6 +766,7 @@ DEFAULT_FORMAT_MAP = {
     'mmHg': '%.1f',
     'mmHg_per_hour': '%.4f',
     'percent': '%.0f',
+    'unix_epoch': '%H:%M',
     'uv_index': '%.1f',
     'watt_per_meter_squared': '%.0f'
 }
@@ -1258,7 +1259,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # values in the field map to ValueTuples
         for field, field_config in six.iteritems(_field_map):
             # obtain the unit group for this field
-            _group = _getUnitGroup(field_config['source'])
+            _group = getUnitGroup(field_config['source'], field_config.get('aggregate'))
             # Obtain the default; the default could be a scalar, a scalar and a
             # unit or a scalar with unit and unit group. If no default was
             # specified it will be None.
@@ -1716,7 +1717,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             source = this_field_map['source']
             # get a few things about our result:
             # unit group
-            result_group = this_field_map['group'] if 'group' in this_field_map else _getUnitGroup(source)
+            result_group = this_field_map['group'] if 'group' in this_field_map \
+                else getUnitGroup(source, this_field_map.get('aggregate'))
             # result units
             result_units = self.group_map[result_group]
             # initialise agg to None
