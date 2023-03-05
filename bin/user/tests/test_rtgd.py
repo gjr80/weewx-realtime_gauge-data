@@ -186,6 +186,515 @@ class ListsAndDictsTestCase(unittest.TestCase):
                                         "a valid format string")
 
 
+class RtgdThreadTestCase(unittest.TestCase):
+    """Test case to test RtgdThread."""
+
+    rtgd_thread_config = {
+        'WEEWX_ROOT': '/home/weewx',
+        'Station': {
+            'station_type': 'test_station_type'
+        },
+        'StdReport': {
+            'HTML_ROOT': 'public_html'
+        },
+        'RealtimeGaugeData': {
+        }
+    }
+    latitude_f = 10
+    longitude_f = 10
+    altitude = 10
+    # default field map
+    DEFAULT_FIELD_MAP = {
+        'temp': {
+            'source': 'outTemp',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'tempTL': {
+            'source': 'outTemp',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'tempTH': {
+            'source': 'outTemp',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'TtempTL': {
+            'source': 'outTemp',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'TtempTH': {
+            'source': 'outTemp',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'temptrend': {
+            'source': 'outTemp',
+            'aggregate': 'trend',
+            'aggregate_period': '3600',
+            'grace_period': '300',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'intemp': {
+            'source': 'inTemp',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'intempTL': {
+            'source': 'inTemp',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'intempTH': {
+            'source': 'inTemp',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'TintempTL': {
+            'source': 'inTemp',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'TintempTH': {
+            'source': 'inTemp',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'hum': {
+            'source': 'outHumidity',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': (0, 'percent', 'group_percent')
+        },
+        'humTL': {
+            'source': 'outHumidity',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': (0, 'percent', 'group_percent')
+        },
+        'humTH': {
+            'source': 'outHumidity',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': (0, 'percent', 'group_percent')
+        },
+        'ThumTL': {
+            'source': 'outHumidity',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'ThumTH': {
+            'source': 'outHumidity',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'inhum': {
+            'source': 'inHumidity',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': (0, 'percent', 'group_percent')
+        },
+        'inhumTL': {
+            'source': 'inHumidity',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': (0, 'percent', 'group_percent')
+        },
+        'inhumTH': {
+            'source': 'inHumidity',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': (0, 'percent', 'group_percent')
+        },
+        'TinhumTL': {
+            'source': 'inHumidity',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'TinhumTH': {
+            'source': 'inHumidity',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'dew': {
+            'source': 'dewpoint',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'dewpointTL': {
+            'source': 'dewpoint',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'dewpointTH': {
+            'source': 'dewpoint',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'TdewpointTL': {
+            'source': 'dewpoint',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'TdewpointTH': {
+            'source': 'dewpoint',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'wchill': {
+            'source': 'windchill',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'wchillTL': {
+            'source': 'windchill',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'TwchillTL': {
+            'source': 'windchill',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'heatindex': {
+            'source': 'heatindex',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'heatindexTH': {
+            'source': 'heatindex',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'TheatindexTH': {
+            'source': 'heatindex',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'apptemp': {
+            'source': 'appTemp',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'apptempTL': {
+            'source': 'appTemp',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'apptempTH': {
+            'source': 'appTemp',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'TapptempTL': {
+            'source': 'appTemp',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'TapptempTH': {
+            'source': 'appTemp',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'humidex': {
+            'source': 'humidex',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': (0, 'degree_C', 'group_temperature')
+        },
+        'press': {
+            'source': 'barometer',
+            'group': 'group_pressure',
+            'format': '%.1f',
+            'default': (0, 'hPa', 'group_pressure')
+        },
+        'pressTL': {
+            'source': 'barometer',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_pressure',
+            'format': '%.1f',
+            'default': (0, 'hPa', 'group_pressure')
+        },
+        'pressTH': {
+            'source': 'barometer',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_pressure',
+            'format': '%.1f',
+            'default': (0, 'hPa', 'group_pressure')
+        },
+        'TpressTL': {
+            'source': 'barometer',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'TpressTH': {
+            'source': 'barometer',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'presstrendval': {
+            'source': 'barometer',
+            'aggregate': 'trend',
+            'aggregate_period': '3600',
+            'grace_period': '300',
+            'group': 'group_pressure',
+            'format': '%.1f',
+            'default': (0, 'hPa', 'group_pressure')
+        },
+        'rfall': {
+            'source': 'rain',
+            'aggregate': 'sum',
+            'aggregate_period': 'day',
+            'group': 'group_rain',
+            'format': '%.1f',
+            'default': (0, 'mm', 'group_rain')
+        },
+        'rrate': {
+            'source': 'rainRate',
+            'group': 'group_rainrate',
+            'format': '%.1f',
+            'default': (0, 'mm_per_hour', 'group_rainrate')
+        },
+        'rrateTM': {
+            'source': 'rainRate',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_rainrate',
+            'format': '%.1f',
+            'default': (0, 'mm_per_hour', 'group_rainrate')
+        },
+        'TrrateTM': {
+            'source': 'rainRate',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'wlatest': {
+            'source': 'windSpeed',
+            'group': 'group_speed',
+            'format': '%.0f',
+            'default': (0, 'km_per_hour', 'group_speed')
+        },
+        'windTM': {
+            'source': 'windSpeed',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_speed',
+            'format': '%.0f',
+            'default': (0, 'km_per_hour', 'group_speed')
+        },
+        'wgust': {
+            'source': 'windGust',
+            'group': 'group_speed',
+            'format': '%.0f',
+            'default': (0, 'km_per_hour', 'group_speed')
+        },
+        'wgustTM': {
+            'source': 'windGust',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_speed',
+            'format': '%.0f',
+            'default': (0, 'km_per_hour', 'group_speed')
+        },
+        'TwgustTM': {
+            'source': 'windGust',
+            'aggregate': 'maxtime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M',
+            'default': (0, 'unix_epoch', 'group_time')
+        },
+        'bearing': {
+            'source': 'windDir',
+            'group': 'group_direction',
+            'format': '%.0f',
+            'default': (0.0, 'degree_compass', 'group_direction')
+        },
+        'avgbearing': {
+            'source': 'wind',
+            'aggregate': 'vecdir',
+            'aggregate_period': 600,
+            'group': 'group_direction',
+            'format': '%.0f',
+            'default': (0, 'degree_compass', 'group_direction')
+        },
+        'bearingTM': {
+            'source': 'wind',
+            'aggregate': 'maxdir',
+            'aggregate_period': 'day',
+            'group': 'group_direction',
+            'format': '%.0f',
+            'default': (0, 'degree_compass', 'group_direction')
+        },
+        'windrun': {
+            'source': 'windrun',
+            'aggregate': 'sum',
+            'aggregate_period': 'day',
+            'group': 'group_distance',
+            'format': '%.1f',
+            'default': (0, 'km', 'group_distance')
+        },
+        'UV': {
+            'source': 'UV',
+            'group': 'group_uv',
+            'format': '%.1f',
+            'default': (0, 'uv_index', 'group_uv')
+        },
+        'UVTH': {
+            'source': 'UV',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_uv',
+            'format': '%.1f',
+            'default': (0, 'uv_index', 'group_uv')
+        },
+        'SolarRad': {
+            'source': 'radiation',
+            'group': 'group_radiation',
+            'format': '%.0f',
+            'default': (0, 'watt_per_meter_squared', 'group_radiation'),
+        },
+        'SolarRadTM': {
+            'source': 'radiation',
+            'aggregate': 'max',
+            'aggregate_period': 'day',
+            'group': 'group_radiation',
+            'format': '%.0f',
+            'default': (0, 'watt_per_meter_squared', 'group_radiation')
+        },
+        'CurrentSolarMax': {
+            'source': 'maxSolarRad',
+            'group': 'group_radiation',
+            'format': '%.0f',
+            'default': (0, 'watt_per_meter_squared', 'group_radiation')
+        },
+        'cloudbasevalue': {
+            'source': 'cloudbase',
+            'group': 'group_altitude',
+            'format': '%.0f',
+            'default': (0, 'foot', 'group_altitude')
+        }
+    }
+
+    def setUp(self):
+        pass
+
+    def test_field_map(self):
+        """Test creation of the field map."""
+
+        _rtgd_thread = user.rtgd.RealtimeGaugeDataThread(control_queue=None,
+                                                         result_queue=None,
+                                                         config_dict=self.rtgd_thread_config,
+                                                         manager_dict={},
+                                                         latitude=self.latitude_f,
+                                                         longitude=self.longitude_f,
+                                                         altitude=self.altitude)
+        # self.maxDiff = None
+        self.assertDictEqual(_rtgd_thread.field_map,
+                             self.DEFAULT_FIELD_MAP,
+                             msg='Default field map mismatch')
+
 def suite(test_cases):
     """Create a TestSuite object containing the tests we are to perform."""
 
@@ -207,7 +716,7 @@ def main():
     import argparse
 
     # test cases that are production ready
-    test_cases = (UtilitiesTestCase, ListsAndDictsTestCase)
+    test_cases = (UtilitiesTestCase, ListsAndDictsTestCase, RtgdThreadTestCase)
 
     usage = """python -m user.tests.test_rtgd --help
            python -m user.tests.test_rtgd --version
