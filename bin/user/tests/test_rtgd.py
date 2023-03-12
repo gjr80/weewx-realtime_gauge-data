@@ -23,12 +23,15 @@ To run the test suite:
 
     $ PYTHONPATH=$BIN python3 -m user.tests.test_rtgd [-v]
 """
+import configobj
+import copy
 # python imports
 import unittest
 from unittest.mock import patch
 
 # Python 2/3 compatibility shims
 import six
+from six.moves import StringIO
 
 # WeeWX imports
 import weewx
@@ -189,7 +192,8 @@ class ListsAndDictsTestCase(unittest.TestCase):
 class RtgdThreadTestCase(unittest.TestCase):
     """Test case to test RtgdThread."""
 
-    rtgd_thread_config = {
+    # bare bones config dict for instantiating RealtimeGaugeDataThread objects
+    rtgd_thread_config_dict = {
         'WEEWX_ROOT': '/home/weewx',
         'Station': {
             'station_type': 'test_station_type'
@@ -200,16 +204,18 @@ class RtgdThreadTestCase(unittest.TestCase):
         'RealtimeGaugeData': {
         }
     }
+    # decimal lat, long and alt used for instantiating RealtimeGaugeDataThread
+    # objects
     latitude_f = 10
     longitude_f = 10
     altitude = 10
-    # default field map
-    DEFAULT_FIELD_MAP = {
+    # the expected default field map
+    default_field_map_expected = {
         'temp': {
             'source': 'outTemp',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'tempTL': {
             'source': 'outTemp',
@@ -217,7 +223,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'tempTH': {
             'source': 'outTemp',
@@ -225,7 +231,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'TtempTL': {
             'source': 'outTemp',
@@ -233,7 +239,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'TtempTH': {
             'source': 'outTemp',
@@ -241,7 +247,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'temptrend': {
             'source': 'outTemp',
@@ -250,13 +256,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'grace_period': '300',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'intemp': {
             'source': 'inTemp',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'intempTL': {
             'source': 'inTemp',
@@ -264,7 +270,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'intempTH': {
             'source': 'inTemp',
@@ -272,7 +278,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'TintempTL': {
             'source': 'inTemp',
@@ -280,7 +286,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'TintempTH': {
             'source': 'inTemp',
@@ -288,13 +294,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'hum': {
             'source': 'outHumidity',
             'group': 'group_percent',
             'format': '%.0f',
-            'default': (0, 'percent', 'group_percent')
+            'default': ValueTuple(0, 'percent', 'group_percent')
         },
         'humTL': {
             'source': 'outHumidity',
@@ -302,7 +308,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_percent',
             'format': '%.0f',
-            'default': (0, 'percent', 'group_percent')
+            'default': ValueTuple(0, 'percent', 'group_percent')
         },
         'humTH': {
             'source': 'outHumidity',
@@ -310,7 +316,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_percent',
             'format': '%.0f',
-            'default': (0, 'percent', 'group_percent')
+            'default': ValueTuple(0, 'percent', 'group_percent')
         },
         'ThumTL': {
             'source': 'outHumidity',
@@ -318,7 +324,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'ThumTH': {
             'source': 'outHumidity',
@@ -326,13 +332,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'inhum': {
             'source': 'inHumidity',
             'group': 'group_percent',
             'format': '%.0f',
-            'default': (0, 'percent', 'group_percent')
+            'default': ValueTuple(0, 'percent', 'group_percent')
         },
         'inhumTL': {
             'source': 'inHumidity',
@@ -340,7 +346,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_percent',
             'format': '%.0f',
-            'default': (0, 'percent', 'group_percent')
+            'default': ValueTuple(0, 'percent', 'group_percent')
         },
         'inhumTH': {
             'source': 'inHumidity',
@@ -348,7 +354,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_percent',
             'format': '%.0f',
-            'default': (0, 'percent', 'group_percent')
+            'default': ValueTuple(0, 'percent', 'group_percent')
         },
         'TinhumTL': {
             'source': 'inHumidity',
@@ -356,7 +362,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'TinhumTH': {
             'source': 'inHumidity',
@@ -364,13 +370,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'dew': {
             'source': 'dewpoint',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'dewpointTL': {
             'source': 'dewpoint',
@@ -378,7 +384,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'dewpointTH': {
             'source': 'dewpoint',
@@ -386,7 +392,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'TdewpointTL': {
             'source': 'dewpoint',
@@ -394,7 +400,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'TdewpointTH': {
             'source': 'dewpoint',
@@ -402,13 +408,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'wchill': {
             'source': 'windchill',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'wchillTL': {
             'source': 'windchill',
@@ -416,7 +422,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'TwchillTL': {
             'source': 'windchill',
@@ -424,13 +430,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'heatindex': {
             'source': 'heatindex',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'heatindexTH': {
             'source': 'heatindex',
@@ -438,7 +444,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'TheatindexTH': {
             'source': 'heatindex',
@@ -446,13 +452,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'apptemp': {
             'source': 'appTemp',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'apptempTL': {
             'source': 'appTemp',
@@ -460,7 +466,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'apptempTH': {
             'source': 'appTemp',
@@ -468,7 +474,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'TapptempTL': {
             'source': 'appTemp',
@@ -476,7 +482,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'TapptempTH': {
             'source': 'appTemp',
@@ -484,19 +490,19 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'humidex': {
             'source': 'humidex',
             'group': 'group_temperature',
             'format': '%.1f',
-            'default': (0, 'degree_C', 'group_temperature')
+            'default': ValueTuple(0, 'degree_C', 'group_temperature')
         },
         'press': {
             'source': 'barometer',
             'group': 'group_pressure',
             'format': '%.1f',
-            'default': (0, 'hPa', 'group_pressure')
+            'default': ValueTuple(0, 'hPa', 'group_pressure')
         },
         'pressTL': {
             'source': 'barometer',
@@ -504,7 +510,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_pressure',
             'format': '%.1f',
-            'default': (0, 'hPa', 'group_pressure')
+            'default': ValueTuple(0, 'hPa', 'group_pressure')
         },
         'pressTH': {
             'source': 'barometer',
@@ -512,7 +518,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_pressure',
             'format': '%.1f',
-            'default': (0, 'hPa', 'group_pressure')
+            'default': ValueTuple(0, 'hPa', 'group_pressure')
         },
         'TpressTL': {
             'source': 'barometer',
@@ -520,7 +526,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'TpressTH': {
             'source': 'barometer',
@@ -528,7 +534,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'presstrendval': {
             'source': 'barometer',
@@ -537,7 +543,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'grace_period': '300',
             'group': 'group_pressure',
             'format': '%.1f',
-            'default': (0, 'hPa', 'group_pressure')
+            'default': ValueTuple(0, 'hPa', 'group_pressure')
         },
         'rfall': {
             'source': 'rain',
@@ -545,13 +551,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_rain',
             'format': '%.1f',
-            'default': (0, 'mm', 'group_rain')
+            'default': ValueTuple(0, 'mm', 'group_rain')
         },
         'rrate': {
             'source': 'rainRate',
             'group': 'group_rainrate',
             'format': '%.1f',
-            'default': (0, 'mm_per_hour', 'group_rainrate')
+            'default': ValueTuple(0, 'mm_per_hour', 'group_rainrate')
         },
         'rrateTM': {
             'source': 'rainRate',
@@ -559,7 +565,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_rainrate',
             'format': '%.1f',
-            'default': (0, 'mm_per_hour', 'group_rainrate')
+            'default': ValueTuple(0, 'mm_per_hour', 'group_rainrate')
         },
         'TrrateTM': {
             'source': 'rainRate',
@@ -567,13 +573,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'wlatest': {
             'source': 'windSpeed',
             'group': 'group_speed',
             'format': '%.0f',
-            'default': (0, 'km_per_hour', 'group_speed')
+            'default': ValueTuple(0, 'km_per_hour', 'group_speed')
         },
         'windTM': {
             'source': 'windSpeed',
@@ -581,13 +587,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_speed',
             'format': '%.0f',
-            'default': (0, 'km_per_hour', 'group_speed')
+            'default': ValueTuple(0, 'km_per_hour', 'group_speed')
         },
         'wgust': {
             'source': 'windGust',
             'group': 'group_speed',
             'format': '%.0f',
-            'default': (0, 'km_per_hour', 'group_speed')
+            'default': ValueTuple(0, 'km_per_hour', 'group_speed')
         },
         'wgustTM': {
             'source': 'windGust',
@@ -595,7 +601,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_speed',
             'format': '%.0f',
-            'default': (0, 'km_per_hour', 'group_speed')
+            'default': ValueTuple(0, 'km_per_hour', 'group_speed')
         },
         'TwgustTM': {
             'source': 'windGust',
@@ -603,13 +609,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_time',
             'format': '%H:%M',
-            'default': (0, 'unix_epoch', 'group_time')
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
         },
         'bearing': {
             'source': 'windDir',
             'group': 'group_direction',
             'format': '%.0f',
-            'default': (0.0, 'degree_compass', 'group_direction')
+            'default': ValueTuple(0.0, 'degree_compass', 'group_direction')
         },
         'avgbearing': {
             'source': 'wind',
@@ -617,7 +623,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 600,
             'group': 'group_direction',
             'format': '%.0f',
-            'default': (0, 'degree_compass', 'group_direction')
+            'default': ValueTuple(0, 'degree_compass', 'group_direction')
         },
         'bearingTM': {
             'source': 'wind',
@@ -625,7 +631,7 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_direction',
             'format': '%.0f',
-            'default': (0, 'degree_compass', 'group_direction')
+            'default': ValueTuple(0, 'degree_compass', 'group_direction')
         },
         'windrun': {
             'source': 'windrun',
@@ -633,13 +639,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_distance',
             'format': '%.1f',
-            'default': (0, 'km', 'group_distance')
+            'default': ValueTuple(0, 'km', 'group_distance')
         },
         'UV': {
             'source': 'UV',
             'group': 'group_uv',
             'format': '%.1f',
-            'default': (0, 'uv_index', 'group_uv')
+            'default': ValueTuple(0, 'uv_index', 'group_uv')
         },
         'UVTH': {
             'source': 'UV',
@@ -647,13 +653,13 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_uv',
             'format': '%.1f',
-            'default': (0, 'uv_index', 'group_uv')
+            'default': ValueTuple(0, 'uv_index', 'group_uv')
         },
         'SolarRad': {
             'source': 'radiation',
             'group': 'group_radiation',
             'format': '%.0f',
-            'default': (0, 'watt_per_meter_squared', 'group_radiation'),
+            'default': ValueTuple(0, 'watt_per_meter_squared', 'group_radiation'),
         },
         'SolarRadTM': {
             'source': 'radiation',
@@ -661,39 +667,283 @@ class RtgdThreadTestCase(unittest.TestCase):
             'aggregate_period': 'day',
             'group': 'group_radiation',
             'format': '%.0f',
-            'default': (0, 'watt_per_meter_squared', 'group_radiation')
+            'default': ValueTuple(0, 'watt_per_meter_squared', 'group_radiation')
         },
         'CurrentSolarMax': {
             'source': 'maxSolarRad',
             'group': 'group_radiation',
             'format': '%.0f',
-            'default': (0, 'watt_per_meter_squared', 'group_radiation')
+            'default': ValueTuple(0, 'watt_per_meter_squared', 'group_radiation')
         },
         'cloudbasevalue': {
             'source': 'cloudbase',
             'group': 'group_altitude',
             'format': '%.0f',
-            'default': (0, 'foot', 'group_altitude')
+            'default': ValueTuple(0, 'foot', 'group_altitude')
+        }
+    }
+    # a custom field map in string format
+    field_map_str = """
+[RealtimeGaugeData]
+    [[FieldMap]]
+        [[[temp]]]
+            source = extraTemp1
+            group = group_temperature
+            format = %.1f
+            default = 0, degree_F, group_temperature
+        [[[tempTL]]]
+            source = extraTemp1
+            aggregate = min
+            aggregate_period = day
+            group = group_temperature
+            format = %.2f
+            default = 0, degree_F, group_temperature
+        [[[TtempTL]]]
+            source = extraTemp1
+            aggregate = mintime
+            aggregate_period = day
+            group = group_time
+            format = %H:%M:%S
+            default = 0, unix_epoch, group_time
+        [[[temptrend]]]
+            source = extraTemp1
+            aggregate = trend
+            aggregate_period = 10800
+            grace_period = 300
+            group = group_temperature
+            format = %.2f
+            default = 0, degree_F, group_temperature
+        [[[hum]]]
+            source = inHumidity
+            group = group_percent
+            format = %.1f
+            default = 0, percent, group_percent
+        [[[humTL]]]
+            source = inHumidity
+            aggregate = min
+            aggregate_period = day
+            group = group_percent
+            format = %.0f
+            default = 0, percent, group_percent
+"""
+    # the extected custom field map
+    field_map_expected = {
+        'temp': {
+            'source': 'extraTemp1',
+            'group': 'group_temperature',
+            'format': '%.1f',
+            'default': ValueTuple(0, 'degree_F', 'group_temperature')
+        },
+        'tempTL': {
+            'source': 'extraTemp1',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.2f',
+            'default': ValueTuple(0, 'degree_F', 'group_temperature')
+        },
+        'TtempTL': {
+            'source': 'extraTemp1',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M:%S',
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
+        },
+        'temptrend': {
+            'source': 'extraTemp1',
+            'aggregate': 'trend',
+            'aggregate_period': '10800',
+            'grace_period': '300',
+            'group': 'group_temperature',
+            'format': '%.2f',
+            'default': ValueTuple(0, 'degree_F', 'group_temperature')
+        },
+        'hum': {
+            'source': 'inHumidity',
+            'group': 'group_percent',
+            'format': '%.1f',
+            'default': ValueTuple(0, 'percent', 'group_percent')
+        },
+        'humTL': {
+            'source': 'inHumidity',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': ValueTuple(0, 'percent', 'group_percent')
+        }
+    }
+    # a field map extension
+    field_map_extension_str = """
+    [RealtimeGaugeData]
+        [[FieldMapExtensions]]
+            [[[temp]]]
+                source = extraTemp2
+                group = group_temperature
+                format = %.2f
+                default = 10, degree_C, group_temperature
+"""
+    # expected extended default field map
+    default_field_map_extended_expected = dict(default_field_map_expected)
+    default_field_map_extended_expected['temp'] = {
+        'source': 'extraTemp2',
+        'group': 'group_temperature',
+        'format': '%.2f',
+        'default': ValueTuple(10.0, 'degree_C', 'group_temperature')
+    }
+    # expected extended field map
+    field_map_extended_expected = {
+        'temp': {
+            'source': 'extraTemp2',
+            'group': 'group_temperature',
+            'format': '%.2f',
+            'default': ValueTuple(10.0, 'degree_C', 'group_temperature')
+        },
+        'tempTL': {
+            'source': 'extraTemp1',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_temperature',
+            'format': '%.2f',
+            'default': ValueTuple(0, 'degree_F', 'group_temperature')
+        },
+        'TtempTL': {
+            'source': 'extraTemp1',
+            'aggregate': 'mintime',
+            'aggregate_period': 'day',
+            'group': 'group_time',
+            'format': '%H:%M:%S',
+            'default': ValueTuple(0, 'unix_epoch', 'group_time')
+        },
+        'temptrend': {
+            'source': 'extraTemp1',
+            'aggregate': 'trend',
+            'aggregate_period': '10800',
+            'grace_period': '300',
+            'group': 'group_temperature',
+            'format': '%.2f',
+            'default': ValueTuple(0, 'degree_F', 'group_temperature')
+        },
+        'hum': {
+            'source': 'inHumidity',
+            'group': 'group_percent',
+            'format': '%.1f',
+            'default': ValueTuple(0, 'percent', 'group_percent')
+        },
+        'humTL': {
+            'source': 'inHumidity',
+            'aggregate': 'min',
+            'aggregate_period': 'day',
+            'group': 'group_percent',
+            'format': '%.0f',
+            'default': ValueTuple(0, 'percent', 'group_percent')
         }
     }
 
     def setUp(self):
-        pass
+        self.config_dict = configobj.ConfigObj(self.rtgd_thread_config_dict)
 
     def test_field_map(self):
-        """Test creation of the field map."""
+        """Test creation of the field map.
 
+        There are four aspects of the field map to be tested:
+        1. test that the default field map is used in the absence of
+           [[FieldMap]] and [[FieldMapExtensions]] stanzas
+        2. test that when a [[FieldMap]] stanza exists with no
+           [[FieldMapExtensions]] stanza the resulting field map is as defined
+           in the [[FieldMap]] stanza
+        3. test that when a [[FieldMapExtensions]] stanza exists with no
+           [[FieldMap]] stanza the resulting field map is the default field map
+           extended by the [[FieldMapExtensions]] stanza
+        4. test that when both [[FieldMap]] and [[FieldMapExtensions]] stanzas
+           exist the resulting field map is as defined in [[FieldMap]] and
+           extended by the [[FieldMapExtensions]] stanza
+        """
+
+        # test the default field map
+        # first get a config dict with no [[FieldMap]] and
+        # [[FieldMapExtensions]] stanzas
+        config_dict = configobj.ConfigObj(self.rtgd_thread_config_dict)
+        # now obtain a RealtimeGaugeDataThread object with this config dict
         _rtgd_thread = user.rtgd.RealtimeGaugeDataThread(control_queue=None,
                                                          result_queue=None,
-                                                         config_dict=self.rtgd_thread_config,
+                                                         config_dict=config_dict,
                                                          manager_dict={},
                                                          latitude=self.latitude_f,
                                                          longitude=self.longitude_f,
                                                          altitude=self.altitude)
-        # self.maxDiff = None
+        # confirm the default field map is used and is correct
         self.assertDictEqual(_rtgd_thread.field_map,
-                             self.DEFAULT_FIELD_MAP,
+                             self.default_field_map_expected,
                              msg='Default field map mismatch')
+
+        # test [[FieldMap]] only
+        # first destroy our previous RealtimeGaugeDataThread object
+        del _rtgd_thread
+        # now get a config dict with no [[FieldMap]] and
+        # [[FieldMapExtensions]] stanzas
+        config_dict = configobj.ConfigObj(self.rtgd_thread_config_dict)
+        # add a [[FieldMap]] stanza to our config dict
+        config_dict.merge(configobj.ConfigObj(StringIO(self.field_map_str)))
+        # obtain a RealtimeGaugeDataThread object using this config dict
+        _rtgd_thread = user.rtgd.RealtimeGaugeDataThread(control_queue=None,
+                                                         result_queue=None,
+                                                         config_dict=config_dict,
+                                                         manager_dict={},
+                                                         latitude=self.latitude_f,
+                                                         longitude=self.longitude_f,
+                                                         altitude=self.altitude)
+        # confirm the [[FieldMap]] overrides the default field map
+        self.assertDictEqual(_rtgd_thread.field_map,
+                             self.field_map_expected,
+                             msg='Custom field map mismatch')
+
+        # test [[FieldMapExtensions]]
+        # first destroy our previous RealtimeGaugeDataThread object
+        del _rtgd_thread
+        # now get a config dict with no [[FieldMap]] and
+        # [[FieldMapExtensions]] stanzas
+        config_dict = configobj.ConfigObj(self.rtgd_thread_config_dict)
+        # add a [[FieldMapExtensions]] stanza to our config
+        config_dict.merge(configobj.ConfigObj(StringIO(self.field_map_extension_str)))
+        # obtain a RealtimeGaugeDataThread object using this config
+        _rtgd_thread = user.rtgd.RealtimeGaugeDataThread(control_queue=None,
+                                                         result_queue=None,
+                                                         config_dict=config_dict,
+                                                         manager_dict={},
+                                                         latitude=self.latitude_f,
+                                                         longitude=self.longitude_f,
+                                                         altitude=self.altitude)
+        # confirm the [[FieldMapExtensions]] correctly extends the default
+        # field map
+        self.assertDictEqual(_rtgd_thread.field_map,
+                             self.default_field_map_extended_expected,
+                             msg='Extended default field map mismatch')
+
+        # test [[FieldMap]] and [[FieldMapExtensions]]
+        # first destroy our previous RealtimeGaugeDataThread object
+        del _rtgd_thread
+        # first get a config dict with no [[FieldMap]] and
+        # [[FieldMapExtensions]] stanzas
+        config_dict = configobj.ConfigObj(self.rtgd_thread_config_dict)
+        # add a [[FieldMap]] stanza to our config
+        config_dict.merge(configobj.ConfigObj(StringIO(self.field_map_str)))
+        # add a [[FieldMapExtensions]] stanza to our config
+        config_dict.merge(configobj.ConfigObj(StringIO(self.field_map_extension_str)))
+        # obtain a RealtimeGaugeDataThread object using this config
+        _rtgd_thread = user.rtgd.RealtimeGaugeDataThread(control_queue=None,
+                                                         result_queue=None,
+                                                         config_dict=config_dict,
+                                                         manager_dict={},
+                                                         latitude=self.latitude_f,
+                                                         longitude=self.longitude_f,
+                                                         altitude=self.altitude)
+        # confirm the [[FieldMap]] overrides the default field map and the
+        # [[FieldMapExtensions]] correctly extends the field map
+        self.assertDictEqual(_rtgd_thread.field_map,
+                             self.field_map_extended_expected,
+                             msg='Extended custom field map mismatch')
 
 def suite(test_cases):
     """Create a TestSuite object containing the tests we are to perform."""
