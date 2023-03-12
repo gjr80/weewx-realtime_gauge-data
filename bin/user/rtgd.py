@@ -1242,16 +1242,15 @@ class RealtimeGaugeDataThread(threading.Thread):
         self.date_format = rtgd_config_dict.get('date_format', '%Y/%m/%d')
         self.time_format = rtgd_config_dict.get('time_format', '%H:%M')
         self.flag_format = '%.0f'
-
         # Get the field map from our config, if it does not exist use the
         # default. Use a deepcopy of the defaults as we will possibly be
         # modifying the field map.
         _field_map = rtgd_config_dict.get('FieldMap', copy.deepcopy(DEFAULT_FIELD_MAP))
+
         # get any extensions
         _extensions = rtgd_config_dict.get('FieldMapExtensions', {})
         # and update the field map with the extensions
         _field_map.update(_extensions)
-
         # make a deepcopy of the extended field map as we will be iterating
         # over it and possibly making changes
         updated_field_map = copy.deepcopy(_field_map)
@@ -1278,7 +1277,7 @@ class RealtimeGaugeDataThread(threading.Thread):
             elif len(_default) == 3:
                 # we already have all the elements of a ValueTuple so no
                 # calculations just creating of the ValueTuple object
-                _vt = ValueTuple(_default)
+                _vt = ValueTuple(float(_default[0]), _default[1], _default[2])
             # update the default in the config for this field in the field map,
             # but make sure we update our copy of the field map not the version
             # we aer iterating over
