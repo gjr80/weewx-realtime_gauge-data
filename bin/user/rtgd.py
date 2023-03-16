@@ -17,10 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.2                                          Date: 13 January 2023
+Version: 0.6.2                                          Date: 16 March 2023
 
   Revision History
-    13 January 2023     v0.6.2
+    16 March 2023       v0.6.2
+        - fix issue that resulted in incorrect formatting of some non-metric
+          observations
         - fix unhandled TypeError that occurs if the WeeWX engine restarts as a
           result of a recoverable error, issue #30 refers
     4 November 2022     v0.6.1
@@ -304,7 +306,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.2b1'
+RTGD_VERSION = '0.6.2'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1537,7 +1539,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                                 log.critical("Thread exiting. Reason: %s" % (e, ))
                                 return
                     # if packets have backed up in the control queue, trim it until
-                    # it's no bigger than the max allowed backlog
+                    # it's not bigger than the max allowed backlog
                     while self.control_queue.qsize() > 5:
                         self.control_queue.get()
         except Exception as e:
@@ -1865,7 +1867,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         """Determine the unit group of an observation and aggregation type.
 
         WeeWX provides a similar function, but it does not support all
-        aggregates used by RTGD. Check for an handle these aggregates
+        aggregates used by RTGD. Check for and handle these aggregates
         separately, otherwise call the WeeWX function for everything else.
         """
 
@@ -2102,7 +2104,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         return data
 
     def process_new_archive_record(self, record):
-        """Control processing when new a archive record is presented."""
+        """Control processing when a new archive record is presented."""
 
         # set our lost contact flag if applicable
         self.lost_contact_flag = self.get_lost_contact(record, 'archive')
@@ -2570,7 +2572,7 @@ seed_functions = ListOfDicts({'wind': Buffer.seed_vector})
 #                              class ObsTuple
 # ============================================================================
 
-# A observation during some period can be represented by the value of the
+# An observation during some period can be represented by the value of the
 # observation and the time at which it was observed. This can be represented
 # in a 2 way tuple called an obs tuple. An obs tuple is useful because its
 # contents can be accessed using named attributes.
@@ -2583,7 +2585,7 @@ seed_functions = ListOfDicts({'wind': Buffer.seed_vector})
 # It is valid to have an observed value of None.
 #
 # It is also valid to have a ts of None (meaning there is no information about
-# the time the was was observed.
+# the time the observation was observed).
 
 class ObsTuple(tuple):
 
@@ -2604,7 +2606,7 @@ class ObsTuple(tuple):
 # ============================================================================
 
 # A vector value can be represented as a magnitude and direction. This can be
-# represented in a 2 way tuple called an vector tuple. A vector tuple is useful
+# represented in a 2 way tuple called a vector tuple. A vector tuple is useful
 # because its contents can be accessed using named attributes.
 #
 # Item   attribute   Meaning
@@ -3077,7 +3079,7 @@ class WUSource(ThreadedSource):
 
         # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
         # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
-        # try..except loop to catch exceptions (ie one or both don't exist.
+        # try..except loop to catch exceptions (ie one or both don't exist).
         try:
             if wu_config_dict.get('api_key') is not None:
                 api_key = wu_config_dict.get('api_key')
@@ -3548,7 +3550,7 @@ class Zambretti(object):
         now = time.time()
         if weewx.debug == 2:
             log.debug("Last Zambretti forecast obtained at %s" % self.last_query_ts)
-        # If we haven't made a db query previously or if its been too long 
+        # If we haven't made a db query previously or if it's been too long
         # since the last query then make the query
         if (self.last_query_ts is None) or ((now + 1 - self.interval) >= self.last_query_ts):
             # if the forecast extension is not installed then return an 
@@ -3659,7 +3661,7 @@ class DarkskySource(ThreadedSource):
         self.last_call_ts = None
         # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
         # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
-        # try..except loop to catch exceptions (ie one or both don't exist.
+        # try..except loop to catch exceptions (ie one or both don't exist).
         key = darksky_config_dict.get('api_key', None)
         if key is None:
             raise MissingApiKey("Cannot find valid Darksky key")
@@ -3701,7 +3703,7 @@ class DarkskySource(ThreadedSource):
             log.debug("Last Darksky API call at %s" % self.last_call_ts)
         # has the lockout period passed since the last call
         if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
-            # If we haven't made an API call previously or if its been too long
+            # If we haven't made an API call previously or if it's been too long
             # since the last call then make the call
             if (self.last_call_ts is None) or ((now + 1 - self.interval) >= self.last_call_ts):
                 # Make the call, wrap in a try..except just in case

@@ -1,3 +1,8 @@
+v0.6.2
+- fix issue that resulted in incorrect formatting of some non-metric
+  observations
+- fix unhandled TypeError that occurs if the WeeWX engine restarts as a result
+  of a recoverable error, issue #30 refers
 v0.6.1
 - fixed issue where a user specified max_cache_age config option is used as a
   string instead of an integer
