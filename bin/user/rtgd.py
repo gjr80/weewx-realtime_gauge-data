@@ -20,6 +20,10 @@ this program.  If not, see https://www.gnu.org/licenses/.
 Version: 0.6.2                                          Date: 16 March 2023
 
   Revision History
+    xx yyyyy 2023       v1.0.0
+        - now supports WeeWX v5.0.0 and later only (may work under WeeWX v4.x
+          with python 3)
+        - compatible with python 3.7 and later (python 2 no longer supported)
     16 March 2023       v0.6.2
         - fix issue that resulted in incorrect formatting of some non-metric
           observations
@@ -272,23 +276,20 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
 import copy
 import datetime
 import errno
+import http.client
 import json
 import logging
 import math
 import os
 import os.path
+import queue
 import socket
 import sys
 import threading
 import time
+import urllib.error
 
 from operator import itemgetter
-
-# Python 2/3 compatibility shims
-import six
-from six.moves import http_client
-from six.moves import queue
-from six.moves import urllib
 
 # WeeWX imports
 import weewx
@@ -306,7 +307,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.2'
+RTGD_VERSION = '1.0.0a1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1046,7 +1047,7 @@ class HttpPostExport(object):
                                                          separators=(',', ':'),
                                                          sort_keys=True))
         except (urllib.error.URLError, socket.error,
-                http_client.BadStatusLine, http_client.IncompleteRead) as e:
+                http.client.BadStatusLine, http.client.IncompleteRead) as e:
             # an exception was thrown, log it and continue
             log.debug("Failed to post data: %s" % e)
         else:
@@ -1258,7 +1259,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         updated_field_map = copy.deepcopy(_field_map)
         # iterate over each field map config entry and convert any default
         # values in the field map to ValueTuples
-        for field, field_config in six.iteritems(_field_map):
+        for field, field_config in _field_map.items():
             # obtain the unit group for this field
             _group = self.get_unit_group(field_config['source'],
                                          field_config.get('aggregate'))
