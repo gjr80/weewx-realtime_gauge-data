@@ -10,9 +10,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.6.2                                          Date: 16 March 2023
+Version: 1.0.0                                          Date: xx yyyyy 2023
 
 Revision History
+    xx yyyyy 2023       v1.0.0
+        - now supports WeeWX v5.0.0 and later only (may work under WeeWX v4.x
+          with python 3)
+        - compatible with python 3.7 and later (python 2 no longer supported)
     16 March 2023       v0.6.2
         - bumped version only
     4 November 2022     v0.6.1
@@ -98,10 +102,8 @@ Revision History
 # python imports
 import configobj
 from distutils.version import StrictVersion
+from io import StringIO
 from setup import ExtensionInstaller
-
-# import StringIO, use six.moves due to python2/python3 differences
-from six.moves import StringIO
 
 # WeeWX imports
 import weewx
