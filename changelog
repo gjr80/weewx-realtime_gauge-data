@@ -1,3 +1,7 @@
+v1.0.0
+- now supports WeeWX v5.0.0 and later only (may work under WeeWX v4.x with
+  python 3)
+- compatible with python 3.7 and later (python 2 no longer supported)
 v0.6.2
 - fix issue that resulted in incorrect formatting of some non-metric
   observations

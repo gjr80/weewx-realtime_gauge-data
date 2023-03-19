@@ -24,11 +24,11 @@ A number of fields have additional pre-requisites:
 
     - download the latest *Realtime gauge-data* extension package:
 
-          $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.2/rtgd-0.6.2.tar.gz
+          $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.2/rtgd-1.0.0a1.tar.gz
 
     - install the *Realtime gauge-data* extension:
 
-          $ wee_extension --install=/var/tmp/rtgd-0.6.2.tar.gz
+          $ wee_extension --install=/var/tmp/rtgd-1.0.0a1.tar.gz
             
         **Note:** Depending on your system/installation the above command may need to be prefixed with *sudo*.
 
