@@ -17,9 +17,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.2                                          Date: 16 March 2023
+Version: 0.6.3                                          Date: 3 April 2023
 
   Revision History
+    3 April 2023        v0.6.3
+        - fix issue with missing or sporadic windGust/windSpeed loop data
     16 March 2023       v0.6.2
         - fix issue that resulted in incorrect formatting of some non-metric
           observations
@@ -306,7 +308,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.2'
+RTGD_VERSION = '0.6.3'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1989,7 +1991,8 @@ class RealtimeGaugeDataThread(threading.Thread):
 
         # wspeed - wind speed (average)
         # obtain the average wind speed from the buffer
-        _wspeed = self.buffer['windSpeed'].history_avg(ts=ts, age=600)
+        _speed = self.buffer['windSpeed'].history_avg(ts=ts, age=600)
+        _wspeed = _speed if _speed is not None else 0.0
         # put into a ValueTuple so we can convert
         wspeed_vt = ValueTuple(_wspeed,
                                self.packet_unit_dict['windSpeed']['units'],
@@ -2004,11 +2007,12 @@ class RealtimeGaugeDataThread(threading.Thread):
         # first look for max windGust value in the history, if windGust is not
         # in the buffer then use windSpeed, if no windSpeed then use 0.0
         if 'windGust' in self.buffer:
-            wgust = self.buffer['windGust'].history_max(ts, age=600).value
+            _gust = self.buffer['windGust'].history_max(ts, age=600)
         elif 'windSpeed' in self.buffer:
-            wgust = self.buffer['windSpeed'].history_max(ts, age=600).value
+            _gust = self.buffer['windSpeed'].history_max(ts, age=600)
         else:
-            wgust = 0.0
+            _gust = ObsTuple(None, None)
+        wgust = _gust.value if _gust.value is not None else 0.0
         # put into a ValueTuple so we can convert
         wgust_vt = ValueTuple(wgust,
                               self.packet_unit_dict['windSpeed']['units'],
@@ -2238,7 +2242,7 @@ class ObsBuffer(object):
             _max = max(snapshot, key=itemgetter(1))
             return ObsTuple(_max[0], _max[1])
         else:
-            return None
+            return ObsTuple(None, None)
 
     def history_avg(self, ts, age=MAX_AGE):
         """Return the average value in my history.
