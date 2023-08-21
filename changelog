@@ -1,6 +1,6 @@
 v0.6.3
 - fix issue with missing or sporadic windGust/windSpeed loop data
-- fix issue with rainRate values being incorrectly converted in some instances
+- fix issue with rain rate values being incorrectly converted in some instances
 v0.6.2
 - fix issue that resulted in incorrect formatting of some non-metric
   observations
