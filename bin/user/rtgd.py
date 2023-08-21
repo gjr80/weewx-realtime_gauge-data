@@ -17,11 +17,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.3                                          Date: 3 April 2023
+Version: 0.6.3                                          Date: 22 August 2023
 
   Revision History
     3 April 2023        v0.6.3
         - fix issue with missing or sporadic windGust/windSpeed loop data
+        - fix issue with rainRate values being incorrectly converted in some
+          instances
     16 March 2023       v0.6.2
         - fix issue that resulted in incorrect formatting of some non-metric
           observations
