@@ -1226,6 +1226,12 @@ class RealtimeGaugeDataThread(threading.Thread):
         # user overrides from the [RealtimeGaugeData] [[Groups]] stanza.
         _group_map = copy.deepcopy(DEFAULT_GROUP_MAP)
         _group_map.update(rtgd_config_dict.get('Groups', {}))
+        # The rainRate unit group is derived from the rain unit group, make
+        # sure we have the correct rainRate unit group
+        if _group_map['group_rain'] == 'inch':
+            _group_map['group_rainrate'] = 'inch_per_hour'
+        else:
+            _group_map['group_rainrate'] = 'mm_per_hour'
         # The SteelSeries Gauges do not support rain in cm, but cm is a valid
         # WeeWX rain unit. So if we have rain or rainRate in cm/cm_per_hour
         # force change the unit to mm/mm_per_hour.
