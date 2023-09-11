@@ -1,3 +1,6 @@
+v0.6.4
+- fix issue that prevented Zambretti forecast from being used as a scroller
+  source in some instances
 v0.6.3
 - fix issue with missing or sporadic windGust/windSpeed loop data
 - fix issue with rain rate values being incorrectly converted in some instances
