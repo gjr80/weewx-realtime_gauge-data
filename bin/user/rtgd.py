@@ -17,9 +17,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.3                                          Date: 22 August 2023
+Version: 0.6.4                                          Date: 12 September 2023
 
   Revision History
+    12 September 2023   v0.6.4
+        - fix issue that prevented Zambretti forecast from being used as a
+          scroller source in some instances
     3 April 2023        v0.6.3
         - fix issue with missing or sporadic windGust/windSpeed loop data
         - fix issue with rain rate values being incorrectly converted in some
@@ -310,7 +313,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.3'
+RTGD_VERSION = '0.6.4'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -3468,7 +3471,7 @@ class ZambrettiSource(ThreadedSource):
         self.config_dict = config_dict
         # get the Zambretti config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
-        self.zambretti_config_dict = _rtgd_config_dict.get("Zambretti")
+        self.zambretti_config_dict = _rtgd_config_dict.get("Zambretti", {})
 
         self.zambretti = None
 
