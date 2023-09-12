@@ -17,202 +17,207 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.4                                          Date: 12 September 2023
+Version: 1.0.0a1                                    Date: xx September 2023
 
   Revision History
+    xx yyyy 2023        v1.0.0
+      - now requires WeeWX v5.0.0 or later (may work with WeeWX 4.x under
+        python 3 but not supported/guaranteed)
+      - compatible with python 3.7 and later (python 2 no longer supported)
+      - removed support for the now defunct DarkSky forecast
     12 September 2023   v0.6.4
-        - fix issue that prevented Zambretti forecast from being used as a
-          scroller source in some instances
+      - fix issue that prevented Zambretti forecast from being used as a
+        scroller source in some instances
     3 April 2023        v0.6.3
-        - fix issue with missing or sporadic windGust/windSpeed loop data
-        - fix issue with rain rate values being incorrectly converted in some
-          instances
+      - fix issue with missing or sporadic windGust/windSpeed loop data
+      - fix issue with rain rate values being incorrectly converted in some
+        instances
     16 March 2023       v0.6.2
-        - fix issue that resulted in incorrect formatting of some non-metric
-          observations
-        - fix unhandled TypeError that occurs if the WeeWX engine restarts as a
-          result of a recoverable error, issue #30 refers
+      - fix issue that resulted in incorrect formatting of some non-metric
+        observations
+      - fix unhandled TypeError that occurs if the WeeWX engine restarts as a
+        result of a recoverable error, issue #30 refers
     4 November 2022     v0.6.1
-        - fixed issue where a user specified max_cache_age config option is
-          used as a string instead of an integer
+      - fixed issue where a user specified max_cache_age config option is
+        used as a string instead of an integer
     3 November 2022     v0.6.0
-        - fixed bug whereby 10 minute average wind bearing always matched
-          current wind bearing
-        - significant rewrite of get_field_value() method in preparation for
-          full implementation of field map
+      - fixed bug whereby 10 minute average wind bearing always matched
+        current wind bearing
+      - significant rewrite of get_field_value() method in preparation for
+        full implementation of field map
     17 April 2022       v0.5.5
-        - fixed bug in date and dateFormat fields that resulted in the
-          incorrect 'last rainfall' date and time being displayed on rainfall
-          gauge mouseovers
-        - as a result of the date and dateFormat bug fix date_format and
-          time_format config options are now limited to a number of fixed
-          formats
+      - fixed bug in date and dateFormat fields that resulted in the
+        incorrect 'last rainfall' date and time being displayed on rainfall
+        gauge mouseovers
+      - as a result of the date and dateFormat bug fix date_format and
+        time_format config options are now limited to a number of fixed
+        formats
     13 April 2022       v0.5.4
-        - added the inadvertently omitted humidex field
-        - added field TrrateTM
-        - reformatted DEFAULT_FIELD_MAP
+      - added the inadvertently omitted humidex field
+      - added field TrrateTM
+      - reformatted DEFAULT_FIELD_MAP
     11 April 2022       v0.5.3
-        - fixed bug where incorrect output field name is used for inside
-          temperature and associated aggregates/times
-        - added inside humidity and associated aggregates/times to output
+      - fixed bug where incorrect output field name is used for inside
+        temperature and associated aggregates/times
+      - added inside humidity and associated aggregates/times to output
     22 October 2021     v0.5.2
-        - fixed bug where tempTH contained today's outTemp minimum rather than
-          maximum
+      - fixed bug where tempTH contained today's outTemp minimum rather than
+        maximum
     17 October 2021     v0.5.1
-        - fixed bug where the default metric rain rate units used cm per hour
-          rather than mm per hour
+      - fixed bug where the default metric rain rate units used cm per hour
+        rather than mm per hour
     15 September 2021   v0.5.0
-        - added ability to rsync gauge-data.txt to an rsync capable server,
-          thanks to John Kline
-        - fixed bug that caused rtgd to abort if the first loop packet did not
-          contain inTemp
-        - reworked buffering of loop data, now use dedicated scalar and vector
-          buffer objects similar in operation to the WeeWX accumulators
-        - implemented a field_map config item allowing certain JSON output field
-          properties to be controlled by the user
-        - field currentSolarMax is no longer directly calculated by rtgd but is
-          now populated from WeeWX field maxSolarRad
-        - field lastRainTipISO is now populated
-        - removed deprecated field Tbeaufort
-        - rtgd now logs the rtgd version number on WeeWX startup
+      - added ability to rsync gauge-data.txt to an rsync capable server,
+        thanks to John Kline
+      - fixed bug that caused rtgd to abort if the first loop packet did not
+        contain inTemp
+      - reworked buffering of loop data, now use dedicated scalar and vector
+        buffer objects similar in operation to the WeeWX accumulators
+      - implemented a field_map config item allowing certain JSON output field
+        properties to be controlled by the user
+      - field currentSolarMax is no longer directly calculated by rtgd but is
+        now populated from WeeWX field maxSolarRad
+      - field lastRainTipISO is now populated
+      - removed deprecated field Tbeaufort
+      - rtgd now logs the rtgd version number on WeeWX startup
     23 November 2019    v0.4.2
-        - fix error in some expressions including > and < where operands could
-          be None
+      - fix error in some expressions including > and < where operands could
+        be None
     19 November 2019    v0.4.1
-        - fix max() error under python3
-        - implemented kludgy work around for lack of response message when
-          using HTTP POST under python 3
+      - fix max() error under python3
+      - implemented kludgy work around for lack of response message when
+        using HTTP POST under python 3
     16 November 2019    v0.4.0
-        - updated to work under WeeWX v4.0 using either python 2 or 3
+      - updated to work under WeeWX v4.0 using either python 2 or 3
     4 April 2019        v0.3.7
-        - revised WU API response parsing to eliminate occasional errors where
-          no forecast text was found
+      - revised WU API response parsing to eliminate occasional errors where
+        no forecast text was found
     28 March 2019       v0.3.6
-        - added support for new weather.com based WU API
-        - removed support for old api.wunderground.com based WU API
-        - updated to gauge-data.txt version 14 through addition of inTemp
-          max/min and times fields (intempTH, intempTL, TintempTH and TintempTL)
-        - minor reformatting of some RealtimeGaugeDataThread __init__ logging
-        - reformatted up front comments
-        - fixed incorrect rtgd.py version number
+      - added support for new weather.com based WU API
+      - removed support for old api.wunderground.com based WU API
+      - updated to gauge-data.txt version 14 through addition of inTemp
+        max/min and times fields (intempTH, intempTL, TintempTH and TintempTL)
+      - minor reformatting of some RealtimeGaugeDataThread __init__ logging
+      - reformatted up front comments
+      - fixed incorrect rtgd.py version number
     1 January 2019      v0.3.5
-        - added support for Darksky forecast API
-        - added support for Zambretti forecast text (subject to WeeWX
-          forecasting extension being installed)
-        - refactored code for obtaining scroller text
-        - each scroller text block now uses its own 2nd level (ie [[ ]]) config
-          with the scroller block specified under [RealtimeGaugeData]
+      - added support for Darksky forecast API
+      - added support for Zambretti forecast text (subject to WeeWX
+        forecasting extension being installed)
+      - refactored code for obtaining scroller text
+      - each scroller text block now uses its own 2nd level (ie [[ ]]) config
+        with the scroller block specified under [RealtimeGaugeData]
     26 April 2018       v0.3.4 (not released)
-        - Added support for optional fields mrfall and yrfall that provide 
-          month and year to date rainfall respectively. Optional fields are 
-          calculated/added to output if config options mtd_rain and/or ytd_rain 
-          are set True.
+      - Added support for optional fields mrfall and yrfall that provide
+        month and year to date rainfall respectively. Optional fields are
+        calculated/added to output if config options mtd_rain and/or ytd_rain
+        are set True.
     26 April 2018       v0.3.3
-        - implemented atomic write when writing gauge-data.txt to file
+      - implemented atomic write when writing gauge-data.txt to file
     20 January 2018     v0.3.2
-        - modified rtgdthread queue management to fix 100% CPU usage issue
+      - modified rtgdthread queue management to fix 100% CPU usage issue
     3 December 2017     v0.3.1
-        - added ignore_lost_contact config option to ignore the sensor contact
-          check result
-        - refactored lost contact flag check code, now uses a dedicated method
-          to determine whether sensor contact has been lost
-        - changed a log entry to indicate 'rtgd' as the block not 'engine'
+      - added ignore_lost_contact config option to ignore the sensor contact
+        check result
+      - refactored lost contact flag check code, now uses a dedicated method
+        to determine whether sensor contact has been lost
+      - changed a log entry to indicate 'rtgd' as the block not 'engine'
     4 September 2017    v0.3.0
-        - added ability to include Weather Underground forecast text
+      - added ability to include Weather Underground forecast text
     8 July 2017         v0.2.14
-        - changed default decimal places for foot, inHg, km_per_hour and
-          mile_per_hour
-        - reformatted change summary
-        - minor refactoring of RtgdBuffer class
+      - changed default decimal places for foot, inHg, km_per_hour and
+        mile_per_hour
+      - reformatted change summary
+      - minor refactoring of RtgdBuffer class
     6 May 2017          v0.2.13
-        - unnecessary whitespace removed from JSON output(issue #2)
-        - JSON output now sorted alphabetically by key (issue #2)
-        - Revised debug logging. Now supports debug=0,1,2 and 3: (issue #7)
-          0 - standard WeeWX output, no debug info
-          1 - as per debug=0, advises whether Zambretti is available, logs
-              minor non-fatal errors (eg posting)
-          2 - as per debug=1, logs events that occur, eg packets queued,
-              packets processed, output generated
-          3   as per debug=2, logs packet/record contents
-        - gauge-data.txt destination directory tree is created if it does not
-          exist(issue #8)
+      - unnecessary whitespace removed from JSON output(issue #2)
+      - JSON output now sorted alphabetically by key (issue #2)
+      - Revised debug logging. Now supports debug=0,1,2 and 3: (issue #7)
+        0 - standard WeeWX output, no debug info
+        1 - as per debug=0, advises whether Zambretti is available, logs
+            minor non-fatal errors (eg posting)
+        2 - as per debug=1, logs events that occur, eg packets queued,
+            packets processed, output generated
+        3   as per debug=2, logs packet/record contents
+      - gauge-data.txt destination directory tree is created if it does not
+        exist(issue #8)
     27 March 2017       v0.2.12(never released)
-        - fixed empty sequence ValueError associated with BearingRangeFrom10
-          and BearingRangeTo10
-        - fixed division by zero error in windrun calculations for first
-          archive period of the day
+      - fixed empty sequence ValueError associated with BearingRangeFrom10
+        and BearingRangeTo10
+      - fixed division by zero error in windrun calculations for first
+        archive period of the day
     22 March 2017       v0.2.11
-        - can now include local date/time in scroller text by including
-          strftime() format directives in the scroller text
-        - gauge-data.txt content can now be sent to a remote URL via HTTP POST.
-          Thanks to Alec Bennett for his idea.
+      - can now include local date/time in scroller text by including
+        strftime() format directives in the scroller text
+      - gauge-data.txt content can now be sent to a remote URL via HTTP POST.
+        Thanks to Alec Bennett for his idea.
     17 March 2017       v0.2.10
-        - now supports reading scroller text from a text file specified by the
-          scroller_text config option in [RealtimeGaugeData]
+      - now supports reading scroller text from a text file specified by the
+        scroller_text config option in [RealtimeGaugeData]
     7 March 2017        v0.2.9
-        - reworked ten minute gust calculation to fix problem where red gust
-          'wedge' would occasionally temporarily disappear from wind speed
-          gauge
+      - reworked ten minute gust calculation to fix problem where red gust
+        'wedge' would occasionally temporarily disappear from wind speed
+        gauge
     28 February 2017    v0.2.8
-        - reworked day max/min calculations to better handle missing historical
-          data. If historical max/min data is missing day max/min will default
-          to the current value for the obs concerned.
+      - reworked day max/min calculations to better handle missing historical
+        data. If historical max/min data is missing day max/min will default
+        to the current value for the obs concerned.
     26 February 2017    v0.2.7
-        - loop packets are now cached to support stations that emit partial
-          packets
-        - windSpeed obtained from archive is now only handled as a ValueTuple
-          to avoid units issues
+      - loop packets are now cached to support stations that emit partial
+        packets
+      - windSpeed obtained from archive is now only handled as a ValueTuple
+        to avoid units issues
     22 February 2017    v0.2.6
-        - updated docstring config options to reflect current library of
-          available options
-        - 'latest' and 'avgbearing' wind directions now return the last
-          non-None wind direction respectively when their feeder direction is
-          None
-        - implemented optional scroller_text config option allowing fixed
-          scroller text to be specified in lieu of Zambretti forecast text
-        - renamed rtgd thread and queue variables
-        - no longer reads unit group config options that have only one possible
-          unit
-        - use of mmHg, knot or cm units reverts to hPa, mile_per_hour and mm
-          respectively due to WeeWX or SteelSeries Gauges not understanding the
-          unit (or derived unit)
-        - made gauge-data.txt unit code determination more robust
-        - reworked code that formats gauge-data.txt field data to better handle
-          None values
+      - updated docstring config options to reflect current library of
+        available options
+      - 'latest' and 'avgbearing' wind directions now return the last
+        non-None wind direction respectively when their feeder direction is
+        None
+      - implemented optional scroller_text config option allowing fixed
+        scroller text to be specified in lieu of Zambretti forecast text
+      - renamed rtgd thread and queue variables
+      - no longer reads unit group config options that have only one possible
+        unit
+      - use of mmHg, knot or cm units reverts to hPa, mile_per_hour and mm
+        respectively due to WeeWX or SteelSeries Gauges not understanding the
+        unit (or derived unit)
+      - made gauge-data.txt unit code determination more robust
+      - reworked code that formats gauge-data.txt field data to better handle
+        None values
     21 February 2017    v0.2.5
-        - fixed error where altitude units could not be changed from meter
-        - rainrate and windrun unit groups are now derived from rain and speed
-          units groups respectively
-        - solar calc config options no longer searched for in [StdWXCalculate]
+      - fixed error where altitude units could not be changed from meter
+      - rainrate and windrun unit groups are now derived from rain and speed
+        units groups respectively
+      - solar calc config options no longer searched for in [StdWXCalculate]
     20 February 2017    v0.2.4
-        - fixed error where rain units could not be changed from mm
-        - pressures now formats to correct number of decimal places
-        - reworked temp and pressure trend formatting
+      - fixed error where rain units could not be changed from mm
+      - pressures now formats to correct number of decimal places
+      - reworked temp and pressure trend formatting
     20 February 2017    v0.2.3
-        - Fixed logic error in windrose calculations. Minor tweaking of
-          windrose processing.
+      - Fixed logic error in windrose calculations. Minor tweaking of
+        windrose processing.
     19 February 2017    v0.2.2
-        - Added config option apptemp_binding specifying a binding containing
-          appTemp data. apptempTL and apptempTH default to apptemp if binding
-          not specified or it does not contain appTemp data.
+      - Added config option apptemp_binding specifying a binding containing
+        appTemp data. apptempTL and apptempTH default to apptemp if binding
+        not specified or it does not contain appTemp data.
     15 February 2017    v0.2.1
-        - fixed error that resulted in incorrect pressL and pressH values
+      - fixed error that resulted in incorrect pressL and pressH values
     24 January 2017     v0.2.0
-        - now runs in a thread to eliminate blocking impact on WeeWX
-        - now calculates WindRoseData
-        - now calculates pressL and pressH
-        - frequency of generation is now specified by a single config option
-          min_interval
-        - gauge-data.txt output path is now specified by rtgd_path config
-          option
-        - added config options for windrose period and number of compass points
-          to be generated
+      - now runs in a thread to eliminate blocking impact on WeeWX
+      - now calculates WindRoseData
+      - now calculates pressL and pressH
+      - frequency of generation is now specified by a single config option
+        min_interval
+      - gauge-data.txt output path is now specified by rtgd_path config
+        option
+      - added config options for windrose period and number of compass points
+        to be generated
     19 January 2017     v0.1.2
-        - fix error that occurred when stations do not emit radiation
+      - fix error that occurred when stations do not emit radiation
     18 January 2017     v0.1.1
-        - better handles loop observations that are None
+      - better handles loop observations that are None
     3 January 2017      v0.1.0
-        - initial release
+      - initial release
 
 
 A WeeWX service to generate a loop based gauge-data.txt.
@@ -279,23 +284,20 @@ Handy things/conditions noted from analysis of SteelSeries Weather Gauges:
 import copy
 import datetime
 import errno
+import http.client
 import json
 import logging
 import math
 import os
 import os.path
+import queue
 import socket
 import sys
 import threading
 import time
+import urllib.error
 
 from operator import itemgetter
-
-# Python 2/3 compatibility shims
-import six
-from six.moves import http_client
-from six.moves import queue
-from six.moves import urllib
 
 # WeeWX imports
 import weewx
@@ -313,7 +315,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.4'
+RTGD_VERSION = '1.0.0a1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -848,8 +850,6 @@ class RealtimeGaugeData(StdService):
         _source = rtgd_config_dict.get('scroller_source', 'text').lower()
         # permit any variant of 'wu' as shorthand for Weather Underground
         _source = 'weatherunderground' if _source == 'wu' else _source
-        # permit any variant of 'ds' as shorthand for Dark Sky
-        _source = 'darksky' if _source == 'ds' else _source
         # if we made it this far we have all we need to create an object
         source_class = SCROLLER_SOURCES.get(_source)
         if source_class is None:
@@ -1053,7 +1053,7 @@ class HttpPostExport(object):
                                                          separators=(',', ':'),
                                                          sort_keys=True))
         except (urllib.error.URLError, socket.error,
-                http_client.BadStatusLine, http_client.IncompleteRead) as e:
+                http.client.BadStatusLine, http.client.IncompleteRead) as e:
             # an exception was thrown, log it and continue
             log.debug("Failed to post data: %s" % e)
         else:
@@ -1271,7 +1271,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         updated_field_map = copy.deepcopy(_field_map)
         # iterate over each field map config entry and convert any default
         # values in the field map to ValueTuples
-        for field, field_config in six.iteritems(_field_map):
+        for field, field_config in _field_map.items():
             # obtain the unit group for this field
             _group = self.get_unit_group(field_config['source'],
                                          field_config.get('aggregate'))
@@ -2917,9 +2917,9 @@ class ThreadedSource(threading.Thread):
                 # shutdown signal
                 # first up query the API
                 _response = self.get_response()
-                # if we have a non-None response then we have data from Darksky,
-                # parse the response, gather the required data and put it in
-                # the result queue
+                # if we have a non-None response then we have data from a
+                # source, parse the response, gather the required data and put
+                # it in the result queue
                 if _response is not None:
                     # parse the API response and extract the forecast text
                     _data = self.parse_response(_response)
@@ -3605,334 +3605,6 @@ class Zambretti(object):
 
 
 # ============================================================================
-#                           class DarkskyThread
-# ============================================================================
-
-class DarkskySource(ThreadedSource):
-    """Thread that obtains Darksky forecast data and places it in a queue.
-
-    The DarkskyThread class queries the Darksky API and places selected 
-    forecast data in JSON format in a queue used by the data consumer. The 
-    Darksky API is called at a user selectable frequency. The thread listens 
-    for a shutdown signal from its parent.
-
-    DarkskyThread constructor parameters:
-
-        control_queue:       A Queue object used by our parent to control 
-                             (shutdown) this thread.
-        result_queue:        A Queue object used to pass forecast data to the
-                             destination
-        engine:              A weewx.engine.StdEngine object
-        conf_dict:           A WeeWX config dictionary.
-
-    DarkskyThread methods:
-
-        run.            Control querying of the API and monitor the control
-                        queue.
-        get_response.   Query the API and put selected forecast data in the
-                        result queue.
-        parse_response. Parse a Darksky API response and return selected data.
-    """
-
-    VALID_UNITS = ['auto', 'ca', 'uk2', 'us', 'si']
-
-    VALID_LANGUAGES = ('ar', 'az', 'be', 'bg', 'bs', 'ca', 'cs', 'da', 'de',
-                       'el', 'en', 'es', 'et', 'fi', 'fr', 'hr', 'hu', 'id',
-                       'is', 'it', 'ja', 'ka', 'ko', 'kw', 'nb', 'nl', 'pl',
-                       'pt', 'ro', 'ru', 'sk', 'sl', 'sr', 'sv', 'tet', 'tr',
-                       'uk', 'x-pig-latin', 'zh', 'zh-tw')
-
-    DEFAULT_BLOCK = 'hourly'
-
-    def __init__(self, control_queue, result_queue, engine, config_dict):
-
-        # initialize my base class:
-        super(DarkskySource, self).__init__(control_queue, result_queue, 
-                                            engine, config_dict)
-
-        # set thread name
-        self.setName('RtgdDarkskyThread')
-
-        # get the darksky config dict
-        _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
-        darksky_config_dict = _rtgd_config_dict.get("DS", dict())
-
-        # Dark Sky uses lat, long to 'locate' the forecast. Check if lat and
-        # long are specified in the darksky_config_dict, if not use station lat
-        # and long.
-        latitude = darksky_config_dict.get("latitude", engine.stn_info.latitude_f)
-        longitude = darksky_config_dict.get("longitude", engine.stn_info.longitude_f)
-
-        # interval between API calls
-        self.interval = to_int(darksky_config_dict.get('interval', 1800))
-        # max no of tries we will make in any one attempt to contact the API
-        self.max_tries = to_int(darksky_config_dict.get('max_tries', 3))
-        # Get API call lockout period. This is the minimum period between API
-        # calls for the same feature. This prevents an error condition making
-        # multiple rapid API calls and thus breach the API usage conditions.
-        self.lockout_period = to_int(darksky_config_dict.get('api_lockout_period',
-                                                             60))
-        # initialise container for timestamp of last API call
-        self.last_call_ts = None
-        # Get our API key from weewx.conf, first look in [RealtimeGaugeData]
-        # [[WU]] and if no luck try [Forecast] if it exists. Wrap in a
-        # try..except loop to catch exceptions (ie one or both don't exist).
-        key = darksky_config_dict.get('api_key', None)
-        if key is None:
-            raise MissingApiKey("Cannot find valid Darksky key")
-        # get a DarkskyForecastAPI object to handle the API calls
-        self.api = DarkskyForecastAPI(key, latitude, longitude)
-        # get units to be used in forecast text
-        _units = darksky_config_dict.get('units', 'ca').lower()
-        # validate units
-        self.units = _units if _units in self.VALID_UNITS else 'ca'
-        # get language to be used in forecast text
-        _language = darksky_config_dict.get('language', 'en').lower()
-        # validate language
-        self.language = _language if _language in self.VALID_LANGUAGES else 'en'
-        # get the Darksky block to be used, default to our default
-        self.block = darksky_config_dict.get('block', self.DEFAULT_BLOCK).lower()
-
-        # log what we will do
-        log.info("RealTimeGaugeData scroller text will use Darksky forecast data")
-
-    def get_response(self):
-        """If required query the Darksky API and return the JSON response.
-
-        Checks to see if it is time to query the API, if so queries the API
-        and returns the raw response in JSON format. To prevent the user
-        exceeding their API call limit the query is only made if at least
-        self.lockout_period seconds have elapsed since the last call.
-
-        Inputs:
-            None.
-
-        Returns:
-            The Darksky API response in JSON format or None if no/invalid 
-            response was obtained.
-        """
-
-        # get the current time
-        now = time.time()
-        if weewx.debug == 2:
-            log.debug("Last Darksky API call at %s" % self.last_call_ts)
-        # has the lockout period passed since the last call
-        if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
-            # If we haven't made an API call previously or if it's been too long
-            # since the last call then make the call
-            if (self.last_call_ts is None) or ((now + 1 - self.interval) >= self.last_call_ts):
-                # Make the call, wrap in a try..except just in case
-                try:
-                    _response = self.api.get_data(block=self.block,
-                                                  language=self.language,
-                                                  units=self.units,
-                                                  max_tries=self.max_tries)
-                    log.debug("Downloaded updated Darksky forecast")
-                except Exception as e:
-                    # Some unknown exception occurred. Set _response to None,
-                    # log it and continue.
-                    _response = None
-                    log.info("Unexpected exception of type %s" % (type(e), ))
-                    weeutil.logger.log_traceback(log.info, 'rtgd: **** ')
-                    log.info("Unexpected exception of type %s" % (type(e), ))
-                    log.info("Darksky forecast API query failed")
-                # if we got something back then reset our last call timestamp
-                if _response is not None:
-                    self.last_call_ts = now
-                return _response
-        else:
-            # the API call limiter kicked in so say so
-            log.info("Tried to make an Darksky API call within %d sec of the previous call." % (self.lockout_period, ))
-            log.info("Darksky API call limit reached. API call skipped.")
-        return None
-
-    def parse_response(self, response):
-        """Parse a Darksky forecast response.
-
-        Take a Darksky forecast response, check for (Darksky defined) errors 
-        then extract and return the required summary text.
-
-        Input:
-            response: A Darksky forecast API response in JSON format.
-
-        Returns:
-            Summary text or None.
-        """
-
-        # There is not too much validation of the data we can do other than 
-        # looking at the 'flags' object
-        if 'flags' in response:
-            if 'darksky-unavailable' in response['flags']:
-                log.info("Darksky data for this location temporarily unavailable")
-                return None
-        else:
-            log.debug("No flag object in Darksky API response.")
-
-        # get the summary data to be used
-        # is our block available, can't assume it is
-        if self.block in response:
-            # we have our block, but is the summary there
-            if 'summary' in response[self.block]:
-                # we have a summary field
-                summary = response[self.block]['summary']
-                return summary
-            else:
-                # we have no summary field, so log it and return None
-                log.debug("Summary data not available for '%s' forecast" % (self.block,))
-                return None
-        else:
-            log.debug('Dark Sky %s block not available' % self.block)
-            return 'Dark Sky %s block not available' % self.block
-
-
-# ============================================================================
-#                         class DarkskyForecastAPI
-# ============================================================================
-
-class DarkskyForecastAPI(object):
-    """Query the Darksky API and return the API response.
-
-    DarkskyForecastAPI constructor parameters:
-
-        darksky_config_dict: Dictionary containing the following keys:
-            key:       Darksky secret key to be used
-            latitude:  Latitude of the location concerned 
-            longitude: Longitude of the location concerned 
-
-    DarkskyForecastAPI methods:
-
-        get_data. Submit a data request to the Darksky API and return the 
-                  response.
-
-        _build_optional: Build a string containing the optional parameters to 
-                         submitted as part of the API request URL.
-        
-        _hit_api: Submit the API request and capture the response.
-
-        obfuscated_key: Property to return an obfuscated secret key.
-    """
-
-    # base URL from which to construct an API call URL
-    BASE_URL = 'https://api.darksky.net/forecast'
-    # blocks we may want to exclude
-    BLOCKS = ('currently', 'minutely', 'hourly', 'daily', 'alerts')
-
-    def __init__(self, key, latitude, longitude):
-        # initialise a DarkskyForecastAPI object
-
-        # save the secret key to be used
-        self.key = key
-        # save lat and long
-        self.latitude = latitude
-        self.longitude = longitude
-
-    def get_data(self, block='hourly', language='en', units='auto',
-                 max_tries=3):
-        """Make a data request via the API and return the response.
-
-        Construct an API call URL, make the call and return the response.
-
-        Parameters:
-            block:    Darksky block to be used. None or list of strings, default is None.
-            language:  The language to be used in any response text. Refer to
-                       the optional parameter 'language' at 
-                       https://darksky.net/dev/docs. String, default is 'en'.
-            units:     The units to be used in the response. Refer to the 
-                       optional parameter 'units' at https://darksky.net/dev/docs.
-                       String, default is 'auto'.
-            max_tries: The maximum number of attempts to be made to obtain a
-                       response from the API. Number, default is 3.
-
-        Returns:
-            The Darksky API response in JSON format.
-        """
-
-        # start constructing the API call URL to be used
-        url = '/'.join([self.BASE_URL,
-                        self.key,
-                        '%s,%s' % (self.latitude, self.longitude)])
-        
-        # now build the optional parameters string
-        optional_string = self._build_optional(block=block,
-                                               language=language,
-                                               units=units)
-        # if it has any content then add it to the URL
-        if len(optional_string) > 0:
-            url = '?'.join([url, optional_string])
-
-        # if debug >=1 log the URL used but obfuscate the key
-        if weewx.debug >= 1:
-            _obfuscated_url = '/'.join([self.BASE_URL,
-                                        self.obfuscated_key,
-                                        '%s,%s' % (self.latitude, self.longitude)])
-            _obfuscated_url = '?'.join([_obfuscated_url, optional_string])
-            log.debug("Submitting API call using URL: %s" % (_obfuscated_url, ))
-        # make the API call
-        _response = self._hit_api(url, max_tries)
-        # if we have a response we need to deserialise it
-        json_response = json.loads(_response) if _response is not None else None
-        # return the response
-        return json_response
-
-    def _build_optional(self, block='hourly', language='en', units='auto'):
-        """Build the optional parameters string."""
-
-        # initialise a list of non-None optional parameters and their values
-        opt_params_list = []
-        # exclude all but our block
-        _blocks = [b for b in self.BLOCKS if b != block]
-        opt_params_list.append('exclude=%s' % ','.join(_blocks))
-        # language
-        if language is not None:
-            opt_params_list.append('lang=%s' % language)
-        # units
-        if units is not None:
-            opt_params_list.append('units=%s' % units)
-        # now if we have any parameters concatenate them separating each with 
-        # an ampersand
-        opt_params = "&".join(opt_params_list)
-        # return the resulting string
-        return opt_params
-
-    @staticmethod
-    def _hit_api(url, max_tries=3):
-        """Make the API call and return the result."""
-
-        # we will attempt the call max_tries times
-        for count in range(max_tries):
-            # attempt the call
-            try:
-                w = urllib.request.urlopen(url)
-                # Get charset used so we can decode the stream correctly.
-                # Unfortunately the way to get the charset depends on whether
-                # we are running under python2 or python3. Assume python3 but be
-                # prepared to catch the error if python2.
-                try:
-                    char_set = w.headers.get_content_charset()
-                except AttributeError:
-                    # must be python2
-                    char_set = w.headers.getparam('charset')
-                # now get the response decoding it appropriately
-                response = w.read().decode(char_set)
-                w.close()
-                return response
-            except (urllib.error.URLError, socket.timeout) as e:
-                log.error("Failed to get API response on attempt %d" % (count+1, ))
-                log.error("   **** %s" % e)
-        else:
-            log.error("Failed to get API response")
-        return None
-
-    @property
-    def obfuscated_key(self):
-        """Produce and obfuscated copy of the key."""
-
-        # replace all characters in the key with an asterisk except for the 
-        # last 4
-        return '*'*(len(self.key) - 4) + self.key[-4:]
-
-
-# ============================================================================
 #                             class FileSource
 # ============================================================================
 
@@ -4059,7 +3731,6 @@ class TextSource(Source):
 SCROLLER_SOURCES = {'text': TextSource,
                     'file': FileSource,
                     'weatherunderground': WUSource,
-                    'darksky': DarkskySource,
                     'zambretti': ZambrettiSource}
 
 # available scroller text block classes
