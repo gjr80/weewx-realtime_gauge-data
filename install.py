@@ -10,9 +10,14 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.6.4                                          Date: 12 September 2023
+Version: 1.0.0a1                                        Date: xx September 2023
 
 Revision History
+    xx September 2023   v1.0.0
+        - now requires WeeWX v5.0.0 or later (may work with WeeWX 4.x under
+          python 3 but not supported/guaranteed)
+        - compatible with python 3.7 and later (python 2 no longer supported)
+
     12 September 2023   v0.6.4
         - bumped version only
     22 August 202       v0.6.3
@@ -103,15 +108,13 @@ Revision History
 import configobj
 from distutils.version import StrictVersion
 from setup import ExtensionInstaller
-
-# import StringIO, use six.moves due to python2/python3 differences
-from six.moves import StringIO
+from io import StringIO
 
 # WeeWX imports
 import weewx
 
 REQUIRED_VERSION = "4.0.0"
-RTGD_VERSION = "0.6.3"
+RTGD_VERSION = "1.0.0a1"
 
 # define our config as a multiline string so we can preserve comments
 rtgd_config = """
@@ -134,14 +137,8 @@ rtgd_config = """
     # Scrolling text display or 'forecast' field source. Case insensitive. 
     # All except Zambretti require a corresponding [[ ]] stanza. Uncomment and 
     # select one entry to enable.
-    # scroller_source = text|file|WU|DS|Zambretti
+    # scroller_source = text|file|WU|Zambretti
     
-    [[DS]]
-        # Settings to be used for Darksky forecast block. Uncomment to use.
-        
-        # DarkSky API key
-        # api_key = xxxxxxxxxxxxxxxx
-        
     [[WU]]
         # Settings to be used for Weather Underground forecast block. Uncomment 
         # to use.
