@@ -1032,7 +1032,7 @@ class HttpPostExport(object):
     def post_data(self, data):
         """Post data to a remote URL via HTTP POST.
 
-        This code is modelled on the WeeWX restFUL API, but rather then
+        This code is modelled on the WeeWX restFUL API, but rather than
         retrying a failed post the failure is logged and then ignored. If
         remote posts are not working then the user should set debug=1 and
         restart WeeWX to see what the log says.
@@ -1866,7 +1866,8 @@ class RealtimeGaugeDataThread(threading.Thread):
             else:
                 # we have a None result, look for a default
                 if 'default' in this_field_map:
-                    # we have a default, defaults are already a ValueTuple so we can just use it as is
+                    # we have a default, defaults are already a ValueTuple so
+                    # we can just use it as is
                     _conv_default = weewx.units.convert(this_field_map['default'],
                                                         result_units).value
                     result = this_field_map['format'] % _conv_default
@@ -2796,7 +2797,7 @@ def calc_trend(obs_type, now_vt, target_units, db_manager, then_ts, grace=0):
         return None
     else:
         # return None if obs_type is not in the 'then' record, or if it is in
-        # the 'then' record but it is None
+        # the 'then' record and it is None
         if then_record.get(obs_type) is None:
             return None
         else:
@@ -2994,11 +2995,10 @@ class Source(object):
     def start(self):
         """Our entry point.
         
-        Unlike most other block class Source does not run in a thread but 
-        rather is a simple non-threaded class that provides a result once and 
-        then does nothing else. The start() method has been defined as the 
-        entry point, so we can be 'started' just like a threading.Thread
-        object.
+        Unlike most sources class Source does not run in a thread, but rather
+        is a simple non-threaded class that provides a result once and then
+        does nothing else. The start() method has been defined as the entry
+        point for all sources.
         """
 
         # get the scroller text string
@@ -3171,8 +3171,8 @@ class WUSource(ThreadedSource):
 
         # has the lockout period passed since the last call
         if self.last_call_ts is None or ((now + 1 - self.lockout_period) >= self.last_call_ts):
-            # If we haven't made an API call previously or if its been too long
-            # since the last call then make the call
+            # if we haven't made an API call previously or if it's been too
+            # long since the last call then make the call
             if (self.last_call_ts is None) or ((now + 1 - self.interval) >= self.last_call_ts):
                 # Make the call, wrap in a try..except just in case
                 try:
@@ -3197,7 +3197,7 @@ class WUSource(ThreadedSource):
                     self.last_call_ts = now
                 return _response
         else:
-            # the API call limiter kicked in so say so
+            # the API call limiter kicked in, so log it
             log.info("Tried to make a WU API call within %d sec of the previous call." % (self.lockout_period, ))
             log.info("        WU API call limit reached. API call skipped.")
         return None
@@ -3249,7 +3249,7 @@ class WUSource(ThreadedSource):
                           "'%s' forecast narrative" % self.forecast_text)
                 return None
         else:
-            # we want the day time or nighttime narrative, but which, WU
+            # We want the day time or nighttime narrative, but which? WU
             # starts dropping the day narrative late in the afternoon and it
             # does not return until the early hours of the morning. If possible
             # use day time up until 7pm but be prepared to fall back to night
@@ -3371,7 +3371,7 @@ class WeatherUndergroundAPIForecast(object):
             format:    The output format_setting of the data returned by the WU
                        API. String, must be 'json' (based on WU API
                        documentation JSON is the only confirmed supported
-                       format_setting.
+                       format_setting).
             max_tries: The maximum number of attempts to be made to obtain a
                        response from the WU API. Default is 3.
 
@@ -3413,16 +3413,9 @@ class WeatherUndergroundAPIForecast(object):
             # attempt the call
             try:
                 w = urllib.request.urlopen(url)
-                # Get charset used so we can decode the stream correctly.
-                # Unfortunately the way to get the charset depends on whether
-                # we are running under python2 or python3. Assume python3 but be
-                # prepared to catch the error if python2.
-                try:
-                    char_set = w.headers.get_content_charset()
-                except AttributeError:
-                    # must be python2
-                    char_set = w.headers.getparam('charset')
-                # now get the response decoding it appropriately
+                # get charset used so we can decode the stream correctly
+                char_set = w.headers.get_content_charset()
+                # now get the response, decoding it appropriately
                 response = w.read().decode(char_set)
                 w.close()
                 return response
