@@ -1,3 +1,9 @@
+v1.0.0
+- now requires WeeWX v5.0.0 or later (may work under WeeWX v4.x with python 3.7
+  or later but not guaranteed or supported)
+- requires python 3.7 or later (python 2 no longer supported, earlier python 3
+  versions way work but not guaranteed or supported)
+- removed support for the now defunct DarkSky forecast
 v0.6.4
 - fix issue that prevented Zambretti forecast from being used as a scroller
   source in some instances
