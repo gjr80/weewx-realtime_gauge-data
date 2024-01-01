@@ -17,9 +17,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.5                                          Date: 1 January 2024
+Version: 0.6.6                                          Date: 2 January 2024
 
   Revision History
+    2 January 2024      v0.6.6
+        - fix incorrect windrun unit conversion
     1 January 2024      v0.6.5
         - fix issue that caused loop based windrun to remain at 0.0
     12 September 2023   v0.6.4
@@ -315,7 +317,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.5'
+RTGD_VERSION = '0.6.6'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -1246,6 +1248,12 @@ class RealtimeGaugeDataThread(threading.Thread):
             _group_map['group_rain'] = 'mm'
         if _group_map['group_rainrate'] == 'cm_per_hour':
             _group_map['group_rainrate'] = 'mm_per_hour'
+        # the distance unit group is derived from the speed unit group, make
+        # sure we have the correct distance unit group
+        if _group_map['group_speed'] == 'km_per_hour' or _group_map['group_speed'] == 'meter_per_second':
+            _group_map['group_distance'] = 'km'
+        else:
+            _group_map['group_distance'] = 'mile'
         self.group_map = _group_map
         # Construct the format map to be used. The format map maps string
         # formats to be used for each unit. It is based on the default format
