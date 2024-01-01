@@ -1,62 +1,67 @@
+v0.6.5
+*   fix issue that caused loop based windrun to remain at 0.0
+*   removed all reference to DarkSky from installer config 
 v0.6.4
-- fix issue that prevented Zambretti forecast from being used as a scroller
-  source in some instances
+*   fix issue that prevented Zambretti forecast from being used as a scroller
+    source in some instances
 v0.6.3
-- fix issue with missing or sporadic windGust/windSpeed loop data
-- fix issue with rain rate values being incorrectly converted in some instances
+*   fix issue with missing or sporadic windGust/windSpeed loop data
+*   fix issue with rain rate values being incorrectly converted in some
+    instances
 v0.6.2
-- fix issue that resulted in incorrect formatting of some non-metric
-  observations
-- fix unhandled TypeError that occurs if the WeeWX engine restarts as a result
-  of a recoverable error, issue #30 refers
+*   fix issue that resulted in incorrect formatting of some non-metric
+    observations
+*   fix unhandled TypeError that occurs if the WeeWX engine restarts as a
+    result of a recoverable error, issue #30 refers
 v0.6.1
-- fixed issue where a user specified max_cache_age config option is used as a
-  string instead of an integer
-- simplified installation instructions contained in the readme
+*   fixed issue where a user specified max_cache_age config option is used as a
+    string instead of an integer
+*   simplified installation instructions contained in the readme
 v0.6.0
-- fixed bug whereby 10 minute average wind bearing always matched current wind
-  bearing
-- significant rewrite of get_field_value() method in preparation for full
-  implementation of field map
+*   fixed bug whereby 10 minute average wind bearing always matched current
+    wind bearing
+*   significant rewrite of get_field_value() method in preparation for full
+    implementation of field map
 v0.5.5
-- fixed bug in date and dateFormat fields that resulted in the incorrect 'last
-  rainfall' date and time being displayed on rainfall gauge mouseovers
-- as a result of the date and dateFormat bug fix date_format and time_format
-  config options are now limited to a number of fixed formats
+*   fixed bug in date and dateFormat fields that resulted in the incorrect
+    'last rainfall' date and time being displayed on rainfall gauge mouseovers
+*   as a result of the date and dateFormat bug fix date_format and time_format
+    config options are now limited to a number of fixed formats
 v0.5.4
-- added the inadvertently omitted humidex field
-- added field TrrateTM
+*   added the inadvertently omitted humidex field
+*   added field TrrateTM
 v0.5.3
-- fixed bug where incorrect output field name is used for inside temperature
+*   fixed bug where incorrect output field name is used for inside temperature
   and associated aggregates/times
-- added inside humidity and associated aggregates/times to gauge-data.txt
+*   added inside humidity and associated aggregates/times to gauge-data.txt
 v0.5.2
-- fixed bug where tempTH contained today's outTemp minimum rather than maximum
+*   fixed bug where tempTH contained today's outTemp minimum rather than
+    maximum
 v0.5.1
-- fixed bug where the default metric rain rate units used cm per hour rather
-  than mm per hour
+*   fixed bug where the default metric rain rate units used cm per hour rather
+    than mm per hour
 v0.5.0
-- added ability to rsync gauge-data.txt to an rsync capable server, thanks to
-  John Kline
-- reworked buffering of loop data, now use dedicated scalar and vector buffer
-  objects similar in operation to the WeeWX accumulators
-- implemented a field_map config item allowing certain JSON output field
-  properties to be controlled by the user
-- field currentSolarMax is no longer directly calculated by rtgd but is now
-  populated from WeeWX field maxSolarRad
-- field lastRainTipISO is now populated
-- rtgd now logs the rtgd version number on WeeWX startup
-- removed deprecated field Tbeaufort
-- fixed bug that caused rtgd to abort if the first loop packet did not contain
-  inTemp
-- changed required WeeWX version to 4.0.0
-- revised config installed by installer
+*   added ability to rsync gauge-data.txt to an rsync capable server, thanks to
+    John Kline
+*   reworked buffering of loop data, now use dedicated scalar and vector buffer
+    objects similar in operation to the WeeWX accumulators
+*   implemented a field_map config item allowing certain JSON output field
+    properties to be controlled by the user
+*   field currentSolarMax is no longer directly calculated by rtgd but is now
+    populated from WeeWX field maxSolarRad
+*   field lastRainTipISO is now populated
+*   rtgd now logs the rtgd version number on WeeWX startup
+*   removed deprecated field Tbeaufort
+*   fixed bug that caused rtgd to abort if the first loop packet did not
+    contain inTemp
+*   changed required WeeWX version to 4.0.0
+*   revised config installed by installer
 v0.4.2
-- fix error in some expressions that include > and < where operands could be
-  None
+*   fix error in some expressions that include > and < where operands could be
+    None
 v0.4.1
-- fix max() error under python3
-- implemented kludgy work around for lack of response message when using HTTP
+*   fix max() error under python3
+*   implemented kludgy work around for lack of response message when using HTTP
   POST under python 3
 v0.4.0
 *   updated to work under WeeWX v4.0 using either python 2 or 3
