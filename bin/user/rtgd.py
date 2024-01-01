@@ -2518,7 +2518,7 @@ class Buffer(dict):
 
         # if there is no windrun in the packet and if obs is windSpeed then we
         # can use windSpeed to update windrun
-        if 'windrun' not in packet and obs == 'windSpeed':
+        if 'windrun' not in packet or packet['windrun'] is None and obs == 'windSpeed':
             # has windrun been seen before, if not add it to the Buffer
             if 'windrun' not in self:
                 self['windrun'] = init_dict.get(obs, ScalarBuffer)(stats=None,
