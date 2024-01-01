@@ -1,3 +1,5 @@
+v0.6.6
+*   fix incorrect windrun unit conversion
 v0.6.5
 *   fix issue that caused loop based windrun to remain at 0.0
 *   removed all reference to DarkSky from installer config 

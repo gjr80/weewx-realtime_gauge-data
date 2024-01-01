@@ -10,9 +10,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.6.5                                          Date: 1 January 2024
+Version: 0.6.6                                          Date: 2 January 2024
 
 Revision History
+    2 January 2024      v0.6.5
+        - bumped version number only
     1 January 2024      v0.6.5
         - removed all reference to DarkSky forecast from installer config
     12 September 2023   v0.6.4
@@ -113,7 +115,7 @@ from six.moves import StringIO
 import weewx
 
 REQUIRED_VERSION = "4.0.0"
-RTGD_VERSION = "0.6.5"
+RTGD_VERSION = "0.6.6"
 
 # define our config as a multiline string so we can preserve comments
 rtgd_config = """
