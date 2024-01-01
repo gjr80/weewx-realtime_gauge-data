@@ -10,30 +10,32 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.6.4                                          Date: 12 September 2023
+Version: 0.6.5                                          Date: 1 January 2024
 
 Revision History
+    1 January 2024      v0.6.5
+        - removed all reference to DarkSky forecast from installer config
     12 September 2023   v0.6.4
-        - bumped version only
+        - bumped version number only
     22 August 202       v0.6.3
-        - bumped version only
+        - bumped version number only
     16 March 2023       v0.6.2
-        - bumped version only
+        - bumped version number only
     4 November 2022     v0.6.1
-        - bumped version only
+        - bumped version number only
     3 November 2022     v0.6.0
-        - bumped version only
+        - bumped version number only
     17 April 2022       v0.5.5
         - change to date_format config option
         - added time_format config option
     13 April 2022       v0.5.4
-        - bumped version only
+        - bumped version number only
     11 April 2022       v0.5.3
-        - bumped version only
+        - bumped version number only
     22 October 2021     v0.5.2
-        - bumped version only
+        - bumped version number only
     17 October 2021     v0.5.1
-        - bumped version only
+        - bumped version number only
     15 September 2021   v0.5.0
         - fix incorrect date format
         - changed WeeWX required version to 4.0.0
@@ -41,40 +43,40 @@ Revision History
           comments
         - revised default config included during install
     23 November 2019    v0.4.2
-        - bumped version only
+        - bumped version number only
     20 November 2019    v0.4.1
-        - bumped version only
+        - bumped version number only
     16 November 2019    v0.4.0
-        - bumped version only
+        - bumped version number only
     4 April 2019        v0.3.7
-        - bumped version only
+        - bumped version number only
     28 March 2019       v0.3.6
-        - bumped version only
+        - bumped version number only
     1 January 2019      v0.3.5
         - reworked default install [RealtimeGaugeData] config stanza as per
           changes to rtgd.py
         - installation now includes a blank [[DS]] config stanza
     26 April 2018       v0.3.4 (not released)
-        - bumped version only
+        - bumped version number only
     26 April 2018       v0.3.3
-        - bumped version only
+        - bumped version number only
     20 January 2018     v0.3.2
-        - bumped version only
+        - bumped version number only
      3 December 2017     v0.3.1
-        - bumped version only
+        - bumped version number only
     4 September 2017    v0.3.0
         - added [[WU]] config stanza to support WU forecast text
     8 July 2017         v0.2.14
         - changed default decimal places for foot, inHg, km_per_hour and
           mile_per_hour
     6 May 2017          v0.2.13
-        - bumped version only
+        - bumped version number only
     29 March 2017       v0.2.12
         - never released
     22 March 2017       v0.2.11
         - added foot StringFormat config option
     17 March 2017       v0.2.10
-        - bumped version only
+        - bumped version number only
     7 March 2017        v0.2.9
         - bumped version number only
     27 February 2017    v0.2.8
@@ -111,7 +113,7 @@ from six.moves import StringIO
 import weewx
 
 REQUIRED_VERSION = "4.0.0"
-RTGD_VERSION = "0.6.3"
+RTGD_VERSION = "0.6.5"
 
 # define our config as a multiline string so we can preserve comments
 rtgd_config = """
@@ -134,14 +136,8 @@ rtgd_config = """
     # Scrolling text display or 'forecast' field source. Case insensitive. 
     # All except Zambretti require a corresponding [[ ]] stanza. Uncomment and 
     # select one entry to enable.
-    # scroller_source = text|file|WU|DS|Zambretti
+    # scroller_source = text|file|WU|Zambretti
     
-    [[DS]]
-        # Settings to be used for Darksky forecast block. Uncomment to use.
-        
-        # DarkSky API key
-        # api_key = xxxxxxxxxxxxxxxx
-        
     [[WU]]
         # Settings to be used for Weather Underground forecast block. Uncomment 
         # to use.
@@ -226,5 +222,5 @@ class RtgdInstaller(ExtensionInstaller):
             author_email="gjroderick<@>gmail.com",
             report_services=['user.rtgd.RealtimeGaugeData'],
             files=[('bin/user', ['bin/user/rtgd.py'])],
-            config = rtgd_dict
+            config=rtgd_dict
         )
