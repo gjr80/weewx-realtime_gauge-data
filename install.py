@@ -113,7 +113,7 @@ from io import StringIO
 # WeeWX imports
 import weewx
 
-REQUIRED_VERSION = "4.0.0"
+REQUIRED_VERSION = "5.0.0a1"
 RTGD_VERSION = "1.0.0a1"
 
 # define our config as a multiline string so we can preserve comments

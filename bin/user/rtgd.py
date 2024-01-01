@@ -1556,8 +1556,8 @@ class RealtimeGaugeDataThread(threading.Thread):
                     while self.control_queue.qsize() > 5:
                         self.control_queue.get()
         except Exception as e:
-            # Some unknown exception occurred. This is probably
-            # a serious problem. Exit.
+            # Some unknown exception occurred. This is probably a serious
+            # problem so log what we can and exit.
             log.critical("Unexpected exception of type %s" % (type(e), ))
             weeutil.logger.log_traceback(log.debug, 'rtgdthread: **** ')
             log.critical("Thread exiting. Reason: %s" % (e, ))
