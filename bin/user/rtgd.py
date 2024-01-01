@@ -3,7 +3,7 @@ rtgd.py
 
 A WeeWX service to generate a loop based gauge-data.txt.
 
-Copyright (C) 2017-2023 Gary Roderick             gjroderick<at>gmail.com
+Copyright (C) 2017-2024 Gary Roderick             gjroderick<at>gmail.com
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,9 +17,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.4                                          Date: 12 September 2023
+Version: 0.6.5                                          Date: 1 January 2024
 
   Revision History
+    1 January 2024      v0.6.5
+        - fix issue that caused loop based windrun to remain at 0.0
     12 September 2023   v0.6.4
         - fix issue that prevented Zambretti forecast from being used as a
           scroller source in some instances
@@ -215,8 +217,6 @@ Version: 0.6.4                                          Date: 12 September 2023
         - initial release
 
 
-A WeeWX service to generate a loop based gauge-data.txt.
-
 Used to update the SteelSeries Weather Gauges in near real time.
 
 Inspired by crt.py v0.5 by Matthew Wall, a WeeWX service to emit loop data to
@@ -229,13 +229,15 @@ Abbreviated instructions for use:
 
 1.  Install the Realtime gauge-data extension using the wee_extension utility:
 
-    - download the latest Realtime gauge-data extension package:
-
-        $ wget -P /var/tmp https://github.com/gjr80/weewx-realtime_gauge-data/releases/download/v0.6.2/rtgd-0.6.2.tar.gz
+    - download the latest Realtime gauge-data extension package from the
+      Realtime gauge-data extension releases page
+      (https://github.com/gjr80/weewx-realtime_gauge-data/releases)
 
     - install the Realtime gauge-data extension:
 
-        $ wee_extension --install=/var/tmp/rtgd-0.6.2.tar.gz
+        $ wee_extension --install=/var/tmp/rtgd-x.y.z.tar.gz
+
+        where x.y.z is the Realtime gauge-data extension package release number
 
         Note: Depending on your system/installation the above command may need
               to be prefixed with 'sudo'.
@@ -313,7 +315,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.4'
+RTGD_VERSION = '0.6.5'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
