@@ -319,7 +319,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.6'
+RTGD_VERSION = '0.6.7'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 

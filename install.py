@@ -116,7 +116,7 @@ from six.moves import StringIO
 import weewx
 
 REQUIRED_VERSION = "4.0.0"
-RTGD_VERSION = "0.6.6"
+RTGD_VERSION = "0.6.7"
 
 # define our config as a multiline string so we can preserve comments
 rtgd_config = """
