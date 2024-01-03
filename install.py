@@ -10,10 +10,12 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
                      Installer for Realtime gauge-data
 
-Version: 0.6.6                                          Date: 2 January 2024
+Version: 0.6.7                                          Date: 4 January 2024
 
 Revision History
-    2 January 2024      v0.6.5
+    4 January 2024      v0.6.7
+        - removed distutils dependency, now works under python 3.13
+    2 January 2024      v0.6.6
         - bumped version number only
     1 January 2024      v0.6.5
         - removed all reference to DarkSky forecast from installer config
@@ -105,7 +107,6 @@ Revision History
 
 # python imports
 import configobj
-from distutils.version import StrictVersion
 from setup import ExtensionInstaller
 
 # import StringIO, use six.moves due to python2/python3 differences
@@ -208,10 +209,30 @@ rtgd_dict = configobj.ConfigObj(StringIO(rtgd_config))
 def loader():
     return RtgdInstaller()
 
+def version_compare(v1, v2):
+    """Basic 'distutils' and 'packaging' free version comparison.
+
+    v1 and v2 are WeeWX version numbers in string format.
+
+    Returns:
+        0 if v1 and v2 are the same
+        -1 if v1 is less than v2
+        +1 if v1 is greater than v2
+    """
+
+    import itertools
+    mash = itertools.zip_longest(v1.split('.'), v2.split('.'), fillvalue='0')
+    for x1, x2 in mash:
+        if x1 > x2:
+            return 1
+        if x1 < x2:
+            return -1
+    return 0
+
 
 class RtgdInstaller(ExtensionInstaller):
     def __init__(self):
-        if StrictVersion(weewx.__version__) < StrictVersion(REQUIRED_VERSION):
+        if version_compare(weewx.__version__, REQUIRED_VERSION) < 0:
             msg = "%s requires WeeWX %s or greater, found %s" % ('Rtgd ' + RTGD_VERSION,
                                                                  REQUIRED_VERSION,
                                                                  weewx.__version__)
