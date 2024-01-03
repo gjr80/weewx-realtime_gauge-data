@@ -17,9 +17,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.6                                          Date: 2 January 2024
+Version: 0.6.7                                          Date: 4 January 2024
 
   Revision History
+    4 January 2024      v0.6.7
+        - bump version only
     2 January 2024      v0.6.6
         - fix incorrect windrun unit conversion
     1 January 2024      v0.6.5
