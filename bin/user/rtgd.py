@@ -1392,7 +1392,7 @@ class RealtimeGaugeDataThread(threading.Thread):
         # notify the user of a couple of things that we will do
         # frequency of generation
         if self.min_interval is None:
-            _msg = "'%s' wil be generated. "\
+            _msg = "'%s' will be generated. "\
                        "min_interval is None" % self.rtgd_path_file
         elif self.min_interval == 1:
             _msg = "'%s' will be generated. "\
