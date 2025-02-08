@@ -3,7 +3,7 @@ rtgd.py
 
 A WeeWX service to generate a loop based gauge-data.txt.
 
-Copyright (C) 2017-2024 Gary Roderick             gjroderick<at>gmail.com
+Copyright (C) 2017-2025 Gary Roderick             gjroderick<at>gmail.com
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,9 +17,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.7                                          Date: 4 January 2024
+Version: 0.6.8b1                                        Date: 8 February 2025
 
   Revision History
+    8 February 2025     v0.6.8
+        - fix windrun calculation exception when windSpeed is None
     4 January 2024      v0.6.7
         - bump version only
     2 January 2024      v0.6.6
@@ -109,9 +111,9 @@ Version: 0.6.7                                          Date: 4 January 2024
         - each scroller text block now uses its own 2nd level (ie [[ ]]) config
           with the scroller block specified under [RealtimeGaugeData]
     26 April 2018       v0.3.4 (not released)
-        - Added support for optional fields mrfall and yrfall that provide 
-          month and year to date rainfall respectively. Optional fields are 
-          calculated/added to output if config options mtd_rain and/or ytd_rain 
+        - Added support for optional fields mrfall and yrfall that provide
+          month and year to date rainfall respectively. Optional fields are
+          calculated/added to output if config options mtd_rain and/or ytd_rain
           are set True.
     26 April 2018       v0.3.3
         - implemented atomic write when writing gauge-data.txt to file
@@ -319,7 +321,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.7'
+RTGD_VERSION = '0.6.8b1'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 
@@ -836,11 +838,11 @@ class RealtimeGaugeData(StdService):
                                                    altitude=convert(engine.stn_info.altitude_vt, 'meter').value)
         self.rtgd_thread.start()
 
-        # are we providing month and/or year to date rain, default is no we are 
+        # are we providing month and/or year to date rain, default is no we are
         # not
         self.mtd_rain = to_bool(rtgd_config_dict.get('mtd_rain', False))
         self.ytd_rain = to_bool(rtgd_config_dict.get('ytd_rain', False))
-        
+
         # bind our self to the relevant WeeWX events
         self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
         self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
@@ -860,7 +862,7 @@ class RealtimeGaugeData(StdService):
         source_class = SCROLLER_SOURCES.get(_source)
         if source_class is None:
             # We have an invalid block specified. Log this and use the default
-            # class Source which will provide a zero length string for the 
+            # class Source which will provide a zero length string for the
             # scroller text.
             log.info("Unknown block specified for scroller_text")
             source_class = Source
@@ -914,7 +916,7 @@ class RealtimeGaugeData(StdService):
                 log.debug("queued min/max barometer values: %s" % _package['payload'])
         # if required get updated month to date rainfall and put in the queue
         if self.mtd_rain:
-            _tspan = weeutil.weeutil.archiveMonthSpan(event.record['dateTime']) 
+            _tspan = weeutil.weeutil.archiveMonthSpan(event.record['dateTime'])
             _rain = self.get_rain(_tspan)
             # if we have some data then package it in a dict since this is not the
             # only data we send via the queue
@@ -929,7 +931,7 @@ class RealtimeGaugeData(StdService):
                     log.debug("queued month to date rain: %s" % _package['payload'])
         # if required get updated year to date rainfall and put in the queue
         if self.ytd_rain:
-            _tspan = weeutil.weeutil.archiveYearSpan(event.record['dateTime']) 
+            _tspan = weeutil.weeutil.archiveYearSpan(event.record['dateTime'])
             _rain = self.get_rain(_tspan)
             # if we have some data then package it in a dict since this is not the
             # only data we send via the queue
@@ -1392,15 +1394,15 @@ class RealtimeGaugeDataThread(threading.Thread):
         # notify the user of a couple of things that we will do
         # frequency of generation
         if self.min_interval is None:
-            _msg = "'%s' will be generated. "\
-                       "min_interval is None" % self.rtgd_path_file
+            _msg = "'%s' will be generated. " \
+                   "min_interval is None" % self.rtgd_path_file
         elif self.min_interval == 1:
-            _msg = "'%s' will be generated. "\
-                       "min_interval is 1 second" % self.rtgd_path_file
+            _msg = "'%s' will be generated. " \
+                   "min_interval is 1 second" % self.rtgd_path_file
         else:
-            _msg = "'%s' will be generated. "\
-                       "min_interval is %s seconds" % (self.rtgd_path_file,
-                                                       self.min_interval)
+            _msg = "'%s' will be generated. " \
+                   "min_interval is %s seconds" % (self.rtgd_path_file,
+                                                   self.min_interval)
         log.info(_msg)
         # lost contact
         if self.ignore_lost_contact:
@@ -1698,7 +1700,7 @@ class RealtimeGaugeDataThread(threading.Thread):
                          history size - nominally 600 seconds).
             mintime. The time of the minimum value. Aggregate periods supported
                      are as for min.
-            max. Maximum value of an observation over the aggregate period. 
+            max. Maximum value of an observation over the aggregate period.
                  Supported aggregate periods are:
                     day. The maximum value seen so far today.
                     xxx. The maximum value seen in the last xxx seconds where
@@ -1718,19 +1720,19 @@ class RealtimeGaugeDataThread(threading.Thread):
                    buffer history size - nominally 600 seconds).
             maxdir: For vector observations (eg 'wind') the direction at the
                     time the maximum value was seen today.
-            vecavg: For vector observations (eg 'wind') the vector average 
-                    magnitude of an observation over the aggregate period. 
+            vecavg: For vector observations (eg 'wind') the vector average
+                    magnitude of an observation over the aggregate period.
                     Supported aggregate periods are:
                     day. The vector average magnitude so far today.
-                    xxx. The vector average magnitude over the last xxx seconds 
-                         where xxx is a number in seconds (up to the maximum 
+                    xxx. The vector average magnitude over the last xxx seconds
+                         where xxx is a number in seconds (up to the maximum
                          buffer history size - nominally 600 seconds).
-            vecdir: For vector observations (eg 'wind') the vector average 
-                    direction of an observation over the aggregate period. 
+            vecdir: For vector observations (eg 'wind') the vector average
+                    direction of an observation over the aggregate period.
                     Supported aggregate periods are:
                     day. The vector average direction so far today.
-                    xxx. The vector average direction over the last xxx seconds 
-                         where xxx is a number in seconds (up to the maximum 
+                    xxx. The vector average direction over the last xxx seconds
+                         where xxx is a number in seconds (up to the maximum
                          buffer history size - nominally 600 seconds).
         """
 
@@ -2569,21 +2571,22 @@ class Buffer(dict):
     def calc_windrun(self, packet):
         """Calculate windrun given windSpeed."""
 
+        # initialise a variable to hold the result
         val = None
-        if packet['usUnits'] == weewx.US:
-            val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0
-            unit = 'mile'
-        elif packet['usUnits'] == weewx.METRIC:
-            val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0
-            unit = 'km'
-        elif packet['usUnits'] == weewx.METRICWX:
-            val = packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts)
-            unit = 'meter'
-        if self['windrun'].units == packet['usUnits']:
-            return val
-        else:
-            _vt = ValueTuple(val, unit, 'group_distance')
-            return weewx.units.convertStd(_vt, self['windrun'].units).value
+        # do we have a non-None windSpeed
+        if packet['windSpeed'] is not None:
+            # we have a non-None windSpeed
+            # obtain the unit and unit group to use
+            _unit, _group = weewx.units.getStandardUnitType(packet['usUnits'], 'windrun')
+            # calculate windrun and package as a valueTuple so we can do any
+            # unit conversion
+            windrun_vt = ValueTuple(packet['windSpeed'] * (packet['dateTime'] - self.last_windSpeed_ts) / 3600.0,
+                                    _unit,
+                                    _group)
+            # do the unit conversion and take the converted value as our result
+            val = weewx.units.convertStd(windrun_vt, self['windrun'].units).value
+        # return our result
+        return val
 
 
 # ============================================================================
@@ -2850,8 +2853,8 @@ def calc_windrose(now, db_manager, period, points):
                   'ts': ts,
                   'angle': angle}
     # the query to be used
-    windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) "\
-                   "FROM %(table_name)s WHERE dateTime>%(ts)s "\
+    windrose_sql = "SELECT ROUND(windDir/%(angle)s),sum(windSpeed) " \
+                   "FROM %(table_name)s WHERE dateTime>%(ts)s " \
                    "GROUP BY ROUND(windDir/%(angle)s)"
 
     # we expect at least 'points' rows in our result so use genSql
@@ -2898,7 +2901,7 @@ class ThreadedSource(threading.Thread):
                         format data. This method must be written for each child 
                         class.
     """
-    
+
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my superclass
@@ -2962,7 +2965,7 @@ class ThreadedSource(threading.Thread):
             log.critical("Unexpected exception of type %s" % (type(e), ))
             weeutil.logger.log_traceback(log.critical, 'rtgd: **** ')
             log.critical("Thread exiting. Reason: %s" % (e, ))
-    
+
     def setup(self):
         """Perform any post post-__init__() setup.
         
@@ -2979,7 +2982,7 @@ class ThreadedSource(threading.Thread):
         """
 
         return None
-        
+
     def parse_response(self, response):
         """Parse the block response and return the required data.
         
@@ -2998,7 +3001,7 @@ class Source(object):
     """base class for a non-threaded scroller text block."""
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
-        
+
         # since we are not running in a thread we only need keep track of the 
         # result queue
         self.result_queue = result_queue
@@ -3082,7 +3085,7 @@ class WUSource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # initialize my base class
-        super(WUSource, self).__init__(control_queue, result_queue, 
+        super(WUSource, self).__init__(control_queue, result_queue,
                                        engine, config_dict)
 
         # set thread name
@@ -3091,7 +3094,7 @@ class WUSource(ThreadedSource):
         # get the WU config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
         wu_config_dict = _rtgd_config_dict.get("WU", dict())
-        
+
         # interval between API calls
         self.interval = to_int(wu_config_dict.get('interval', 1800))
         # max no of tries we will make in any one attempt to contact WU via API
@@ -3474,7 +3477,7 @@ class ZambrettiSource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # Initialize my base class
-        super(ZambrettiSource, self).__init__(control_queue, result_queue, 
+        super(ZambrettiSource, self).__init__(control_queue, result_queue,
                                               engine, config_dict)
 
         # set thread name
@@ -3489,7 +3492,7 @@ class ZambrettiSource(ThreadedSource):
 
         # log what we will do
         log.info("RealTimeGaugeData scroller text will use Zambretti forecast data")
-    
+
     def setup(self):
         """Get a Zambretti object.
         
@@ -3497,12 +3500,12 @@ class ZambrettiSource(ThreadedSource):
         limitations.
         """
 
-        self.zambretti = Zambretti(self.config_dict, 
+        self.zambretti = Zambretti(self.config_dict,
                                    self.zambretti_config_dict)
-        
+
     def get_response(self):
         """Get the raw Zambretti forecast text."""
-        
+
         _data = self.zambretti.get_data()
         return _data
 
@@ -3536,10 +3539,10 @@ class Zambretti(object):
         self.retry_wait = to_int(zambretti_config_dict.get('retry_wait', 3))
         # initialise container for timestamp of last db query
         self.last_query_ts = None
-        
+
         # flag indicating whether the WeeWX forecasting extension is installed
         self.forecasting_installed = False
-        
+
         # Get a db manager for the forecast database and import the Zambretti
         # label lookup dict. If an exception is raised then we can assume the
         # forecast extension is not installed.
@@ -3586,8 +3589,8 @@ class Zambretti(object):
                 return self.UNAVAILABLE_MESSAGE
             # make the query
             # SQL query to get the latest Zambretti forecast code
-            sql = "SELECT dateTime,zcode FROM %s "\
-                  "WHERE method = 'Zambretti' "\
+            sql = "SELECT dateTime,zcode FROM %s " \
+                  "WHERE method = 'Zambretti' " \
                   "ORDER BY dateTime DESC LIMIT 1" % self.dbm.table_name
             # execute the query, wrap in try..except just in case
             for count in range(self.max_tries):
@@ -3659,7 +3662,7 @@ class DarkskySource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # initialize my base class:
-        super(DarkskySource, self).__init__(control_queue, result_queue, 
+        super(DarkskySource, self).__init__(control_queue, result_queue,
                                             engine, config_dict)
 
         # set thread name
@@ -3863,7 +3866,7 @@ class DarkskyForecastAPI(object):
         url = '/'.join([self.BASE_URL,
                         self.key,
                         '%s,%s' % (self.latitude, self.longitude)])
-        
+
         # now build the optional parameters string
         optional_string = self._build_optional(block=block,
                                                language=language,
@@ -3969,7 +3972,7 @@ class FileSource(ThreadedSource):
     def __init__(self, control_queue, result_queue, engine, config_dict):
 
         # initialize my base class
-        super(FileSource, self).__init__(control_queue, result_queue, engine, 
+        super(FileSource, self).__init__(control_queue, result_queue, engine,
                                          config_dict)
 
         # set thread name
@@ -3978,7 +3981,7 @@ class FileSource(ThreadedSource):
         # get the File config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
         file_config_dict = _rtgd_config_dict.get("File", dict())
-        
+
         # interval between file reads
         self.interval = to_int(file_config_dict.get('interval', 1800))
         # get block file, check it refers to a file
@@ -3989,11 +3992,11 @@ class FileSource(ThreadedSource):
 
         # initialise the time of last file read
         self.last_read_ts = None
-        
+
         # log what we will do
         if self.scroller_file is not None:
             log.info("RealTimeGaugeData scroller text will use text from file '%s'" % self.scroller_file)
-    
+
     def get_response(self):
         """Get a single line of text from a file.
 
@@ -4043,11 +4046,11 @@ class TextSource(Source):
     """Class to return user specified text string."""
 
     def __init__(self, control_queue, result_queue, engine, config_dict):
-        
+
         # Initialize my base class
-        super(TextSource, self).__init__(control_queue, result_queue, engine, 
+        super(TextSource, self).__init__(control_queue, result_queue, engine,
                                          config_dict)
-        
+
         # since we are not running in a thread we only need keep track of our
         # config dict
         _rtgd_config_dict = config_dict.get("RealtimeGaugeData")
