@@ -17,10 +17,10 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see https://www.gnu.org/licenses/.
 
-Version: 0.6.8b1                                        Date: 8 February 2025
+Version: 0.6.8.                                         Date: 25 April 2025
 
   Revision History
-    8 February 2025     v0.6.8
+    25 April 2025       v0.6.8
         - fix windrun calculation exception when windSpeed is None
     4 January 2024      v0.6.7
         - bump version only
@@ -321,7 +321,7 @@ from weeutil.weeutil import to_bool, to_int
 log = logging.getLogger(__name__)
 
 # version number of this script
-RTGD_VERSION = '0.6.8b1'
+RTGD_VERSION = '0.6.8'
 # version number (format) of the generated gauge-data.txt
 GAUGE_DATA_VERSION = '14'
 

@@ -1,3 +1,6 @@
+v0.6.8
+*   fixed windrun calculation bug that caused an exception when windSpeed is
+    None
 v0.6.7
 *   removed distutils dependency, now works under python 3.13
 v0.6.6
